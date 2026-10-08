@@ -913,58 +913,46 @@ class SourceSemanticMapEngine:
     def extract_semantic_map(cls, scene_id: str, chapter_num: int, source_text: str, known_entities: Optional[List[str]] = None) -> SourceSemanticMap: ...
 ```
 
-### 4. `TranslationCertifier`, `TieredRepairEngine` & `IntelligentTranslationPipeline`
-*12-Gate independent certification (`Gates T0–T11`), 3-tier self-healing repair, and end-to-end chapter orchestration.*
+### 4. `TranslationEngine`, `contracts.py` & Deterministic Parity Gates (Option D Standalone Architecture)
+*Decoupled text-to-text translation engine, typed Pydantic contracts, bilingual macro-chunker, and full-text parity verification.*
 
 ```python
-# audiobook_factory/translation/certification.py
-class TranslationCertifier:
-    def certify_scene(
-        self,
-        scene_plan: ScenePlan,
-        source_text: str,
-        translated_text: str,
-        semantic_map: SourceSemanticMap,
-        provenance_record: Optional[SceneProvenanceRecord] = None,
-        run_llm_audits: bool = True,
-    ) -> SceneCertificationReport:
-        """Executes Gates T0 through T11 and returns a complete SceneCertificationReport."""
+# audiobook_factory/translation/contracts.py
+class FidelityTier(str, Enum):
+    RAW_UNRATED = "RAW_UNRATED"
+    CLASSIC_REVERENT = "CLASSIC_REVERENT"
 
-# audiobook_factory/translation/repair_engine.py
-class TieredRepairEngine:
-    MAX_PARAGRAPH_ATTEMPTS: int = 2
-    MAX_SCENE_ATTEMPTS: int = 1
+class TranslationRequest(BaseModel):
+    source_text: str
+    source_title: str = ""
+    tier: FidelityTier = FidelityTier.RAW_UNRATED
+    book_bible_path: Optional[str] = None
+    dynamic_glossary: Dict[str, str] = {}
+    chunk_size_words: int = 1800
+    thinking_budget: int = 1024
+    source_language: str = "en"
+    target_language: str = "hi"
 
-    def repair_scene(
-        self,
-        scene_plan: ScenePlan,
-        source_text: str,
-        translated_text: str,
-        semantic_map: SourceSemanticMap,
-        cert_report: SceneCertificationReport,
-        retranslate_scene_fn: Optional[Callable[[str, str], str]] = None,
-    ) -> Tuple[str, SceneCertificationReport, List[str]]:
-        """Escalates Tier 1 (0ms Regex/Advisory DB) -> Tier 2 (Surgical Paragraph LLM) -> Tier 3 (Full Scene)."""
+class TranslationResult(BaseModel):
+    translated_markdown: str
+    alignments: List[ParagraphAlignment] = []
+    parity: ParityMetrics
+    new_entities_discovered: Dict[str, str] = {}
+    total_chunks: int = 1
+    llm_calls_made: int = 1
+    elapsed_seconds: float = 0.0
 
-# audiobook_factory/translation/pipeline.py
-class IntelligentTranslationPipeline:
+# audiobook_factory/translation/engine.py
+class TranslationEngine:
     def __init__(
         self,
-        project_dir: Path,
-        book_bible: Optional[BookBible] = None,
-        policy: Optional[TranslationPolicyConfig] = None,
-        genre: str = "fantasy",
-        enable_llm_audits: bool = True,
+        llm_fn: Optional[Callable[[str, Optional[int], Optional[float]], str]] = None,
+        model_name: str = "gemini-2.5-flash",
     ): ...
 
-    def translate_chapter(
-        self,
-        chapter_text: str,
-        chapter_num: int,
-        chapter_title: str = "",
-        force_retranslate: bool = False,
-    ) -> str:
-        """Executes full Pillar 2 scene planning, Memory 2.0 retrieval, drafting, T0-T11 certification, and repair."""
+    def translate(self, request: TranslationRequest) -> TranslationResult:
+        """Executes macro-chunking, single-pass Gemini Flash translation with thinking budget,
+        and deterministic parity verification in a completely standalone environment."""
 ```
 
 ### 5. World & Character Memory 2.0 ([`audiobook_factory.translation.memory`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/translation/memory/))

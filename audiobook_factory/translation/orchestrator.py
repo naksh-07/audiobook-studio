@@ -17,8 +17,12 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Callable
 
 from .book_bible import BookBible
-from audiobook_factory.audio_utils import _atomic_replace
 from .entity_discovery import EntityDiscoveryEngine
+
+def _atomic_replace(src: Path, dst: Path) -> None:
+    """Atomically replaces destination file with source file without audio dependencies."""
+    import os
+    os.replace(src, dst)
 from .scene_planner import ScenePlanner, ScenePlan, ChapterPlan
 from .narrative_state import NarrativeContinuityState, NarrativeStateEngine
 from .source_semantic_map import (
@@ -60,7 +64,10 @@ class IntelligentTranslationPipeline:
         self.project_dir = Path(project_dir).resolve()
         if not model:
             from audiobook_factory.model_manager import get_model_manager, TaskType
-            model = get_model_manager().resolve_active_model(TaskType.TRANSLATION)
+            try:
+                model = get_model_manager().resolve_active_model(TaskType.TRANSLATION)
+            except Exception:
+                model = "gemini-2.5-flash"
         self.model = model
         self.policy = policy or get_default_translation_policy()
         self.book_bible = BookBible.load_from_project(self.project_dir)

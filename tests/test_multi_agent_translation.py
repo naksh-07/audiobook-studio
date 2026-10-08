@@ -170,11 +170,33 @@ class TestMultiAgentTranslation(unittest.TestCase):
         self.assertEqual(report["status"], "CERTIFIED")
 
     def test_translation_collective_end_to_end(self):
-        """Verifies the 4-agent collective runs in sequence and returns certified translation."""
+        """Verifies Option D single-pass translation deliberates in 1 call, eliminating the telephone game."""
         collective = MultiAgentTranslationCollective(model="mock-model")
 
-        # Mock responses for each agent in sequence:
-        # Pass 1 Draft -> Pass 2 Cadence -> Pass 3 Idiom -> Pass 4 (deterministic audit)
+        mock_response = "गेराल्ट ने येनेफ़र को देखा।"
+        call_count = 0
+
+        def fake_llm(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            return mock_response
+
+        result = collective.translate_block(
+            text_block="Geralt looked at Yennefer.",
+            glossary=self.sample_glossary,
+            block_title="Scene 1",
+            call_llm_fn=fake_llm,
+        )
+
+        self.assertIn("गेराल्ट", result)
+        self.assertIn("येनेफ़र", result)
+        # Option D executes in exactly 1 deliberative pass instead of 4 sequential rewrites
+        self.assertEqual(call_count, 1)
+
+    def test_translation_collective_legacy_cascade(self):
+        """Verifies legacy 4-pass serial cascade when use_single_pass=False."""
+        collective = MultiAgentTranslationCollective(model="mock-model")
+
         mock_responses = [
             "गेराल्ट ने येनेफ़र को देखा।",  # Draft
             "गेराल्ट ने—येनेफ़र को देखा...",  # Cadence
@@ -193,6 +215,7 @@ class TestMultiAgentTranslation(unittest.TestCase):
             glossary=self.sample_glossary,
             block_title="Scene 1",
             call_llm_fn=fake_llm,
+            use_single_pass=False,
         )
 
         self.assertIn("गेराल्ट", result)

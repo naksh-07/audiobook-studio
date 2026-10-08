@@ -163,7 +163,14 @@ class ModelManager:
             if not refresh and self._cached_models and (now - self._last_discovery_time < self.cache_ttl_sec):
                 return list(self._cached_models)
 
-        key = api_key or self.pool.get_key(service="text")
+        key = api_key
+        if not key:
+            try:
+                key = self.pool.get_key(service="text")
+            except Exception as e:
+                logger.debug(f"  [MODEL MANAGER] Could not retrieve text key from pool: {e}")
+                key = None
+
         if not key:
             logger.warning("  [MODEL MANAGER] No text API key available. Using catalog fallback.")
             with self._lock:

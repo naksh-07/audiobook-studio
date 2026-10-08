@@ -28,3 +28,7 @@
 
 ## Antigravity Studio Plugin & UI Extension
 - **Live Extension**: Registered at `~/.gemini/config/plugins/audiobook-studio/` (`@audiobook-director`, `audiobook-studio` skill, Stitch-grade sidecar panel).
+
+## Active Milestone: Pillar 2 Standalone Translation Architecture (Option D)
+- **Status**: Phases 1, 2 & 3 COMPLETE & ADVERSARIALLY HARDENED (102/102 tests passing). Standalone engine & CLI active with zero audio imports. Documentation fully updated across all 5 core guides.
+- **Scope**: Single-pass `MultiAgentTranslationCollective` + `TranslationEngine` (`thinking_budget = 1024`, `temperature = 0.35`); full-text deterministic parity gates ($\pm 15\%$ paras fail-closed on $>2$ paras, $\pm 10\%$ quotes, $\ge 75\%$ length, compound negation separation); strict Room 2 boundary contracts (text-to-text Devanagari Markdown only; zero actor tags; zero audio QA/synthesis); purged `audio_utils` import leak; backward-compatibility preserved via `translate_block_legacy()`. Ready for Phase 4.

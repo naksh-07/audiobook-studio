@@ -29,7 +29,10 @@ class HindustaniCadenceSpecialist:
     def _resolve_model(self) -> str:
         if self.model:
             return self.model
-        return get_model_manager().resolve_active_model(TaskType.TRANSLATION)
+        try:
+            return get_model_manager().resolve_active_model(TaskType.TRANSLATION)
+        except Exception:
+            return "gemini-2.5-flash"
 
     def refine_cadence(
         self,
@@ -71,7 +74,7 @@ class HindustaniCadenceSpecialist:
             "If you see 'नितंब' or 'कटि', immediately rewrite to natural spoken 'कमर' or 'कूल्हे'! "
             "If you see 'नग्न' or 'अनावृत', rewrite to living spoken 'नंगा / नंगी / खुला / खुली' (e.g. 'नग्न भुजाएँ' -> 'खुली बाँहें', 'नग्न थीं' -> 'बाँहें खुली थीं / नंगी थीं')! "
             "If you see 'युवतियाँ', rewrite to 'जवान औरतें / लड़कियाँ'! "
-            "If you see literal calques of heraldic titles/monikers like 'तीन कउवे' / 'तीन कौवे', rewrite to phonetic transliteration 'थ्री जैकडॉज'! "
+            "If you see literal calques of heraldic titles or character monikers, preserve authentic poetic cadence or transliterate proper monikers as specified in the entity glossary rather than making clumsy word-for-word calques! "
             "If you see 'वीरांगनाएं', rewrite to 'लड़ाकू औरतें / महिला योद्धा'! "
             "If you see 'प्रस्ताव', rewrite to 'सौदा / बात'! "
             "If you see raw English profanity in source, ensure authentic visceral spoken delivery ('गांड', 'हरामी', 'बकचोदी') without bowdlerization. "

@@ -59,17 +59,17 @@ class LiteraryAdvisoryDB:
             default_rules = [
                 (
                     "appearance",
-                    "blonde hair / fair complexion",
-                    "Never translate 'blonde girl' literally as 'सुनहरी लड़की' (which sounds metallic or robotic). Transpose to organic Desi physical imagery such as 'गोरी-चिट्टी / गोरी-निखरी लड़की जिसके सुनहरे बाल थे'.",
-                    json.dumps(["गोरी-चिट्टी", "गोरी-निखरी", "सुनहरे बालों वाली", "चाँद जैसी गोरी"], ensure_ascii=False),
+                    "blonde hair / golden hair",
+                    "Never translate 'blonde girl' literally as 'सुनहरी लड़की' (which sounds metallic or robotic). Transpose to natural physical imagery such as 'सुनहरे बालों वाली लड़की' or 'स्वर्णिम केशों वाली लड़की'.",
+                    json.dumps(["सुनहरे बालों वाली", "स्वर्णिम बालों वाली", "सुनहरी जुल्फों वाली"], ensure_ascii=False),
                     json.dumps(["सुनहरी लड़की", "सोने की लड़की"], ensure_ascii=False),
                     "global",
                 ),
                 (
                     "youth_sensual",
-                    "virgin's plait / maiden youth",
-                    "Never use awkward literal translations like 'कुंवारी चोटी'. Transpose with cultural naturalism and poetic sensuality as 'कमसिन की चोटी', 'कुंवारी लड़की की लंबी चोटी', or 'अछूती जवानी की लटें'.",
-                    json.dumps(["कमसिन की चोटी", "कुंवारी लड़की की चोटी", "अछूती जवानी की लटें", "कमसिन जवानी"], ensure_ascii=False),
+                    "virgin's plait / maiden braid",
+                    "Never use awkward literal translations like 'कुंवारी चोटी'. Transpose with natural phrasing as 'लंबी चोटी', 'कुंवारी लड़की की चोटी', or 'गुंथी हुई चोटी'.",
+                    json.dumps(["लंबी चोटी", "कुंवारी लड़की की चोटी", "गुंथी हुई चोटी"], ensure_ascii=False),
                     json.dumps(["कुंवारी चोटी"], ensure_ascii=False),
                     "global",
                 ),

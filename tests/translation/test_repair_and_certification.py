@@ -33,7 +33,7 @@ class TestRepairAndCertification(unittest.TestCase):
         self.assertNotIn("विचरर", repaired)
         self.assertIn("विचर", repaired)
         self.assertNotIn("सुनहरी लड़की", repaired)
-        self.assertIn("गोरी-चिट्टी", repaired)
+        self.assertIn("सुनहरे बालों वाली", repaired)
         self.assertGreaterEqual(len(actions), 2)
         self.assertTrue(all(a.repaired_successfully for a in actions))
 

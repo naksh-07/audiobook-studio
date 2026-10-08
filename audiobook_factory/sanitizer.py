@@ -348,8 +348,8 @@ def sanitize_screenplay_segment(segment: Dict[str, Any], is_hindi: bool = True) 
 
 # Unambiguous robotic literalisms and clinical loanwords eligible for deterministic normalization
 UNAMBIGUOUS_CALQUE_REPAIRS = {
-    r"सुनहरी\s+लड़की": "गोरी-चिट्टी लड़की",
-    r"क[ुंँ]+वारी\s+चोटी": "कमसिन लड़की की चोटी",
+    r"सुनहरी\s+लड़की": "सुनहरे बालों वाली लड़की",
+    r"क[ुंँ]+वारी\s+चोटी": "लंबी चोटी",
     r"(?<![\u0900-\u097F])डिप्रेशन(?![\u0900-\u097F])": "उदासी का साया",
     r"(?<![\u0900-\u097F])ट्रॉमा(?![\u0900-\u097F])": "गहरा सदमा",
     r"(?<![\u0900-\u097F])स्ट्रेस(?![\u0900-\u097F])": "तनाव",
@@ -370,11 +370,6 @@ TAT_SAMA_REGISTER_REPAIRS = {
     r"(?<![\u0900-\u097F])दो\s+युवतियाँ(?![\u0900-\u097F])": "दो जवान औरतें",
     r"(?<![\u0900-\u097F])युवतियों(?![\u0900-\u097F])": "लड़कियों",
     r"(?<![\u0900-\u097F])युवतियाँ(?![\u0900-\u097F])": "लड़कियाँ",
-    # Literal bird calque repairs for Three Jackdaws moniker
-    r"(?<![\u0900-\u097F])तीन\s+क[उू]वे(?![\u0900-\u097F])": "थ्री जैकडॉज",
-    r"(?<![\u0900-\u097F])तीन\s+कौवे(?![\u0900-\u097F])": "थ्री जैकडॉज",
-    r"(?<![\u0900-\u097F])तीन\s+कौए(?![\u0900-\u097F])": "थ्री जैकडॉज",
-    r"(?<![\u0900-\u097F])तीन\s+कौवों(?![\u0900-\u097F])": "थ्री जैकडॉज",
 }
 
 # Contextual dialectal / register expressions: valid in rustic/tavern/folklore dialogue, NEVER auto-replaced!

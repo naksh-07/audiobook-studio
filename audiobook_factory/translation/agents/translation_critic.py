@@ -31,7 +31,10 @@ class TranslationQualityCritic:
     def _resolve_model(self) -> str:
         if self.model:
             return self.model
-        return get_model_manager().resolve_active_model(TaskType.AUDITING)
+        try:
+            return get_model_manager().resolve_active_model(TaskType.AUDITING)
+        except Exception:
+            return "gemini-2.5-flash"
 
     def audit_and_certify(
         self,
@@ -93,15 +96,6 @@ class TranslationQualityCritic:
         for eng, hin in untranslated_found:
             pattern = rf"(?<![\w\u0900-\u097F]){re.escape(eng)}(?![\w\u0900-\u097F])"
             certified_text = re.sub(pattern, hin, certified_text, flags=re.IGNORECASE)
-
-        # Deterministic moniker calque repair (e.g. Three Jackdaws literally translated)
-        calque_repairs = [
-            (r"\bतीन\s+कउवे\b", "थ्री जैकडॉज"),
-            (r"\bतीन\s+कौवे\b", "थ्री जैकडॉज"),
-            (r"\bतीन\s+कौए\b", "थ्री जैकडॉज"),
-        ]
-        for c_pat, c_sub in calque_repairs:
-            certified_text = re.sub(c_pat, c_sub, certified_text)
 
         # If significant omission is suspected or major discrepancies found, trigger Reflection Repair Pass
         if is_omission_suspected or len(untranslated_found) > 3:

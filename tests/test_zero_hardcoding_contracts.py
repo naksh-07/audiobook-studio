@@ -325,6 +325,31 @@ def scan_for_hardcoded_soundtracks(py_file_path: Path, tree: ast.AST) -> List[Tu
     return violations
 
 
+# Forbidden franchise lore regexes and colorist/sexist calques
+FORBIDDEN_FRANCHISE_REGEXES_AND_BIASES = {
+    "तीन कौवे",
+    "तीन कउवे",
+    "तीन कौए",
+    "तीन कौवों",
+    "थ्री जैकडॉज",
+    "गोरी-चिट्टी",
+    "कमसिन लड़की की चोटी",
+}
+
+
+def scan_for_franchise_regexes_and_biases(py_file_path: Path, tree: ast.AST) -> List[Tuple[int, str, str]]:
+    """
+    Scans an AST tree for forbidden franchise lore regexes or colorist calques in string constants.
+    """
+    violations = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            for pattern in FORBIDDEN_FRANCHISE_REGEXES_AND_BIASES:
+                if pattern in node.value:
+                    violations.append((node.lineno, node.value, pattern))
+    return violations
+
+
 class TestZeroHardcodingContracts(unittest.TestCase):
     """
     Zero-Hardcoding Contract Test Suite:
@@ -488,6 +513,46 @@ track_expansion = "206 Blood and Wine"
         self.assertTrue(any("steel for humans" in t for t in found_tracks))
         self.assertTrue(any("blood and wine" in t for t in found_tracks))
 
+        # 5. Test franchise lore and colorist bias detector on synthetic negative cases
+        bad_franchise_code = """
+calque_1 = "तीन कौवे"
+calque_2 = "थ्री जैकडॉज"
+colorist = "गोरी-चिट्टी"
+sexist = "कमसिन लड़की की चोटी"
+"""
+        tree_fr = ast.parse(bad_franchise_code)
+        fr_violations = scan_for_franchise_regexes_and_biases(Path("bad.py"), tree_fr)
+        found_patterns = {v[2] for v in fr_violations}
+        self.assertIn("तीन कौवे", found_patterns)
+        self.assertIn("थ्री जैकडॉज", found_patterns)
+        self.assertIn("गोरी-चिट्टी", found_patterns)
+        self.assertIn("कमसिन लड़की की चोटी", found_patterns)
+
+    def test_05_assert_zero_hardcoded_franchise_regexes_and_biases(self):
+        """
+        Pillar 2 Invariant: Asserts zero hardcoded franchise lore regexes (e.g. 'तीन कौवे' -> 'थ्री जैकडॉज')
+        or colorist/sexist calques (e.g. 'गोरी-चिट्टी') across all python files in audiobook_factory/.
+        """
+        all_violations = []
+
+        for py_path in self.py_files:
+            rel_path = py_path.relative_to(WORKSPACE_DIR)
+            content = py_path.read_text(encoding="utf-8")
+            tree = ast.parse(content, filename=str(py_path))
+            file_violations = scan_for_franchise_regexes_and_biases(py_path, tree)
+
+            for lineno, raw_str, pattern in file_violations:
+                all_violations.append(
+                    f"File: {rel_path}:{lineno} | Hardcoded franchise/bias pattern '{pattern}' found in string: '{raw_str}'"
+                )
+
+        if all_violations:
+            self.fail(
+                f"Detected {len(all_violations)} hardcoded franchise/bias pattern(s) in codebase:\n"
+                + "\n".join(all_violations)
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
+
