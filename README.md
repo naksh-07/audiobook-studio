@@ -39,14 +39,15 @@ Rather than masking spoken dialogue with noisy background beds or suffering from
 
 ```mermaid
 flowchart TD
-    subgraph Room1["🌍 Room 1: Pre-Production Intelligence"]
-        RawBook["Raw Book (PDF / EPUB / TXT)"] --> DeepSearch["Novel DeepSearch Engine (Factual Grounding)"]
-        DeepSearch --> BookDNA["Book DNA Agent (Literary Tradition, Era & Dialect)"]
-        BookDNA --> Personae["Dramatis Personae & Phonetic Lexicon (cast_lock.json)"]
+    subgraph Room1["🌍 Room 1: 2-System Pre-Production Architecture"]
+        direction TB
+        RawBook["Raw Book (PDF / EPUB / TXT)"] --> S1["System 1: Novel Researcher Engine<br/><i>(Stateless Compute & Zero Disk I/O)</i><br/>• LexicalCorpusScanner (0-Token Sweep)<br/>• NovelDeepSearchEngine (Search Grounding)<br/>• BookDNAAgent + DramatisPersonaeAgent<br/>• VocalAcousticDirector (Room Impulse DSP)<br/>• PhoneticLexiconDramaturge (Devanagari)"]
+        S1 -->|"Immutable Pydantic DTOs"| S2["System 2: Novel Metadata & State Maintainer<br/><i>(Canonical State Store & Atomic Persistence)</i><br/>• audiobook_factory/metadata/ (BookBible & NovelEntity)<br/>• NovelStateMaintainer (NR-GATE-06 2-Phase Commit)<br/>• _STATE_LOCK (Thread Concurrency Protection)<br/>• Dynamic Character Locking (NR-GATE-03 [0.70, 1.30])"]
+        S2 --> MasterFiles[("Locked Master State<br/>book_dna.json | book_bible.json | cast_lock.json<br/>vocal_spaces.json | voice_registry.json")]
     end
 
     subgraph Room2["🧠 Room 2: Sense-for-Sense Translation Collective"]
-        Personae --> Collective["4-Agent Translation Collective<br/>• LiteraryDraftTranslator (70/30 Canon Sacredness)<br/>• HindustaniCadenceSpecialist (Spoken Flow & Pauses)<br/>• SubtextAndIdiomDramaturge (Earthy Desi Grit & 19-to-21)<br/>• TranslationQualityCritic (Anti-Omission & Terminology)"]
+        MasterFiles --> Collective["4-Agent Translation Collective<br/>• LiteraryDraftTranslator (70/30 Canon Sacredness)<br/>• HindustaniCadenceSpecialist (Spoken Flow & Pauses)<br/>• SubtextAndIdiomDramaturge (Earthy Desi Grit & 19-to-21)<br/>• TranslationQualityCritic (Anti-Omission & Terminology)"]
         Collective --> DualRule["Dual-Rule Invariant ('Nothing Above Source')<br/>Classic Reverent Pathos vs Raw Unrated Realism"]
     end
 
@@ -221,11 +222,12 @@ pytest tests/ -v
 
 All quality gates are fail-closed:
 - **Gate 0.1**: Forensic Ingestion & Reading Order AST Validation.
-- **Gate 1**: Dramatis Personae & 0% Voice Collision Casting.
+- **Gate 1 / NR-GATE-01/03**: Dramatis Personae, $\ge 4\%$ Voice Step Separation & $[0.70, 1.30]$ Pitch Bounds.
 - **Gate 2**: DialogueAttributionAuditor (0% Speaker Turn Swaps).
 - **Gate 2.5**: Stanislavski Acting Restraint (clamped temp, physical vocal anchors).
 - **Gate 5**: Dialogue Editorial Snapping & Hann Micro-fades.
 - **Gate 6**: Two-Pass Linear Loudnorm Certification (-19.0 LUFS, -1.5 dBTP).
+- **NR-GATE-06**: Atomic Multi-File State Gate with Staged Two-Phase Commit and Rollback.
 
 ---
 
@@ -233,6 +235,7 @@ All quality gates are fail-closed:
 
 For exhaustive technical guides, visit the [`docs/`](docs/) directory:
 - [🏛️ Architecture Blueprint](docs/ARCHITECTURE.md)
+- [🔬 Novel Researcher Architecture Specification (2-System Decomposition)](docs/NOVEL_RESEARCHER_ARCHITECTURE.md)
 - [🎛️ Audio Engineering & Mastering](docs/AUDIO_ENGINEERING.md)
 - [🎙️ Gemini Flash TTS Synthesis & Directing](docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
 - [🎭 Voice Casting Director Guide](docs/VOICE_CASTING_DIRECTOR_GUIDE.md)

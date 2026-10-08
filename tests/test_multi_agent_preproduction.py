@@ -21,11 +21,15 @@ from audiobook_factory.preproduction import (
     PreProductionSupervisor,
     run_preproduction,
 )
+from audiobook_factory.preproduction.novel_deepsearch import DeepSearchNovelDossier
+from audiobook_factory.preproduction.vocal_acoustic_director import VocalSpacesManifest
 
 
 class TestMultiAgentPreproduction(unittest.TestCase):
 
     def setUp(self):
+        import os
+        os.environ["MOCK_OFFLINE"] = "1"
         self.temp_dir = tempfile.TemporaryDirectory()
         self.project_dir = Path(self.temp_dir.name)
 
@@ -150,8 +154,20 @@ class TestMultiAgentPreproduction(unittest.TestCase):
             "regional_dialect_cadence": "Hindustani",
         }
 
-        with patch.object(supervisor.book_dna_agent, "analyze_book_dna", return_value=mock_dna), \
+        mock_dossier = DeepSearchNovelDossier(
+            book_title="Test Chronicles",
+            author="Test Author",
+            project_slug="test_chronicles",
+        )
+        mock_vocal_manifest = VocalSpacesManifest(
+            project_id="proj-test_chronicles",
+            book_title="Test Chronicles",
+        )
+
+        with patch.object(supervisor.deepsearch, "conduct_deepsearch", return_value=mock_dossier), \
+             patch.object(supervisor.book_dna_agent, "analyze_book_dna", return_value=mock_dna), \
              patch.object(supervisor.dramatis_personae_agent, "extract_dramatis_personae", return_value=mock_chars), \
+             patch.object(supervisor.vocal_director, "design_vocal_spaces", return_value=mock_vocal_manifest), \
              patch.object(supervisor.sonic_architect, "design_sonic_bible", return_value=mock_sonic), \
              patch.object(supervisor.lexicon_dramaturge, "extract_lexicon_and_phonetics", return_value=mock_lex):
 

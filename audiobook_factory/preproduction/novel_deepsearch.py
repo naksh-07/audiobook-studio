@@ -153,12 +153,14 @@ class NovelDeepSearchEngine:
         sample_text: str = "",
         project_slug: str = "",
         call_llm_fn: Optional[Callable[..., Any]] = None,
+        lexical_index: Optional[Any] = None,
     ) -> DeepSearchNovelDossier:
         """
         Conducts multi-angle Google Search Grounded research on the novel.
+        Verifies web findings against local corpus via Bidirectional Grounding Gate.
         Returns the authoritative DeepSearchNovelDossier.
         """
-        model = self._resolve_model()
+        model = self.model or ("mock-model" if call_llm_fn else self._resolve_model())
         clean_title = title.strip() or "Unknown Novel"
         clean_author = author.strip() or "Unknown Author"
         slug = project_slug or clean_title.lower().replace(" ", "_")
@@ -287,12 +289,56 @@ Output JSON Schema:
         dossier_data["project_slug"] = slug
 
         dossier = DeepSearchNovelDossier.model_validate(dossier_data)
+
+        # Bidirectional Corpus Grounding Gate: Verify web entities against local text
+        if lexical_index:
+            verified_chars, rejected = self.verify_against_corpus(dossier, lexical_index)
+            dossier.characters = verified_chars
+
         logger.info(
             f"[+] NovelDeepSearch: Canonical dossier assembled for '{clean_title}'. "
             f"Tradition: {dossier.literary_dna.tradition}, Era: {dossier.literary_dna.historical_era}, "
             f"Characters Identified: {len(dossier.characters)}, Banned Anachronisms: {len(dossier.world_acoustics.banned_anachronisms)}."
         )
         return dossier
+
+    @classmethod
+    def verify_against_corpus(
+        cls,
+        dossier: DeepSearchNovelDossier,
+        lexical_index: Optional[Any] = None,
+    ) -> Tuple[List[CanonicalCharacter], List[Dict[str, Any]]]:
+        """
+        Bidirectional Corpus Grounding Gate.
+        Cross-references web-discovered characters against local novel text.
+        Rejects external hallucinations that have zero mentions in the provided text corpus.
+        """
+        if not lexical_index or not dossier.characters:
+            return dossier.characters, []
+
+        verified: List[CanonicalCharacter] = []
+        rejected: List[Dict[str, Any]] = []
+
+        for c in dossier.characters:
+            name = c.english_name.strip()
+            if not name or name.lower() in ("protagonist", "narrator"):
+                continue
+            mentions = lexical_index.get_mention_count(name, c.aliases)
+            # Accept if entity has >= 2 mentions or is a multi-word proper noun with >= 1 mention
+            if mentions >= 2 or (mentions >= 1 and len(name.split()) > 1):
+                verified.append(c)
+            else:
+                rejected.append({
+                    "name": name,
+                    "reason": f"Zero or insufficient corpus occurrences ({mentions} mentions)",
+                    "aliases": c.aliases,
+                })
+
+        if rejected:
+            logger.info(
+                f"[*] NovelDeepSearch Gate: Filtered out {len(rejected)} ungrounded web artifacts: {[r['name'] for r in rejected]}"
+            )
+        return verified, rejected
 
     @staticmethod
     def _extract_fallback_characters(sample_text: str) -> List[Dict[str, Any]]:

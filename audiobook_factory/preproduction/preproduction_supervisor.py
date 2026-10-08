@@ -15,13 +15,20 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 
-from audiobook_factory.translation.book_bible import BookBible, BookEntity
+from audiobook_factory.metadata.book_bible import (
+    BookBible,
+    BookEntity,
+    EpistemicProvenance,
+)
+from audiobook_factory.metadata.state_maintainer import NovelStateMaintainer
 from audiobook_factory.character_caster import CharacterCaster
 from .novel_deepsearch import NovelDeepSearchEngine, DeepSearchNovelDossier
 from .book_dna_agent import BookDNAAgent
 from .dramatis_personae_agent import DramatisPersonaeAgent
 from .sonic_world_architect import SonicWorldArchitect
+from .vocal_acoustic_director import VocalAcousticDirector, VocalSpacesManifest
 from .phonetic_lexicon_dramaturge import PhoneticLexiconDramaturge
+from .lexical_scanner import LexicalCorpusScanner, LexicalCorpusIndex
 
 logger = logging.getLogger("AudiobookFactory")
 
@@ -35,6 +42,7 @@ class PreProductionSupervisor:
         self.book_dna_agent = BookDNAAgent(model=model)
         self.dramatis_personae_agent = DramatisPersonaeAgent(model=model)
         self.sonic_architect = SonicWorldArchitect(model=model)
+        self.vocal_director = VocalAcousticDirector(model=model)
         self.lexicon_dramaturge = PhoneticLexiconDramaturge(model=model)
 
     def execute_preproduction(
@@ -48,17 +56,19 @@ class PreProductionSupervisor:
         book_dna_path = p_dir / "book_dna.json"
         book_bible_path = p_dir / "book_bible.json"
         sonic_bible_path = p_dir / "sonic_bible.json"
+        vocal_spaces_path = p_dir / "vocal_spaces.json"
         cast_lock_path = p_dir / "cast_lock.json"
         meta_path = p_dir / "metadata.json"
 
         # Check existing master state
-        if not force and book_dna_path.exists() and book_bible_path.exists() and sonic_bible_path.exists() and cast_lock_path.exists():
+        if not force and book_dna_path.exists() and book_bible_path.exists() and (vocal_spaces_path.exists() or sonic_bible_path.exists()) and cast_lock_path.exists():
             logger.info(f"[*] PreProductionSupervisor: Master novel state already locked for {p_dir.name}. Skipping.")
             return {
                 "status": "CACHED_LOCKED",
                 "book_dna": str(book_dna_path),
                 "book_bible": str(book_bible_path),
                 "sonic_bible": str(sonic_bible_path),
+                "vocal_spaces": str(vocal_spaces_path),
                 "cast_lock": str(cast_lock_path),
             }
 
@@ -76,7 +86,15 @@ class PreProductionSupervisor:
             book_metadata["title"] = p_dir.name.replace("_", " ").title()
         book_metadata.setdefault("project_slug", p_dir.name)
 
-        # Gather sample chapters across the novel
+        # 0. Deterministic Full-Corpus Lexical Sweep (100% Chapter Coverage, 0 Tokens)
+        logger.info("  [Room 1 Step 0/5] Scanning full novel corpus with deterministic LexicalCorpusScanner...")
+        lexical_index = LexicalCorpusScanner.scan_project_dir(p_dir)
+        logger.info(
+            f"  [+] LexicalCorpusScanner complete: {lexical_index.total_words} words across "
+            f"{lexical_index.total_chapters} chapters, {len(lexical_index.entities)} unique candidate entities."
+        )
+
+        # Gather sample chapters across the novel (beginning, middle, climax, end)
         search_dirs = [p_dir / "extracted", p_dir / "chapters", p_dir / "translation"]
         chapter_files = []
         for sdir in search_dirs:
@@ -87,13 +105,12 @@ class PreProductionSupervisor:
 
         sample_passages: list[str] = []
         if chapter_files:
-            # Sample up to 5 chapters distributed across beginning, middle, and end
-            step = max(1, len(chapter_files) // 5)
-            selected_files = chapter_files[::step][:5]
+            step = max(1, len(chapter_files) // 8)
+            selected_files = chapter_files[::step][:8]
             for cf in selected_files:
                 try:
                     txt = cf.read_text(encoding="utf-8")
-                    sample_passages.append(txt[:3000])
+                    sample_passages.append(txt[:4000])
                 except Exception:
                     pass
 
@@ -101,7 +118,7 @@ class PreProductionSupervisor:
         if not combined_sample.strip():
             combined_sample = f"Novel title: {book_metadata.get('title')}"
 
-        # 0A. Canonical Novel DeepSearch Reconnaissance (Google Search Grounding)
+        # 0A. Canonical Novel DeepSearch Reconnaissance with Bidirectional Grounding Gate
         dossier_path = p_dir / "book_dossier.json"
         dossier: Optional[DeepSearchNovelDossier] = None
         if dossier_path.exists():
@@ -124,6 +141,7 @@ class PreProductionSupervisor:
                 sample_text=combined_sample,
                 project_slug=p_dir.name,
                 call_llm_fn=call_llm_fn,
+                lexical_index=lexical_index,
             )
             with open(dossier_path, "w", encoding="utf-8") as f:
                 json.dump(dossier.model_dump(), f, ensure_ascii=False, indent=2)
@@ -138,6 +156,8 @@ class PreProductionSupervisor:
                     logger.info("  [Room 1 Step 0B/5] Existing book_dna.json verified on disk. Reusing.")
                 else:
                     book_dna_data = None
+            except Exception:
+                book_dna_data = None
             except Exception:
                 book_dna_data = None
 
@@ -167,9 +187,6 @@ class PreProductionSupervisor:
                 book_dna_data["historical_era"] = dossier.literary_dna.historical_era
             if dossier.linguistic_dialect.recommended_hindustani_register:
                 book_dna_data["regional_dialect_cadence"] = dossier.linguistic_dialect.recommended_hindustani_register
-
-        with open(book_dna_path, "w", encoding="utf-8") as f:
-            json.dump(book_dna_data, f, ensure_ascii=False, indent=2)
 
         # 1. Dramatis Personae Extraction (Guided by Book DNA & DeepSearch)
         logger.info("  [Room 1 Step 1/5] DramatisPersonaeAgent extracting character dossiers...")
@@ -210,44 +227,45 @@ class PreProductionSupervisor:
                     characters_list.append(c)
                     known_names.add(name.lower())
 
-        # 2. Sonic World Architecture
-        sonic_bible_data = None
-        if sonic_bible_path.exists() and not force:
-            try:
-                with open(sonic_bible_path, "r", encoding="utf-8") as f:
-                    sonic_bible_data = json.load(f)
-                if sonic_bible_data.get("acoustic_spaces"):
-                    logger.info("  [Room 1 Step 2/5] Existing sonic_bible.json verified on disk. Reusing.")
-                else:
-                    sonic_bible_data = None
-            except Exception:
-                sonic_bible_data = None
+        # Append high-frequency speaking characters from full-text lexical scanner
+        if lexical_index:
+            for top_ent in lexical_index.get_top_speaking_characters(40):
+                ent_name = top_ent.name.strip()
+                if ent_name.lower() not in known_names and ent_name.lower() not in ("protagonist", "narrator"):
+                    if top_ent.dialogue_speaker_count >= 1 or top_ent.total_mentions >= 3:
+                        characters_list.append({
+                            "english_name": ent_name,
+                            "hindi_name": ent_name,
+                            "gender": "neutral",
+                            "aliases": sorted(list(top_ent.associated_titles)),
+                            "prominence": "lead" if top_ent.dialogue_speaker_count >= 10 else "major" if top_ent.dialogue_speaker_count >= 3 else "minor",
+                            "vocal_archetype": "authoritative",
+                            "sociolect_trait": "NEUTRAL",
+                            "recommended_pronoun_level": "tum",
+                            "speech_quirks": "",
+                        })
+                        known_names.add(ent_name.lower())
 
-        if sonic_bible_data is None:
-            logger.info("  [Room 1 Step 2/5] SonicWorldArchitect synthesizing acoustic DNA...")
-            sonic_bible_data = self.sonic_architect.design_sonic_bible(
+        # 2. Vocal Acoustic Architecture & Room Impulse Spaces (Vocals-Only)
+        vocal_manifest: Optional[VocalSpacesManifest] = None
+        if vocal_spaces_path.exists() and not force:
+            try:
+                with open(vocal_spaces_path, "r", encoding="utf-8") as vf:
+                    vocal_manifest = VocalSpacesManifest.model_validate_json(vf.read())
+                if vocal_manifest and vocal_manifest.spaces:
+                    logger.info("  [Room 1 Step 2/5] Existing vocal_spaces.json verified on disk. Reusing.")
+                else:
+                    vocal_manifest = None
+            except Exception:
+                vocal_manifest = None
+
+        if vocal_manifest is None:
+            logger.info("  [Room 1 Step 2/5] VocalAcousticDirector synthesizing vocal room acoustics...")
+            vocal_manifest = self.vocal_director.design_vocal_spaces(
                 novel_text_sample=combined_sample,
                 book_metadata=book_metadata,
                 call_llm_fn=call_llm_fn,
             )
-        if dossier:
-            if dossier.world_acoustics.banned_anachronisms:
-                sonic_bible_data["banned_anachronisms"] = dossier.world_acoustics.banned_anachronisms
-            if dossier.musical_tradition.signature_instruments:
-                sonic_bible_data["signature_instruments"] = dossier.musical_tradition.signature_instruments
-            if dossier.musical_tradition.cultural_tradition:
-                sonic_bible_data["cultural_tradition"] = dossier.musical_tradition.cultural_tradition
-            if dossier.musical_tradition.primary_moods:
-                sonic_bible_data["primary_moods"] = dossier.musical_tradition.primary_moods
-            if dossier.world_acoustics.primary_materials:
-                sonic_bible_data["primary_materials"] = dossier.world_acoustics.primary_materials
-            if dossier.world_acoustics.architectural_style:
-                sonic_bible_data["architectural_style"] = dossier.world_acoustics.architectural_style
-            if dossier.literary_dna.historical_era:
-                sonic_bible_data["primary_era"] = dossier.literary_dna.historical_era
-
-        with open(sonic_bible_path, "w", encoding="utf-8") as f:
-            json.dump(sonic_bible_data, f, ensure_ascii=False, indent=2)
 
         # 3. Phonetic Lexicon Extraction
         logger.info("  [Room 1 Step 3/5] PhoneticLexiconDramaturge extracting world lexicon...")
@@ -257,7 +275,7 @@ class PreProductionSupervisor:
             call_llm_fn=call_llm_fn,
         )
 
-        # 4. Assemble and Save BookBible
+        # 4. Assemble BookBible in memory with Epistemic Provenance
         bible = BookBible.load_from_project(p_dir)
         bible.book_title = book_metadata.get("title", bible.book_title)
         bible.author = book_metadata.get("author", bible.author)
@@ -265,15 +283,29 @@ class PreProductionSupervisor:
         for c_dict in characters_list:
             if isinstance(c_dict, dict) and c_dict.get("english_name"):
                 eng_name = c_dict["english_name"]
+                c_aliases = c_dict.get("aliases", [])
+                c_mentions = lexical_index.get_mention_count(eng_name, c_aliases) if lexical_index else 1
+                c_first_ch = lexical_index.get_first_chapter(eng_name) if lexical_index else 1
+                c_quote = lexical_index.get_intro_sentence(eng_name) if lexical_index else ""
+
+                prov_origin = "WEB_VERIFIED" if (dossier and any(dc.english_name.lower() == eng_name.lower() for dc in dossier.characters)) else "CORPUS_EXTRACTED"
+                prov = EpistemicProvenance(
+                    origin=prov_origin,
+                    first_chapter=c_first_ch,
+                    corpus_mention_count=c_mentions,
+                    evidence_quote=c_quote,
+                )
+
                 entity = BookEntity(
                     canonical_name=eng_name,
                     english_name=eng_name,
-                    hindi_name=c_dict.get("hindi_name", ""),
-                    gender=c_dict.get("gender", "neutral"),
-                    aliases=c_dict.get("aliases", []),
-                    sociolect_trait=c_dict.get("sociolect_trait"),
-                    speech_quirks=c_dict.get("speech_quirks", ""),
-                    recommended_pronoun_level=c_dict.get("recommended_pronoun_level", "tum"),
+                    hindi_name=c_dict.get("hindi_name", "") or eng_name,
+                    gender=c_dict.get("gender", "neutral") or "neutral",
+                    aliases=c_aliases,
+                    sociolect_archetype=c_dict.get("sociolect_trait") or "NEUTRAL",
+                    speech_quirks=c_dict.get("speech_quirks", "") or "",
+                    default_honorific_level=c_dict.get("recommended_pronoun_level", "tum") or "tum",
+                    provenance=prov,
                 )
                 bible.characters[eng_name] = entity
 
@@ -289,43 +321,46 @@ class PreProductionSupervisor:
         bible.creatures.update(lexicon_data.get("creatures", {}))
         bible.objects.update(lexicon_data.get("objects", {}))
         bible.terminology.update(lexicon_data.get("terminology", {}))
-        bible.save(p_dir)
+
+        # 5. Allocate Voice Cast via CharacterCaster (NR-GATE-03 >=4% pitch separation)
+        logger.info("  [Room 1 Step 4/5] Allocating non-colliding voice cast via CharacterCaster...")
+        roster_chars = [
+            {
+                "name": c.english_name,
+                "gender": c.gender or "male",
+                "aliases": c.aliases,
+                "archetype": c.sociolect_trait or "",
+            }
+            for c in bible.characters.values()
+        ]
+        if not roster_chars:
+            roster_chars = [
+                {"name": c.get("english_name"), "gender": c.get("gender", "male")}
+                for c in characters_list if isinstance(c, dict) and c.get("english_name")
+            ]
+        roster, vreg, cast_lock = CharacterCaster._build_cast_allocation(
+            project_id=f"proj-{p_dir.name}",
+            raw_characters=roster_chars,
+            use_hindi=True,
+        )
+
+        # 6. Commit Master Pre-Production State atomically via NovelStateMaintainer (NR-GATE-06)
+        logger.info("  [Room 1 Finalize] Atomically committing master preproduction state via NovelStateMaintainer...")
+        NovelStateMaintainer.commit_master_preproduction(
+            project_dir=p_dir,
+            book_metadata=book_metadata,
+            book_dna=book_dna_data,
+            book_bible=bible,
+            vocal_spaces=vocal_manifest,
+            roster=roster,
+            voice_registry=vreg,
+            cast_lock=cast_lock,
+        )
+
         try:
             bible.sync_pronunciation_lexicon(p_dir)
         except Exception as e:
             logger.warning(f"  [!] Lexicon sync notice: {e}")
-
-        # 5. Lock Cast using CharacterCaster
-        logger.info("  [Room 1 Finalize] Locking cast registry via CharacterCaster...")
-        try:
-            CharacterCaster.discover_and_cast_project(
-                project_dir=p_dir,
-                use_hindi=True,
-                force_recast=force,
-            )
-        except Exception as e:
-            logger.warning(f"  [!] CharacterCaster lock warning: {e}")
-
-        # Ensure cast_lock.json exists even in minimal or synthetic project setups
-        if not cast_lock_path.exists():
-            try:
-                roster_chars = [
-                    {"name": c.get("english_name"), "gender": c.get("gender", "male")}
-                    for c in characters_list if isinstance(c, dict) and c.get("english_name")
-                ]
-                roster, vreg, cast_lock = CharacterCaster._build_cast_allocation(
-                    project_id=f"proj-{p_dir.name}",
-                    raw_characters=roster_chars,
-                    use_hindi=True,
-                )
-                with open(cast_lock_path, "w", encoding="utf-8") as f:
-                    json.dump(cast_lock, f, ensure_ascii=False, indent=2)
-                with open(p_dir / "voice_registry.json", "w", encoding="utf-8") as f:
-                    json.dump(vreg, f, ensure_ascii=False, indent=2)
-                with open(p_dir / "character_roster.json", "w", encoding="utf-8") as f:
-                    json.dump(roster, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                logger.warning(f"  [!] Direct cast lock synthesis warning: {e}")
 
         logger.info(f"[+] PreProductionSupervisor: Novel master state locked successfully in {p_dir.name}.")
         return {
@@ -335,6 +370,7 @@ class PreProductionSupervisor:
             "book_dna": str(book_dna_path),
             "book_bible": str(book_bible_path),
             "sonic_bible": str(sonic_bible_path),
+            "vocal_spaces": str(vocal_spaces_path),
             "cast_lock": str(cast_lock_path),
         }
 

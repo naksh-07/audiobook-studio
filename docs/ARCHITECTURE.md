@@ -15,14 +15,15 @@
 
 ```mermaid
 flowchart TD
-    subgraph Room1["🌍 Room 1: Pre-Production Intelligence"]
-        RawBook["Raw Book (PDF / EPUB / TXT)"] --> DeepSearch["Novel DeepSearch Engine (Factual Grounding)"]
-        DeepSearch --> BookDNA["Book DNA Agent (Literary Tradition, Era & Dialect)"]
-        BookDNA --> Personae["Dramatis Personae & Phonetic Lexicon (cast_lock.json)"]
+    subgraph Room1["🌍 Room 1: 2-System Pre-Production Architecture"]
+        direction TB
+        RawBook["Raw Book (PDF / EPUB / TXT)"] --> S1["System 1: Novel Researcher Engine<br/><i>(Stateless Compute & Zero Disk I/O)</i><br/>• LexicalCorpusScanner (0-Token Full Sweep)<br/>• NovelDeepSearchEngine (Bidirectional Grounding)<br/>• BookDNAAgent + DramatisPersonaeAgent<br/>• VocalAcousticDirector (Room Impulse DSP)<br/>• PhoneticLexiconDramaturge (70/30 Devanagari)"]
+        S1 -->|"Immutable Pydantic DTOs"| S2["System 2: Novel Metadata & State Maintainer<br/><i>(Canonical State Store & Atomic Persistence)</i><br/>• audiobook_factory/metadata/ (BookBible & NovelEntity)<br/>• NovelStateMaintainer (NR-GATE-06 Two-Phase Commit)<br/>• _STATE_LOCK (Thread Concurrency Protection)<br/>• Dynamic Character Locking (NR-GATE-03 Clamp [0.70, 1.30])"]
+        S2 --> MasterFiles[("Locked Master State<br/>book_dna.json | book_bible.json | cast_lock.json<br/>vocal_spaces.json | voice_registry.json")]
     end
 
     subgraph Room2["🧠 Room 2: Sense-for-Sense Translation Collective"]
-        Personae --> Collective["4-Agent Translation Collective<br/>• LiteraryDraftTranslator (70/30 Canon Sacredness)<br/>• HindustaniCadenceSpecialist (Spoken Flow & Pauses)<br/>• SubtextAndIdiomDramaturge (Earthy Desi Grit & 19-to-21)<br/>• TranslationQualityCritic (Anti-Omission & Terminology)"]
+        MasterFiles --> Collective["4-Agent Translation Collective<br/>• LiteraryDraftTranslator (70/30 Canon Sacredness)<br/>• HindustaniCadenceSpecialist (Spoken Flow & Pauses)<br/>• SubtextAndIdiomDramaturge (Earthy Desi Grit & 19-to-21)<br/>• TranslationQualityCritic (Anti-Omission & Terminology)"]
         Collective --> DualRule["Dual-Rule Invariant ('Nothing Above Source')<br/>Classic Reverent Pathos vs Raw Unrated Realism"]
     end
 
@@ -55,12 +56,24 @@ flowchart TD
 
 ## 🚪 Deep-Dive: The 5 Production Rooms
 
-### Room 1: Pre-Production World & Lore Ingestion Studio
-*Modules: `audiobook_factory/preproduction/` (`novel_deepsearch.py`, `book_dna_agent.py`, `dramatis_personae_agent.py`, `phonetic_lexicon_dramaturge.py`)*
+### Room 1: Pre-Production World, Lore & Canonical State Studio
+*Subsystems: System 1 Researcher Engine ([`audiobook_factory/preproduction/`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/)) & System 2 Metadata Maintainer ([`audiobook_factory/metadata/`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/metadata/))*
 
-1. **Novel DeepSearch Grounding**: Multi-angle factual dossier compilation (`NovelDeepSearchEngine`, `DeepSearchNovelDossier`) executing grounded web analysis to build an immutable canonical dossier before production runs, eliminating hallucinations.
-2. **Universal Book DNA Profiling**: Analyzes literary tradition, source fidelity tier (`CLASSIC_REVERENT` vs `RAW_UNRATED`), regional dialect cadence, and profanity policy without hardcoded titles or era biases.
-3. **Dramatis Personae & Phonetic Lexicon**: Extracts novel characters, sociolect traits, vocal weight, and phonetic Devanagari transliterations into `book_bible.json` and `cast_lock.json`.
+Room 1 operates under a strict **2-System Decoupled Architecture**:
+1. **System 1: Novel Researcher Engine (Pure Stateless Compute, 0 Disk I/O)**:
+   - **Deterministic 0-Token Lexical Scanner** ([`LexicalCorpusScanner`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/lexical_scanner.py)): Sweeps entire novel text in under $50\text{ms}$ with UTF-8 replacement defense, indexing word counts, proper nouns, dialogue attribution frequencies, and speaker introduction quotes into [`LexicalCorpusIndex`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/lexical_scanner.py).
+   - **Bidirectional Web Grounding** ([`NovelDeepSearchEngine`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/novel_deepsearch.py)): Leverages Google Search Grounding to assemble [`DeepSearchNovelDossier`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/novel_deepsearch.py). Enforces **NR-GATE-02**: entities from search results must possess $\ge 2$ mentions in the local text corpus to be granted canonical status.
+   - **Universal Literary DNA** ([`BookDNAAgent`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/book_dna_agent.py)): Dynamically resolves literary tradition, source fidelity tier (`CLASSIC_REVERENT` vs `RAW_UNRATED`), regional cadence, and profanity policy without hardcoded novel titles or author biases.
+   - **Dramatis Personae & Sociolects** ([`DramatisPersonaeAgent`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/dramatis_personae_agent.py)): Identifies character taxonomies, social hierarchy, vocal weight, and baseline honorific pronouns (`aap`, `tum`, `tu`).
+   - **Vocal Acoustic Director** ([`VocalAcousticDirector`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/vocal_acoustic_director.py)): Designs pure vocal room acoustics (reverb wet mix, decay time, predelay) into [`VocalSpacesManifest`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/vocal_acoustic_director.py) with zero BGM/SFX artifacts (**NR-GATE-04**), with hardened pitch ratio protection against `ZeroDivisionError`.
+   - **Phonetic Lexicon Dramaturge** ([`PhoneticLexiconDramaturge`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/phonetic_lexicon_dramaturge.py)): Maps names, heraldic monikers, and world lore into 70/30 Devanagari phonetics.
+   - **Stateless Orchestrator** ([`PreProductionSupervisor`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/preproduction/preproduction_supervisor.py)): Aggregates DTOs without direct disk writing, delegating canonical persistence to System 2.
+
+2. **System 2: Novel Metadata & State Maintainer (Canonical Persistence & Thread Safety)**:
+   - **Canonical Lore & Entity Registry** ([`BookBible`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/metadata/book_bible.py) & [`NovelEntity`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/metadata/book_bible.py)): Single source of truth recording character profiles, 4D acoustic vectors, and forensic [`EpistemicProvenance`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/metadata/book_bible.py) (`CORPUS_EXTRACTED`, `WEB_VERIFIED`, `INFERRED_DERIVED`). Re-exported via backward-compatible facade at [`audiobook_factory/translation/book_bible.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/translation/book_bible.py).
+   - **NR-GATE-06 Two-Phase Atomic Multi-File Staging** ([`NovelStateMaintainer`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/metadata/state_maintainer.py)): Atomically commits all 7 master state files (`book_dna.json`, `book_bible.json`, `vocal_spaces.json`, `sonic_bible.json`, `character_roster.json`, `voice_registry.json`, `cast_lock.json` + `translation/glossary.json`) by staging to `.tmp.{staging_id}`, snapshoting existing files to `.bak.{staging_id}`, atomically swapping via `os.replace`, and performing automated rollback if any I/O failure occurs.
+   - **Thread-Safe Mid-Novel Casting** (`discover_and_lock_character`): Protected by `_STATE_LOCK = threading.RLock()`, enabling downstream translation and screenplay threads to dynamically register and cast minor characters without race conditions.
+   - **NR-GATE-03 Pitch Clamping `[0.70, 1.30]`**: Step-stepping algorithm guarantees $\ge 4.0\%$ acoustic separation while bounding pitch between `0.70` and `1.30` with secondary speed micro-tuning to prevent robotic distortion across large ensembles.
 
 ### Room 2: Sense-for-Sense Translation Collective
 *Modules: `audiobook_factory/translation/` & `audiobook_factory/translation/agents/`*

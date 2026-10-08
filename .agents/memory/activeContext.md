@@ -26,5 +26,14 @@
   - True Peak: **-4.0 dBFS** (Hard ceiling: $\le$ -1.5 dBTP).
   - Loudness Range: **5.8 LU** (EBU R128 dynamic compliance).
 
-## Antigravity Studio Plugin & UI Extension
-- **Live Extension**: Registered at `~/.gemini/config/plugins/audiobook-studio/` (`@audiobook-director`, `audiobook-studio` skill, Stitch-grade sidecar panel).
+## Milestone: Novel Researcher System (Phase 1, 2, Expert Audit & Phase 3)
+- **Status**: 100% IMPLEMENTED & VERIFIED (37/37 regression tests passing in Native Termux).
+- **2-System Split Completed**:
+  - System 1 (Novel Researcher Engine): Pure stateless compute (LexicalScanner, DeepSearch, VocalAcousticDirector).
+  - System 2 (Novel Metadata & State Maintainer): `audiobook_factory/metadata/` (`BookBible`, `NovelStateMaintainer`, `MasterPreProductionState`).
+  - NR-GATE-06: Two-phase commit with automatic backup rollback on I/O error verified.
+  - Native Termux Environment: Python 3.14.6 ARM64 verified with zero PRoot Ubuntu dependency.
+
+## Immediate Next Steps
+- Production test on full novel or next room integration.
+

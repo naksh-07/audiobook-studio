@@ -149,7 +149,7 @@ class LiteraryDraftTranslator:
         call_llm_fn: Optional[Callable[..., str]] = None,
     ) -> str:
         """Generates the foundational literary Hindi translation draft."""
-        model = self._resolve_model()
+        model = self.model or ("mock-model" if call_llm_fn else self._resolve_model())
         eff_dna = book_dna or (glossary.get("book_dna") if isinstance(glossary, dict) else None)
         scene_directives = self._detect_scene_mode(text_block, block_title, book_dna=eff_dna)
 

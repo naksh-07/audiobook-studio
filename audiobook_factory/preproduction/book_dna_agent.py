@@ -50,7 +50,7 @@ class BookDNAAgent:
         Synthesizes the complete book_dna.json profiling the novel's literary tradition,
         register boundaries, and acoustic/emotional DNA using LLM and Google Search Grounding.
         """
-        model = self._resolve_model()
+        model = self.model or ("mock-model" if call_llm_fn else self._resolve_model())
         book_title = book_metadata.get("title", "Unknown Novel")
         author = book_metadata.get("author", "Unknown Author")
         project_slug = book_metadata.get("project_slug", "novel")
