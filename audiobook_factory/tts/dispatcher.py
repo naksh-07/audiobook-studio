@@ -100,10 +100,12 @@ class TTSDispatcher:
         audio_dir: Optional[Path] = None,
         strict_speakers: bool = True,
         allow_dynamic_cast: Optional[bool] = None,
+        chunk_prefix: str = "c",
     ):
         self.project_dir = Path(project_dir).resolve()
         self.audio_dir = Path(audio_dir).resolve() if audio_dir else (self.project_dir / "audio_chunks")
         self.audio_dir.mkdir(parents=True, exist_ok=True)
+        self.chunk_prefix = chunk_prefix
         self.registry_file = self.project_dir / "voice_registry.json"
         self.roster_file = self.project_dir / "character_roster.json"
         self.default_backend = default_backend
@@ -533,7 +535,7 @@ class TTSDispatcher:
         softclip_tanh = bool(sp_cfg.get("softclip_tanh", False))
         eq_formant_profile = str(sp_cfg.get("eq_formant_profile", "")).strip()
 
-        out_filename = compute_canonical_segment_filename(chapter_num, seg_num, text, sp_cfg, default_voice=self.default_voice)
+        out_filename = compute_canonical_segment_filename(chapter_num, seg_num, text, sp_cfg, default_voice=self.default_voice, prefix=self.chunk_prefix)
         out_file = self.audio_dir / out_filename
 
         # Resume checkpoint: skip if exact hash file already exists and valid
@@ -626,7 +628,7 @@ class TTSDispatcher:
                 take_target = out_file
             else:
                 take_hash = hashlib.md5(f"{tts_text}|{voice}|{emotion}|{acting}|{v_type}".encode("utf-8")).hexdigest()[:8]
-                take_target = self.take_bank.takes_dir / f"c{chapter_num:03d}_s{seg_num:04d}_{v_type}_{take_hash}.wav"
+                take_target = self.take_bank.takes_dir / f"{self.chunk_prefix}{chapter_num:03d}_s{seg_num:04d}_{v_type}_{take_hash}.wav"
 
             if not (take_target.exists() and take_target.stat().st_size > 1000):
                 _call_gemini_tts(

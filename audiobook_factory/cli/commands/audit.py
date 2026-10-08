@@ -9,7 +9,7 @@ from audiobook_factory.cli.context import get_projects_dir, get_workspace_dir
 from audiobook_factory.gate_auditor import audit_book_master, audit_chapter_gates, GateAuditError
 
 def cmd_audit_book(args):
-    """Executes Macro-Tier Gate 6 (6A, 6B, 6C, 6D) audit for an entire book project."""
+    """Executes Macro-Tier Gate 6 and 8-Pillar Studio Production Certification for a book project."""
     target = Path(args.project_dir)
     project_dir = target if (target.exists() and target.is_dir()) else (get_projects_dir() / args.project_dir)
 
@@ -18,7 +18,7 @@ def cmd_audit_book(args):
     print("\n" + "=" * 65)
     print(f"📘 MACRO BOOK GATE 6 VERDICT: {report['overall_status']}")
     print("=" * 65)
-    print(f"  Gate 6A (Voice Continuity):   {report['gate_6a']['status']}")
+    print(f"  Gate 6A (Voice Continuity):    {report['gate_6a']['status']}")
     if report['gate_6a'].get('errors'):
         for err in report['gate_6a']['errors']:
             print(f"     [!] {err}")
@@ -34,9 +34,31 @@ def cmd_audit_book(args):
     if report['gate_6d'].get('errors'):
         for err in report['gate_6d']['errors']:
             print(f"     [!] {err}")
+
+    # Run 8-Pillar Studio Certification
+    from audiobook_factory.certification import StudioCertificationRunner
+    print("\n" + "=" * 65)
+    print("🎖️  8-PILLAR STUDIO PRODUCTION CERTIFICATION SCORECARD")
     print("=" * 65)
-    if not report['overall_passed']:
+    cert = StudioCertificationRunner.certify_project(project_dir)
+    for p_id, p_res in cert.pillars.items():
+        status_icon = "✅" if p_res.status == "PASSED" else ("⚠️" if p_res.status == "WARNING" else ("⏭️" if p_res.status == "SKIPPED" else "❌"))
+        print(f"  {status_icon} {p_res.pillar_name:<50} [{p_res.score:5.1f}% | {p_res.status}]")
+        if p_res.critical_findings:
+            for cf in p_res.critical_findings:
+                print(f"     [CRITICAL] {cf}")
+        if p_res.warnings:
+            for w in p_res.warnings:
+                print(f"     [WARNING]  {w}")
+
+    print("-" * 65)
+    cert_icon = "🏆 CERTIFIED" if cert.is_certified else "⛔ CERTIFICATION FAILED"
+    print(f"  OVERALL SCORE: {cert.overall_score:.1f}%  |  VERDICT: {cert_icon}")
+    print("=" * 65)
+
+    if not report['overall_passed'] or not cert.is_certified:
         sys.exit(1)
+
 
 
 

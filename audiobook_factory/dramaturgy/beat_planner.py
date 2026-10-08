@@ -890,13 +890,22 @@ class BeatPlanner:
 
         chunks: List[Dict[str, Any]] = []
         num_scenes = len(dramatic_plan.scenes)
-        paras_per_scene = max(1, total_paras // max(1, num_scenes))
-
         chunk_idx = 1
+
         for s_idx, scene in enumerate(dramatic_plan.scenes):
-            start_p = s_idx * paras_per_scene
-            end_p = (s_idx + 1) * paras_per_scene if s_idx < num_scenes - 1 else total_paras
-            scene_paras = paragraphs[start_p:end_p]
+            # Honor exact paragraph boundaries discovered by SceneAnalyzer
+            start_p = getattr(scene, "start_paragraph_idx", 0)
+            end_p = getattr(scene, "end_paragraph_idx", total_paras - 1)
+            
+            # Fallback if indices are not set or corrupt
+            if start_p == 0 and end_p == 0 and num_scenes > 1:
+                paras_per_scene = max(1, total_paras // num_scenes)
+                start_p = s_idx * paras_per_scene
+                end_p = (s_idx + 1) * paras_per_scene - 1 if s_idx < num_scenes - 1 else total_paras - 1
+
+            start_p = max(0, min(start_p, total_paras - 1))
+            end_p = max(start_p, min(end_p, total_paras - 1))
+            scene_paras = paragraphs[start_p : end_p + 1]
             scene_words = sum(len(p.split()) for p in scene_paras)
 
             if scene_words <= max_words:
@@ -908,10 +917,12 @@ class BeatPlanner:
                     "word_count": scene_words,
                     "is_scene_start": True,
                     "is_scene_end": True,
+                    "start_paragraph_idx": start_p,
+                    "end_paragraph_idx": end_p,
                 })
                 chunk_idx += 1
             else:
-                # Scene exceeds max_words: slice on intra-scene beat boundaries
+                # Scene exceeds max_words: slice on intra-scene beat boundaries within [start_p, end_p]
                 num_beats = max(1, len(scene.beats))
                 paras_per_beat = max(1, len(scene_paras) // num_beats)
                 cur_b_paras: List[str] = []
@@ -933,6 +944,8 @@ class BeatPlanner:
                             "word_count": cur_b_words,
                             "is_scene_start": (chunk_idx == 1 or chunks[-1]["scene_id"] != scene.scene_id),
                             "is_scene_end": False,
+                            "start_paragraph_idx": start_p,
+                            "end_paragraph_idx": end_p,
                         })
                         chunk_idx += 1
                         cur_b_paras = list(beat_paras)
@@ -952,6 +965,8 @@ class BeatPlanner:
                         "word_count": cur_b_words,
                         "is_scene_start": (chunk_idx == 1 or chunks[-1]["scene_id"] != scene.scene_id),
                         "is_scene_end": True,
+                        "start_paragraph_idx": start_p,
+                        "end_paragraph_idx": end_p,
                     })
                     chunk_idx += 1
 

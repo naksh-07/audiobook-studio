@@ -27,8 +27,19 @@ def cmd_package(args):
     project_dir = target if (target.exists() and target.is_dir()) else (get_projects_dir() / args.book)
     cover = Path(args.cover) if getattr(args, "cover", None) else None
     enforce = getattr(args, "enforce_gate6", False)
-    final_m4b = package_m4b_audiobook(project_dir, cover_image=cover, enforce_gate6=enforce)
-    print(f"\n[DONE] Finished Audiobook Package: {final_m4b}")
+    format_mode = getattr(args, "format", "audiobook")
+
+    from audiobook_factory.packaging import package_project
+    res = package_project(
+        project_dir=project_dir,
+        format_mode=format_mode,
+        cover_image=cover,
+        enforce_gate6=enforce,
+    )
+    print(f"\n[DONE] Finished Packaging ({format_mode}):")
+    for k, v in res.get("artifacts", {}).items():
+        print(f"  - {k}: {v}")
+
 
 
 def cmd_direct(args):

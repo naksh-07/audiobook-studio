@@ -291,6 +291,10 @@ class DramaticBeat(BaseModel):
     # Capability 10: Dramatic Silence Intent
     silence_intent: Optional[DramaticSilenceIntent] = Field(default=None, description="Narrative purpose of pause or silence")
 
+    # SPU & Paragraph Spans
+    start_paragraph_idx: Optional[int] = Field(default=None, ge=0, description="0-indexed starting paragraph within scene")
+    end_paragraph_idx: Optional[int] = Field(default=None, ge=0, description="0-indexed ending paragraph within scene (inclusive)")
+
 
 # -----------------------------------------------------------------------------
 # Scene-Level Contracts
@@ -325,6 +329,11 @@ class SceneDramaticPlan(BaseModel):
     tension_curve: List[float] = Field(default_factory=list, description="Sampled tension trajectory across beats")
     beats: List[DramaticBeat] = Field(default_factory=list, description="Sequential dramatic beats")
     source_hash: str = Field(default="", description="SHA-256 hash of underlying source text")
+
+    # SPU & Paragraph Spans
+    start_paragraph_idx: int = Field(default=0, ge=0, description="0-indexed starting paragraph in chapter source")
+    end_paragraph_idx: int = Field(default=0, ge=0, description="0-indexed ending paragraph in chapter source (inclusive)")
+    spu_ids: List[str] = Field(default_factory=list, description="Ordered Semantic Paragraph Unit hashes")
 
     # Capability 2: Dramatic State Delta
     state_delta: Optional[DramaticStateDelta] = Field(default_factory=DramaticStateDelta, description="Net transformation between scene entry and exit")
@@ -376,9 +385,10 @@ class DramaticPlan(BaseModel):
 
     def save_to_file(self, path: Path | str) -> None:
         """Persist dramatic plan as JSON atomically."""
+        import uuid
         p = Path(path).resolve()
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(f".tmp_{p.stat().st_mtime if p.exists() else 'new'}")
+        tmp = p.with_suffix(f".tmp_{uuid.uuid4().hex[:8]}")
         try:
             with open(tmp, "w", encoding="utf-8") as f:
                 f.write(self.model_dump_json(indent=2))
@@ -441,16 +451,17 @@ class PerformanceBible(BaseModel):
 
     def get_profile(self, name: str) -> Optional[CharacterPerformanceProfile]:
         """Lookup character performance profile case-insensitively."""
-        clean = name.strip().lower()
+        clean = (name or "").strip().lower()
         for k, v in self.characters.items():
             if k.strip().lower() == clean:
                 return v
         return None
 
     def save_to_file(self, path: Path | str) -> None:
+        import uuid
         p = Path(path).resolve()
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(".tmp_pb")
+        tmp = p.with_suffix(f".tmp_pb_{uuid.uuid4().hex[:8]}")
         try:
             with open(tmp, "w", encoding="utf-8") as f:
                 f.write(self.model_dump_json(indent=2))
@@ -499,9 +510,10 @@ class DramaticValidationResult(BaseModel):
     checked_at: str = Field(default="")
 
     def save_to_file(self, path: Path | str) -> None:
+        import uuid
         p = Path(path).resolve()
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(".tmp_val")
+        tmp = p.with_suffix(f".tmp_val_{uuid.uuid4().hex[:8]}")
         try:
             with open(tmp, "w", encoding="utf-8") as f:
                 f.write(self.model_dump_json(indent=2))

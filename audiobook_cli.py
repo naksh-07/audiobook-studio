@@ -26,6 +26,7 @@ from audiobook_factory.cli.commands.pipeline import (
     cmd_extract,
     cmd_translate,
     cmd_script,
+    cmd_podcast,
     cmd_synthesize,
     cmd_master,
     cmd_produce,
@@ -43,6 +44,7 @@ __all__ = [
     "cmd_extract",
     "cmd_translate",
     "cmd_script",
+    "cmd_podcast",
     "cmd_synthesize",
     "cmd_master",
     "cmd_produce",
@@ -80,11 +82,24 @@ def main():
     p_script.add_argument("book", help="Project book slug")
     p_script.add_argument("--hindi", action="store_true", help="Use translated Hindi chapters")
     p_script.add_argument("--dramatized", action="store_true", help="Multi-voice character attribution mode")
+    p_script.add_argument("--adapter", choices=["audiobook", "podcast"], default="audiobook", help="Format script adapter: audiobook (default) or podcast")
     p_script.add_argument("--flow", action="store_true", default=True, help="Enable Audible Flow mode (preserves prose and tags, eliminates Foley)")
     p_script.add_argument("--cast-mode", choices=["ensemble", "solo"], default="ensemble", help="Cast mode: ensemble (multi-voice cast) or solo (master narrator)")
     p_script.add_argument("--chapter", type=int, default=None, help="Specific chapter number to script")
     p_script.add_argument("--chapters", type=str, default=None, help="Comma-separated or range of chapters (e.g. 1-2 or 1,2)")
     p_script.add_argument("--overwrite", action="store_true", help="Overwrite existing script files")
+
+    # podcast
+    p_podcast = subparsers.add_parser("podcast", help="Generate 2-Host conversational narrative podcast episodes")
+    p_podcast.add_argument("book", help="Project book slug")
+    p_podcast.add_argument("--hindi", action="store_true", help="Generate Hindi/Hindustani podcast (default)")
+    p_podcast.add_argument("--english", action="store_true", help="Generate English podcast")
+    p_podcast.add_argument("--produce", action="store_true", help="Synthesize and master podcast episode to -16.0 LUFS broadcast audio")
+    p_podcast.add_argument("--chapter", type=int, default=None, help="Specific chapter number")
+    p_podcast.add_argument("--chapters", type=str, default=None, help="Comma-separated or range of chapters (e.g. 1-2 or 1,2)")
+    p_podcast.add_argument("--workers", default=3, type=int, help="Number of concurrent TTS synthesis workers (default: 3)")
+    p_podcast.add_argument("--target-lufs", default=-16.0, type=float, help="Target broadcast integrated loudness (default: -16.0 LUFS)")
+    p_podcast.add_argument("--overwrite", action="store_true", help="Overwrite existing podcast files")
 
     # synthesize
     p_synth = subparsers.add_parser("synthesize", help="Synthesize audio segments via Gemini Cloud TTS")
@@ -101,8 +116,9 @@ def main():
     p_master.add_argument("--chapters", type=str, default=None, help="Comma-separated or range of chapters (e.g. 1-2 or 1,2)")
 
     # package
-    p_pack = subparsers.add_parser("package", help="Assemble final chapterized M4B container")
+    p_pack = subparsers.add_parser("package", help="Assemble final chapterized container (Audiobook M4B or Podcast M4A)")
     p_pack.add_argument("book", help="Project book slug or path")
+    p_pack.add_argument("--format", choices=["audiobook", "podcast", "both"], default="audiobook", help="Target delivery format: audiobook (default), podcast, or both")
     p_pack.add_argument("--cover", default=None, help="Cover art image path")
     p_pack.add_argument("--enforce-gate6", action="store_true", help="Abort packaging if any Gate 6 verification check fails")
 
@@ -114,6 +130,7 @@ def main():
     p_auto = subparsers.add_parser("auto", help="Run entire end-to-end vocals-only pipeline in one command")
     p_auto.add_argument("file", help="Input book path")
     p_auto.add_argument("--hindi", action="store_true", help="Translate English book to Hindi")
+    p_auto.add_argument("--format", choices=["audiobook", "podcast", "both"], default="audiobook", help="Output format: audiobook (default), podcast, or both")
     p_auto.add_argument("--backend", default="gemini_tts", choices=["gemini_tts"], help="TTS engine (default: gemini_tts)")
     p_auto.add_argument("--voice", default="Aoede", help="Voice persona")
     p_auto.add_argument("--dramatized", action="store_true", help="Multi-voice dramatization")
@@ -149,6 +166,7 @@ def main():
         "extract": cmd_extract,
         "translate": cmd_translate,
         "script": cmd_script,
+        "podcast": cmd_podcast,
         "synthesize": cmd_synthesize,
         "master": cmd_master,
         "package": cmd_package,

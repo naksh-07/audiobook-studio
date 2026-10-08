@@ -62,6 +62,19 @@ def cmd_script(args):
         os.environ["AUDIBLE_CLEAN_DSP"] = "true"
         os.environ["AUDIBLE_ROOM_TONE"] = "true"
 
+    adapter_mode = getattr(args, "adapter", "audiobook")
+    if adapter_mode == "podcast":
+        from audiobook_factory.podcast import generate_project_podcasts
+        use_hindi = getattr(args, "hindi", False) or not getattr(args, "english", False)
+        pod_dir = generate_project_podcasts(
+            project_dir,
+            use_hindi=use_hindi,
+            overwrite=getattr(args, "overwrite", False),
+            chapters=chapters,
+        )
+        print(f"\n[OK] Podcast episodes ready at: {pod_dir}")
+        return
+
     cast_mode = getattr(args, "cast_mode", "ensemble")
     dramatized = (cast_mode != "solo") if hasattr(args, "cast_mode") else args.dramatized
 
@@ -73,6 +86,45 @@ def cmd_script(args):
         chapters=chapters,
     )
     print(f"\n[OK] Scripts ready at: {scripts_dir} (Mode: {cast_mode.upper()})")
+
+
+def cmd_podcast(args):
+    """Generate or produce 2-Host conversational narrative podcast episodes."""
+    project_dir = get_projects_dir() / args.book
+    os.environ["CURRENT_PROJECT_DIR"] = str(project_dir.resolve())
+    chapters = _parse_chapters_arg(args)
+
+    use_hindi = getattr(args, "hindi", False) or not getattr(args, "english", False)
+    overwrite = getattr(args, "overwrite", False)
+
+    if getattr(args, "produce", False):
+        from audiobook_factory.podcast.orchestrator import PodcastOrchestrator
+        orchestrator = PodcastOrchestrator()
+        target_chapters = chapters or ([args.chapter] if getattr(args, "chapter", None) is not None else [1])
+        print(f"[*] Producing 2-Host Podcast episodes for '{args.book}' ({len(target_chapters)} chapters)...")
+        results = []
+        for ch in target_chapters:
+            res = orchestrator.produce_podcast_episode(
+                project_dir=project_dir,
+                chapter_num=ch,
+                use_hindi=use_hindi,
+                target_lufs=getattr(args, "target_lufs", -16.0),
+                workers=getattr(args, "workers", 3),
+                overwrite=overwrite,
+            )
+            results.append(res)
+            print(f"[OK] Produced Episode for Chapter {ch}: {res['master_file']} ({res['duration_min']} min, {res['total_turns']} turns)")
+        print(f"\n[OK] All {len(results)} podcast episodes produced successfully!")
+    else:
+        from audiobook_factory.podcast import generate_project_podcasts
+        pod_dir = generate_project_podcasts(
+            project_dir,
+            use_hindi=use_hindi,
+            overwrite=overwrite,
+            chapters=chapters,
+        )
+        print(f"\n[OK] 2-Host Podcast episodes generated successfully at: {pod_dir}")
+
 
 
 
@@ -267,6 +319,7 @@ def cmd_auto(args):
     dramatized = (cast_mode != "solo") if hasattr(args, "cast_mode") else args.dramatized
 
     orchestrator = PipelineOrchestrator(get_projects_dir())
+    format_mode = getattr(args, "format", "audiobook")
     orchestrator.run_autonomous_pipeline(
         input_file=input_file,
         hindi=args.hindi,
@@ -276,6 +329,7 @@ def cmd_auto(args):
         workers=workers,
         force_gate=force_gate,
         chapters=chapters,
+        format_mode=format_mode,
     )
 
 

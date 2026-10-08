@@ -241,6 +241,7 @@ def clean_screenplay_pass2(
             "recommended_register",
             "memory_vocal_constraint",
             "scene_id",
+            "scene_idx",
             "beat_id",
             "dramatic_function",
             "character_objective",
@@ -321,22 +322,38 @@ def clean_screenplay_pass2(
 
         final_script.append(entry)
 
-    # Attach dramatic plan metadata if not already attached
+    # Attach dramatic plan metadata if not already attached (Scene-Scoped Resolution)
     if dramatic_plan and getattr(dramatic_plan, "scenes", None):
-        all_beats: List[Tuple[Any, Any]] = []
-        for sc in dramatic_plan.scenes:
-            for bt in sc.beats:
-                all_beats.append((sc, bt))
+        scene_by_id = {sc.scene_id: sc for sc in dramatic_plan.scenes}
+        default_sc = dramatic_plan.scenes[0]
 
-        num_segs = len(final_script)
-        num_bts = len(all_beats)
-        if num_bts > 0 and num_segs > 0:
-            segs_per_beat = max(1, num_segs // num_bts)
-            for s_idx, entry in enumerate(final_script):
-                b_idx = min(s_idx // segs_per_beat, num_bts - 1)
-                sc, bt = all_beats[b_idx]
-                if not entry.get("scene_id"):
-                    entry["scene_id"] = sc.scene_id
+        # 1. Group segment indices strictly by their enclosing scene_id
+        scene_segment_indices: Dict[str, List[int]] = {}
+        curr_scene_id = default_sc.scene_id
+        for s_idx, entry in enumerate(final_script):
+            sc_id = entry.get("scene_id")
+            if sc_id and sc_id in scene_by_id:
+                curr_scene_id = sc_id
+            else:
+                entry["scene_id"] = curr_scene_id
+            scene_segment_indices.setdefault(curr_scene_id, []).append(s_idx)
+
+        # 2. For each scene, map its segments strictly to its own intra-scene beats
+        for sc in dramatic_plan.scenes:
+            indices = scene_segment_indices.get(sc.scene_id, [])
+            if not indices or not sc.beats:
+                continue
+
+            num_sc_segs = len(indices)
+            num_sc_bts = len(sc.beats)
+            segs_per_beat = max(1, num_sc_segs // num_sc_bts)
+
+            for pos_in_scene, s_idx in enumerate(indices):
+                b_idx = min(pos_in_scene // segs_per_beat, num_sc_bts - 1)
+                bt = sc.beats[b_idx]
+                entry = final_script[s_idx]
+
+                entry["scene_id"] = sc.scene_id
                 if not entry.get("beat_id"):
                     entry["beat_id"] = bt.beat_id
                 if not entry.get("dramatic_function"):
