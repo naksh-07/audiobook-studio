@@ -639,3 +639,10 @@ def get_persistent_key_pool() -> PersistentKeyPool:
             if _pool_instance is None:
                 _pool_instance = PersistentKeyPool()
     return _pool_instance
+
+
+def __getattr__(name: str) -> Any:
+    if name == "global_key_pool":
+        return get_persistent_key_pool()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+

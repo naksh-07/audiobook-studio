@@ -1803,6 +1803,430 @@ class ProductionTelemetryLedger:
 
 ---
 
+## 🎙️ Studio TTS Platform Core ([`audiobook_factory.tts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/))
+
+The Studio TTS Platform Core provides a unified 4-tier speech synthesis platform (Option C: Layered Shared Core with Specialized Pipeline Facades). All public interfaces are exported directly from [`audiobook_factory.tts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/__init__.py) and [`audiobook_factory.tts_dispatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts_dispatcher.py).
+
+### 1. `GenericTTSClient` ([`audiobook_factory/tts/facades/generic_client.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/generic_client.py))
+*High-level client facade for single-utterance, ad-hoc, low-latency speech synthesis (UI feedback, CLI prompts, voice testing).*
+
+```python
+class GenericTTSClient:
+    def __init__(self, orchestrator: Optional[TTSCoreOrchestrator] = None): ...
+
+    def speak(
+        self,
+        text_or_request: Union[str, CanonicalTTSRequest],
+        voice: str = "Puck",
+        model: str = "gemini-3.8-flash",
+        output_path: Optional[Union[str, Path]] = None,
+        validate: bool = True,
+        speaker: str = "Narrator",
+        delivery_intent: Optional[DeliveryIntent] = None,
+        **guard_kwargs: Any,
+    ) -> Tuple[Optional[Path], SynthesizedAudioChunk, Optional[AudioValidationResult]]:
+        """
+        Synthesizes a single text or request, returning raw audio chunk and optional saved file path.
+        Dispatches directly through UniversalInputGuard and TTSCoreOrchestrator (<800ms latency).
+        """
+
+    def speak_to_bytes(
+        self,
+        text_or_request: Union[str, CanonicalTTSRequest],
+        voice: str = "Puck",
+        model: str = "gemini-3.8-flash",
+        validate: bool = True,
+        speaker: str = "Narrator",
+        delivery_intent: Optional[DeliveryIntent] = None,
+        **guard_kwargs: Any,
+    ) -> bytes:
+        """
+        Synthesizes single text or request directly into a complete in-memory RIFF WAV byte stream.
+        """
+```
+
+**Usage Example**:
+```python
+from audiobook_factory.tts import GenericTTSClient
+
+client = GenericTTSClient()
+
+# 1. Synthesize and save directly to file
+out_path, chunk, validation = client.speak(
+    "प्रणाम! स्टूडियो ऑडिओबुक इंजन में आपका स्वागत है।",
+    voice="Puck",
+    output_path="output/greeting.wav",
+    validate=True,
+)
+print(f"Generated: {out_path} ({chunk.duration_sec:.2f}s, SR={chunk.sample_rate}Hz)")
+
+# 2. In-memory bytes for streaming API or instant playback
+wav_bytes = client.speak_to_bytes("तत्काल ऑडियो स्ट्रीम।", voice="Aoede")
+assert wav_bytes.startswith(b"RIFF")
+```
+
+---
+
+### 2. `LongFormTTSClient` ([`audiobook_factory/tts/facades/long_form_client.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/long_form_client.py))
+*Client facade for continuous long-form narrative prose and novel chapters. Handles 4-tier semantic chunking, concurrent synthesis, checkpoint resumption, and net-silence stitching.*
+
+```python
+class LongFormTTSClient:
+    def __init__(self, orchestrator: Optional[TTSCoreOrchestrator] = None): ...
+
+    def synthesize_prose(
+        self,
+        text: str,
+        output_path: Union[str, Path],
+        voice: str = "Puck",
+        model: str = "gemini-3.8-flash",
+        speaker: str = "Narrator",
+        target_words_per_chunk: int = 120,
+        progress_callback: Optional[Callable[..., None]] = None,
+    ) -> Tuple[Path, float, List[SynthesizedAudioChunk]]:
+        """
+        Synthesizes arbitrary long-form prose by semantically chunking, synthesizing concurrently,
+        and stitching into a seamless master audio file with net silence and Hann micro-fades.
+        """
+
+    def synthesize_chapter(
+        self,
+        chapter_num: int,
+        text: str,
+        output_file: Optional[Union[str, Path]] = None,
+        checkpoint_dir: Optional[Union[str, Path]] = None,
+        voice: str = "Puck",
+        model: str = "gemini-3.8-flash",
+        speaker: str = "Narrator",
+        target_words_per_chunk: int = 120,
+        progress_callback: Optional[Callable[..., None]] = None,
+    ) -> ChapterMasterResult:
+        """
+        Synthesizes a complete chapter with checkpoint caching (checkpoint_manifest.json)
+        and returns a structured ChapterMasterResult. Resumes seamlessly from interruptions.
+        """
+```
+
+**Usage Example**:
+```python
+from pathlib import Path
+from audiobook_factory.tts import LongFormTTSClient
+
+client = LongFormTTSClient()
+chapter_text = Path("data/chapter_01.txt").read_text(encoding="utf-8")
+
+result = client.synthesize_chapter(
+    chapter_num=1,
+    text=chapter_text,
+    output_file="output/chapter_001_master.wav",
+    checkpoint_dir="checkpoints/ch001",
+    voice="Puck",
+    target_words_per_chunk=120,
+    progress_callback=lambda pct, cur, tot: print(f"Progress: {pct*100:.1f}% ({cur}/{tot})"),
+)
+print(f"Master created at: {result.master_audio_path} ({result.duration_sec}s, {result.total_segments} chunks)")
+```
+
+---
+
+### 3. `MultiCastStudioClient` ([`audiobook_factory/tts/facades/multi_cast_client.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/multi_cast_client.py))
+*Client facade for ensemble multi-character screenplay synthesis, character casting maps, anti-swap attribution verification, 4D acoustic formants, TakeBank auditioning, and conversational turn latencies.*
+
+```python
+class MultiCastStudioClient:
+    def __init__(self, orchestrator: Optional[TTSCoreOrchestrator] = None): ...
+
+    def produce_screenplay(
+        self,
+        segments: List[Dict[str, Any]],
+        character_voices: Dict[str, str],
+        chapter_num: int,
+        output_dir: Union[str, Path],
+        model: str = "gemini-3.8-flash",
+        default_narrator_voice: str = "Puck",
+        cast_lock_file: Optional[Union[str, Path]] = None,
+        character_formants: Optional[Dict[str, Union[str, FormantProfile]]] = None,
+        enable_take_bank: bool = False,
+        progress_callback: Optional[Callable[..., None]] = None,
+    ) -> ChapterMasterResult:
+        """
+        Synthesizes an ensemble multi-character screenplay, applies 4D formants,
+        auditions candidate takes via TakeBank, applies conversational turn latency,
+        and produces an EBU R128 compliant master audio file.
+        """
+```
+
+**Usage Example**:
+```python
+from audiobook_factory.tts import MultiCastStudioClient, FormantProfile
+
+client = MultiCastStudioClient()
+segments = [
+    {"speaker": "Narrator", "text": "जंगल की गहराई में हवा थम चुकी थी।"},
+    {"speaker": "Geralt", "text": "रुको, यहाँ कोई छिपा हुआ है।", "acting": {"emotion": "grave", "delivery_style": "restraint"}},
+    {"speaker": "Jaskier", "text": "क्या फिर से कोई पिशाच?", "acting": {"emotion": "anxious"}, "performance_priority": "high"},
+]
+
+result = client.produce_screenplay(
+    segments=segments,
+    character_voices={"Narrator": "Puck", "Geralt": "Charon", "Jaskier": "Fenrir"},
+    chapter_num=1,
+    output_dir="output/chapter_01",
+    cast_lock_file="configs/cast_lock.json",
+    character_formants={
+        "Geralt": FormantProfile.DEEP_RESONANT,
+        "Jaskier": FormantProfile.CRISP_TENOR,
+    },
+    enable_take_bank=True,
+)
+```
+
+---
+
+### 4. `UniversalInputGuard` ([`audiobook_factory/tts/guard/input_guard.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/input_guard.py))
+*Universal text normalization, Unicode NFC hygiene, control character stripping, delivery intent extraction, and deterministic numeral/currency phonetization.*
+
+```python
+class UniversalInputGuard:
+    @classmethod
+    def guard_and_normalize(
+        cls,
+        raw_text: str,
+        voice_id: str,
+        segment_uid: Optional[str] = None,
+        speaker: str = "Narrator",
+        language: str = "hi-IN",
+        temperature: float = 0.40,
+        sample_rate: int = 24000,
+        pipeline_mode: TTSPipelineMode = TTSPipelineMode.GENERIC,
+        chapter_num: Optional[int] = None,
+        scene_num: Optional[int] = None,
+        default_intent: Optional[DeliveryIntent] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> CanonicalTTSRequest:
+        """
+        Validates, normalizes, and transforms raw input text into an immutable CanonicalTTSRequest.
+        Enforces the Sacred Literary Text vs. Spoken Text boundary:
+        - raw_text / literary_text is strictly preserved.
+        - spoken_text is phonetized (Devanagari numerals, currency words, abbreviations).
+        - Neural stage tags [whispers] are extracted to DeliveryIntent and stripped from spoken text.
+        (Authoritative method; also aliased as sanitize_and_guard).
+        """
+```
+
+**Usage Example**:
+```python
+from audiobook_factory.tts import UniversalInputGuard
+
+req = UniversalInputGuard.guard_and_normalize(
+    raw_text="Geralt whispered [whispers], 'We need 500 coins for the contract.'",
+    voice_id="Charon",
+    speaker="Geralt",
+)
+
+# Sacred Literary Text (Immutable for display/subtitles)
+assert req.literary_text == "Geralt whispered, 'We need 500 coins for the contract.'"
+
+# Spoken Phonetized Text (Dispatched to neural model)
+assert "पाँच सौ" in req.spoken_text
+assert "[" not in req.spoken_text  # Zero leaked stage direction brackets!
+
+# Extracted Delivery Intent
+assert req.delivery_intent.delivery_style == "whispers"
+```
+
+---
+
+### 5. `SemanticProseChunker` ([`audiobook_factory/tts/chunker.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/chunker.py))
+*4-Tier semantic chunking engine splitting long prose along natural scene, paragraph, sentence, and clause boundaries to permanently eliminate autoregressive TTS rate drift.*
+
+```python
+class SemanticProseChunker:
+    @classmethod
+    def chunk_prose(
+        cls,
+        text: str,
+        target_words: int = 120,
+        max_words: int = 180,
+        min_words: int = 40,
+    ) -> List[SemanticChunk]:
+        """
+        Splits long-form text into balanced semantic units using a 4-tier hierarchy:
+        Level 1: Scene Breaks (---, ***, # headers)
+        Level 2: Paragraph Breaks (\n\n) -> Target 80-160 words
+        Level 3: Sentence Boundaries (।, ., ?, !) -> Target 30-75 words
+        Level 4: Clause Boundaries (,, —, ;) -> Emergency fallback for >45 words
+        Level 5: Mid-word slicing is strictly prohibited.
+        """
+```
+
+**Usage Example**:
+```python
+from audiobook_factory.tts import SemanticProseChunker
+
+chunks = SemanticProseChunker.chunk_prose(long_prose_text, target_words=120)
+for chunk in chunks:
+    print(f"UID: {chunk.chunk_uid} | Level: {chunk.level.value} | Words: {chunk.word_count} | Pause: {chunk.suggested_pause_after_ms}ms")
+```
+
+---
+
+### 6. `EditorialDSPEngine` ([`audiobook_factory/tts/dsp/editorial.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/dsp/editorial.py))
+*Dialogue Editorial Layer combining zero-crossing endpoint alignment (-52 dBFS speech floor), raised-cosine Hann micro-fades (12ms in / 18ms out), and net silence timeline concatenation.*
+
+```python
+class EditorialDSPEngine:
+    @classmethod
+    def process_and_stitch(
+        cls,
+        chunks_pcm: List[bytes],
+        target_pauses_ms: List[int],
+        sample_rate: int = 24000,
+    ) -> Tuple[bytes, float]:
+        """
+        Stitches a sequence of 16-bit mono PCM chunks with zero-crossing alignment,
+        Hann micro-fades (12ms in / 18ms out), TPDF dither, and net silence subtraction:
+            Injected_Silence = max(20ms, Target_Pause - (Tail_Decay_A + Head_Margin_B))
+        Returns:
+            (stitched_pcm_bytes, total_duration_sec)
+        """
+```
+
+**Usage Example**:
+```python
+from audiobook_factory.tts import EditorialDSPEngine
+
+stitched_pcm, total_dur = EditorialDSPEngine.process_and_stitch(
+    chunks_pcm=[chunk1_pcm, chunk2_pcm, chunk3_pcm],
+    target_pauses_ms=[350, 450],
+    sample_rate=24000,
+)
+print(f"Seamlessly stitched {len(stitched_pcm)} bytes ({total_dur:.2f}s) with zero clicks.")
+```
+
+---
+
+### 7. `FormantSculptor` ([`audiobook_factory/tts/formant_sculptor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/formant_sculptor.py))
+*Parametric EQ and acoustic formant filter ensuring character voice distinctiveness when multiple characters share base neural voices.*
+
+```python
+class FormantSculptor:
+    @classmethod
+    def apply_formant_eq(
+        cls,
+        pcm_bytes: bytes,
+        profile: Union[FormantProfile, str],
+        sample_rate: int = 24000,
+    ) -> bytes:
+        """
+        Applies calibrated 2nd-order Peaking EQ Biquad Filters on 16-bit signed PCM.
+        Features float-precision calculation, headroom pre-attenuation (10^(-G_max/20)),
+        and soft hyperbolic tangent knee peak limiting (<= 32,760) to eliminate clipping.
+        """
+```
+
+**Available Profiles**: `WARM_BARITONE`, `CRISP_TENOR`, `BRIGHT_FEMALE`, `DEEP_RESONANT`, `ELDERLY_TEXTURED`, `CHILD_ANIME`, `NEUTRAL`.
+
+**Usage Example**:
+```python
+from audiobook_factory.tts import FormantSculptor, FormantProfile
+
+# Apply deep resonant baritone profile to male warrior character
+sculpted_pcm = FormantSculptor.apply_formant_eq(
+    pcm_bytes=actor_pcm,
+    profile=FormantProfile.DEEP_RESONANT,
+    sample_rate=24000,
+)
+```
+
+---
+
+### 8. `TakeBankManager` ([`audiobook_factory/tts/take_bank_manager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/take_bank_manager.py))
+*Multi-take auditioning and candidate selection manager for high-priority dramatic screenplay turns.*
+
+```python
+class TakeBankManager:
+    def __init__(self, orchestrator: Optional[TTSCoreOrchestrator] = None): ...
+
+    def generate_candidate_takes(
+        self,
+        base_request: CanonicalTTSRequest,
+        priority: str = "standard",
+        model: str = "gemini-3.8-flash",
+    ) -> List[CandidateTake]:
+        """
+        Generates candidate takes based on performance priority:
+        - 'standard': 1 take (standard delivery)
+        - 'focused': 2 takes (standard, restraint)
+        - 'high': 3 takes (standard, restraint, vulnerable)
+        - 'climactic': 4 takes (standard, restraint, vulnerable, exposed)
+        Scores and ranks all candidate takes.
+        """
+
+    def select_best_take(
+        self,
+        base_request: CanonicalTTSRequest,
+        priority: str = "standard",
+        model: str = "gemini-3.8-flash",
+    ) -> Tuple[SynthesizedAudioChunk, Optional[AudioValidationResult], List[CandidateTake]]:
+        """
+        Convenience method that generates candidate takes, audits quality,
+        and returns the single highest-scoring take.
+        """
+```
+
+**Usage Example**:
+```python
+from audiobook_factory.tts import TakeBankManager, CanonicalTTSRequest
+
+manager = TakeBankManager()
+best_chunk, validation, takes = manager.select_best_take(
+    base_request=dialogue_req,
+    priority="climactic",
+    model="gemini-3.8-flash",
+)
+print(f"Selected take {best_chunk.segment_uid} from {len(takes)} candidate variants.")
+```
+
+---
+
+### 9. `TwoTierAudioQualityGate` ([`audiobook_factory/tts/quality_gate.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/quality_gate.py))
+*Deterministic mathematical acoustic validation and phonetic duration bounds checking.*
+
+```python
+class TwoTierAudioQualityGate:
+    @classmethod
+    def audit_chunk(
+        cls,
+        request: CanonicalTTSRequest,
+        chunk: SynthesizedAudioChunk,
+        skip_tier2: bool = False,
+    ) -> AudioValidationResult:
+        """
+        Runs Tier 1 Mathematical Acoustic Probe (<5ms, zero-cost):
+        - Peak Amplitude: Peak >= 1500
+        - RMS Loudness: -52.0 dBFS <= RMS <= -6.0 dBFS
+        - DC Bias Offset: |DC| <= 0.05
+        - Consecutive Clipped Samples <= 5
+        - Internal Dead Air <= 2.5s
+        Runs Tier 2 Phonetic Duration Bounds:
+        - Duration ratio: 0.12s/word <= R <= 0.95s/word (rejects skipped lines or runaway stutters).
+        """
+```
+
+**Usage Example**:
+```python
+from audiobook_factory.tts import TwoTierAudioQualityGate
+
+val = TwoTierAudioQualityGate.audit_chunk(request, chunk)
+if val.passed:
+    print(f"Chunk certified: RMS={val.rms_dbfs:.1f} dBFS, Peak={val.peak_amplitude}")
+else:
+    print(f"Chunk failed quality gate: {val.diagnostics}")
+```
+
+---
+
 ## ⚙️ Environment Variables Reference
 
 | Variable | Type | Default | Description |
