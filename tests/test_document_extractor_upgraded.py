@@ -311,6 +311,99 @@ A woman in a hooded cloak watched the witcher from across the fountain.
             self.assertIn('"Evil is evil,"', first_block.normalized_text)
             self.assertEqual(first_block.provenance.line_start, 1)
 
+    def test_07_heading_disambiguation_quoted_and_multiline_titles(self):
+        """
+        Verifies:
+        - Standalone 'I' in dialogue / prose does not create false chapter headings.
+        - Valid Roman numerals (II, IV, XIV, I., I - Title) are accepted.
+        - Quoted chapter titles (Chapter 1: "The Voice") are accepted.
+        - Two-line chapter titles (CHAPTER ONE \\n\\n The Awakening) are assembled into a single title.
+        """
+        sample_text = """
+Prologue
+
+The ancient council gathered before the great hall.
+"Do you agree?" asked the elder.
+
+I
+
+"No," answered the hunter firmly.
+He turned and walked away into the shadows.
+
+CHAPTER 1: "The Voice of Reason"
+
+The tavern was warm and crowded with travelers from all corners of the realm.
+A bard sang softly in the corner.
+
+CHAPTER TWO
+
+The Awakening
+
+The dawn brought a chill across the mountains.
+Geralt sharpened his silver blade with rhythmic strokes.
+"""
+        chapters = segment_chapters_from_text(sample_text)
+
+        # Expected chapters:
+        # 1. Prologue / Introduction
+        # 2. CHAPTER 1: "The Voice of Reason"
+        # 3. CHAPTER TWO: The Awakening (assembled from two lines!)
+        self.assertEqual(len(chapters), 3)
+
+        titles = [c["title"] for c in chapters]
+        self.assertIn("Prologue", titles[0])
+        self.assertEqual(titles[1], 'CHAPTER 1: "The Voice of Reason"')
+        self.assertEqual(titles[2], 'CHAPTER TWO: The Awakening')
+
+        # Ensure standalone 'I' did NOT become a chapter heading and is retained in prologue content
+        self.assertNotIn("I", titles)
+        self.assertIn('"No," answered the hunter firmly.', chapters[0]["content"])
+
+        # Test valid Roman numeral headings like "II." and "I - The Awakening"
+        roman_text = """
+I - The Awakening
+
+The sun rose over the hills.
+
+II. The Hunt
+
+The tracks led deep into the ancient forest.
+"""
+        roman_chaps = segment_chapters_from_text(roman_text)
+        self.assertEqual(len(roman_chaps), 2)
+        self.assertEqual(roman_chaps[0]["title"], "I - The Awakening")
+        self.assertEqual(roman_chaps[1]["title"], "II. The Hunt")
+
+    def test_08_abbreviation_safe_semantic_splitting(self):
+        """
+        Verify that meso-tier semantic splitting at Priority 4 (sentence boundary)
+        does not split inside abbreviations or honorifics (e.g. 'Dr. Watson', 'Capt. Miller').
+        """
+        # Create a large single-paragraph text of ~13,000 words with Dr. Watson exactly at midpoint
+        sentence_a = "The ancient detective examined the footprints on the wet gravel path in silence. "
+        sentence_mid = "Dr. Watson stepped forward and spoke with Capt. Miller about the case. "
+        sentence_b = "They followed the dark trail until it reached the edge of the abandoned wharf. "
+
+        # 900 repetitions = ~13,500 words
+        part1 = sentence_a * 450
+        part2 = sentence_b * 450
+        full_content = part1 + sentence_mid + part2
+
+        splits = split_large_chapter_on_semantic_boundary(
+            title="Chapter 1: The Investigation",
+            content=full_content,
+            max_words=8000,
+        )
+
+        self.assertGreaterEqual(len(splits), 2)
+        for part in splits:
+            c = part["content"].strip()
+            # Assert that no part ends with "Dr." or starts with "Watson"
+            self.assertFalse(c.endswith("Dr."), f"Part ended with abbreviation 'Dr.': ...{c[-30:]}")
+            self.assertFalse(c.endswith("Capt."), f"Part ended with abbreviation 'Capt.': ...{c[-30:]}")
+            self.assertFalse(c.startswith("Watson"), f"Part started with separated name 'Watson': {c[:30]}...")
+            self.assertFalse(c.startswith("Miller"), f"Part started with separated name 'Miller': {c[:30]}...")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -120,6 +120,50 @@ class TestBookBible(unittest.TestCase):
         # Canonical spelling preserved
         self.assertEqual(bible.characters["Foltest"].hindi_name, "फ़ोल्टेस्ट")
 
+    def test_04_full_chapter_entity_harvesting(self):
+        """
+        Verify that EntityDiscoveryEngine and ChapterEntityHarvester scan 100% of chapter text
+        and discover characters introduced late in long chapters (e.g. at character 35,000+).
+        """
+        from audiobook_factory.translation.entity_discovery import EntityDiscoveryEngine, ChapterEntityHarvester
+
+        filler_intro = "The riders rode through the dark forest under the silver moon.\n\n" * 500  # ~32,000 characters
+        late_scene = "Near the midnight campfire, Lord Malakar unsheathed his blade. Lord Malakar spoke with his commander."
+        full_chapter = filler_intro + late_scene  # > 32,000 characters
+
+        bible = BookBible(book_title="Test Epic")
+        discovered = EntityDiscoveryEngine.discover_entities_from_text(
+            text=full_chapter,
+            book_bible=bible,
+            chapter_num=1,
+            call_llm_fn=None,
+        )
+        discovered_names = [d.name for d in discovered]
+        self.assertIn("Lord Malakar", discovered_names, "Entity at char 32,000+ must be discovered by full chapter scanning")
+
+        # Test ChapterEntityHarvester syncs the late-discovered character to bible
+        ChapterEntityHarvester.harvest_and_sync(
+            chapter_text=full_chapter,
+            project_dir=self.project_dir,
+            chapter_num=1,
+            global_glossary=None,
+            call_llm_fn=lambda prompt, system_instruction, json_mode=True: {
+                "characters": [
+                    {
+                        "english_name": "Lord Malakar",
+                        "hindi_name": "लॉर्ड मालाकार",
+                        "entity_type": "PROPER_NAME",
+                        "aliases": ["The Shadow Commander"],
+                        "gender": "male",
+                    }
+                ],
+                "locations_and_terms": {},
+            },
+        )
+        updated_bible = BookBible.load_from_project(self.project_dir)
+        self.assertIn("Lord Malakar", updated_bible.characters)
+        self.assertEqual(updated_bible.characters["Lord Malakar"].hindi_name, "लॉर्ड मालाकार")
+
 
 if __name__ == "__main__":
     unittest.main()

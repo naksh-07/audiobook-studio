@@ -6,6 +6,7 @@ sacred source text unmutated in the canonical layer.
 """
 
 from __future__ import annotations
+import html
 import re
 import unicodedata
 from typing import Tuple, List, Dict
@@ -14,6 +15,15 @@ from typing import Tuple, List, Dict
 # U+200C (ZWNJ) and U+200D (ZWJ) are preserved for Indic conjuncts, eyelash-ra, and explicit halants
 ZERO_WIDTH_CHARS = ("\u200b", "\ufeff", "\u2060", "\u00ad")
 CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+UNICODE_SPACES = (
+    "\u00a0",  # Non-breaking space
+    "\u1680",  # Ogham space mark
+    "\u2000", "\u2001", "\u2002", "\u2003", "\u2004", "\u2005", "\u2006", "\u2007", "\u2008", "\u2009", "\u200a",  # En/Em/Thin/Hair
+    "\u202f",  # Narrow no-break space
+    "\u205f",  # Medium mathematical space
+    "\u3000",  # Ideographic space
+)
 
 PUNCTUATION_REPLACEMENTS = {
     "\u2018": "'",   # Left single quote
@@ -34,7 +44,7 @@ def clean_book_text(text: str, preserve_literary_quotes: bool = False) -> str:
     Retains 100% backward compatibility for existing callers.
     
     Operations:
-    0. Unicode NFC normalization & invisible zero-width/control character hygiene.
+    0. Unicode NFC normalization, HTML entity unescaping & invisible zero-width/control character hygiene.
     1. Broken hyphenated linebreak healing (e.g. "impor-\\ntant" -> "important").
     2. Smart quote & dash normalization (unless preserve_literary_quotes is True).
     3. Safe footnote reference removal (e.g. "[1]", "[23]").
@@ -50,6 +60,12 @@ def clean_book_text(text: str, preserve_literary_quotes: bool = False) -> str:
         text = text.replace(zw, "")
     text = CONTROL_CHARS_RE.sub("", text)
 
+    # 0B. Decode unescaped HTML entities and normalize non-standard Unicode space variants
+    if "&" in text:
+        text = html.unescape(text)
+    for sp in UNICODE_SPACES:
+        text = text.replace(sp, " ")
+
     # 1. Fix broken hyphenated linebreaks across lines (ASCII, Accented Latin, Devanagari)
     text = re.sub(
         r"(\b[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F]{2,})-\n+([a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F]{2,}\b)",
@@ -64,8 +80,13 @@ def clean_book_text(text: str, preserve_literary_quotes: bool = False) -> str:
     else:
         text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # 3. Strip footnote reference marks: e.g. "[1]", "[23]"
-    text = re.sub(r"\[\d{1,3}\]", "", text)
+    # 3. Strip footnote reference marks (e.g. "[1]", "[23]") while preserving Sci-Fi/military coordinates (e.g. "Sector [4]", "Unit [12]")
+    text = re.sub(
+        r"(\b(?:sector|unit|level|grid|vault|protocol|section|gate|node|channel|sample|group|matrix|model|phase|tier|type|class|port|district|block|row|column|area|chapter|part|book)\s+)?\[\d{1,3}\]",
+        lambda m: m.group(0) if m.group(1) else "",
+        text,
+        flags=re.IGNORECASE,
+    )
 
     # 4. Remove common running headers/page number lines: e.g. "Page 42 of 300", "- 42 -"
     text = re.sub(r"^[\s\-\–—]*(?:page|pg\.|p\.)\s+\d+(?:\s+of\s+\d+)?[\s\-\–—]*$", "", text, flags=re.IGNORECASE | re.MULTILINE)

@@ -40,9 +40,11 @@ SPEECH_VERBS: Set[str] = {
 GENERIC_ROLES: Set[str] = {
     "poet", "bard", "hunter", "priestess", "priest", "mother superior",
     "abbess", "alderman", "mayor", "peasant", "peasants", "knight", "king",
-    "queen", "sorceress", "sorcerer", "mage", "girl", "boy", "man", "woman",
-    "monster", "creature", "beast", "devil", "stranger", "guard", "guards",
-    "traveler", "merchant", "innkeeper", "doctor", "healer", "warrior", "elder"
+    "queen", "sorceress", "sorcerer", "mage", "wizard", "witch", "girl", "boy",
+    "man", "woman", "monster", "creature", "beast", "devil", "stranger",
+    "guard", "guards", "traveler", "merchant", "innkeeper", "doctor", "healer",
+    "warrior", "elder", "assassin", "killer", "soldier", "captain", "commander",
+    "ranger", "archer", "thief", "bandit", "prince", "princess", "lord", "lady"
 }
 
 SUBJECT_PRONOUNS: Set[str] = {"he", "she", "they", "i", "we", "you", "it"}
@@ -258,6 +260,63 @@ def _extract_source_action_and_actors(
     if speaker and speech_verb:
         actors.append(speaker)
         action = speech_verb
+
+    # Check for passive construction: e.g. "X was struck by Y" or "A was healed by B"
+    passive_match = re.search(
+        r"\b(?:was|were|is|are|been|being|became)\s+([a-z]+)\s+by\s+((?:the|a|an\s+)?[a-zA-Z\s]+?)(?:[.,;!?]|\s+(?:with|in|at|on|using|for|from|to|while|after|before)\b|$)",
+        s_norm,
+        re.IGNORECASE,
+    )
+    if passive_match and not (speaker and speech_verb):
+        action = passive_match.group(1).lower()
+        agent_raw = passive_match.group(2).strip()
+        patient_candidate = s_norm[:passive_match.start()].strip()
+
+        # Resolve agent as actor
+        agent_clean = re.sub(r"^(?:the|a|an)\s+", "", agent_raw.lower()).strip()
+        resolved_agent = None
+        for e in known_entities:
+            if re.search(rf"\b{re.escape(e)}\b", agent_raw, re.IGNORECASE):
+                resolved_agent = e
+                break
+        if not resolved_agent:
+            if agent_clean in GENERIC_ROLES:
+                resolved_agent = (role_aliases or {}).get(agent_clean, f"the {agent_clean}")
+            else:
+                resolved_agent = agent_raw
+        actors.append(resolved_agent)
+
+        # Resolve patient from preceding clause as recipient
+        for e in known_entities:
+            if re.search(rf"\b{re.escape(e)}\b", patient_candidate, re.IGNORECASE):
+                if e not in recipients:
+                    recipients.append(e)
+        if not recipients:
+            for role in GENERIC_ROLES:
+                if re.search(rf"\b(?:the|a|an)?\s*\b({re.escape(role)})\b", patient_candidate, re.IGNORECASE):
+                    r_name = (role_aliases or {}).get(role, f"the {role}")
+                    if r_name not in recipients:
+                        recipients.append(r_name)
+        if not recipients:
+            first_words = re.findall(r"\b[a-zA-Z']+\b", patient_candidate.lower())
+            for w in first_words[:3]:
+                if w in SUBJECT_PRONOUNS:
+                    recipients.append(w.capitalize())
+                    break
+
+        # Extract key objects
+        object_candidates = re.findall(
+            r"\b(?:the|a|an|his|her|their|this|that)\s+([a-z]+\s+[a-z]+|[a-z]+)\b",
+            s_norm.lower(),
+        )
+        stop_objs = {"time", "way", "moment", "thing", "voice", "eyes", "head", "face", "man", "woman"}
+        for oc in object_candidates:
+            oc = oc.strip()
+            if oc not in stop_objs and oc not in GENERIC_ROLES and len(oc) > 3:
+                if oc not in key_objects and oc not in [a.lower() for a in actors] and oc not in [r.lower() for r in recipients]:
+                    key_objects.append(oc)
+
+        return actors, action, recipients, key_objects[:4]
 
     # Find all entity occurrences with positions
     matched_pos: List[Tuple[int, str]] = []

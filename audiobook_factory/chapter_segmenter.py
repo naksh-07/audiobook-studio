@@ -24,8 +24,8 @@ CHAPTER_PATTERNS = [
     r"^(?:\s*#+\s*)?(?:prologue|epilogue|interlude|introduction|preface|afterword)\b.*$",
     # Hindi / Devanagari chapter markers (अध्याय, भाग, खंड, काण्ड, प्रस्तावना, उपसंहार)
     r"^(?:\s*#+\s*)?(?:अध्याय|भाग|खंड|काण्ड|प्रस्तावना|उपसंहार)\s*(?:\d+|[०-९]+|[a-z]+)?\b.*$",
-    # Roman numeral standalone headers (e.g. "IV.", "XIV", "I - The Awakening") preceded and followed by blank lines
-    r"^(?:[IVXLCDM]{1,8}(?:\.|\s*[\-–—]\s*[A-Z][^\n]{2,60})?)$",
+    # Roman numeral standalone headers (e.g. "IV.", "XIV", "II. The Hunt", "I - The Awakening"; disallows isolated 'I')
+    r"^(?:(?:[IVXLCDM]{2,8}|[VXLCDM])(?:\.|\:|\s*[\:\-–—])?(?:\s+[A-Z0-9\u0900-\u097F][^\n]{1,60})?|I(?:\.|\:|\s*[\:\-–—])(?:\s+[A-Z0-9\u0900-\u097F][^\n]{1,60})?)$",
     # Word-number standalone headers (e.g. "ONE", "TWENTY-TWO", "THREE: The Journey", "THIRTY-FOUR")
     r"^(?:(?:(?:ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|ELEVEN|TWELVE|THIRTEEN|FOURTEEN|FIFTEEN|SIXTEEN|SEVENTEEN|EIGHTEEN|NINETEEN)|(?:TWENTY|THIRTY|FORTY|FIFTY|SIXTY|SEVENTY|EIGHTY|NINETY)(?:[\s\-]+(?:ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE))?|HUNDRED)(?:\s*[\:\-–—]\s*[A-Z][^\n]{2,60})?)$",
 ]
@@ -39,12 +39,27 @@ def is_valid_heading_candidate(match_text: str, preceding_text: str, following_t
     Ensures match is bounded by whitespace/newlines and not merely a speaker line or dialogue snippet.
     """
     cleaned = match_text.strip().lstrip("#").strip()
-    if len(cleaned) < 1 or len(cleaned) > 90:
+    if len(cleaned) < 1 or len(cleaned) > 120:
         return False
 
-    # Disallow common dialogue or quote punctuation at start or end
-    if cleaned.startswith(('"', "'", "“", "‘", "—", "-")) or cleaned.endswith(('"', "'", "”", "’", ",", ";")):
+    # Strict ban on isolated standalone single 'I'
+    if cleaned == "I":
         return False
+
+    # Check dialogue: Only reject if starts AND ends with quotes AND lacks chapter keywords
+    has_keywords = bool(
+        re.search(
+            r"\b(?:chapter|book|part|act|scene|prologue|epilogue|interlude|introduction|preface|afterword|अध्याय|भाग|खंड|काण्ड|प्रस्तावना|उपसंहार)\b",
+            cleaned,
+            re.IGNORECASE,
+        )
+        or match_text.strip().startswith("#")
+    )
+    if not has_keywords:
+        if cleaned.startswith(('"', "'", "“", "‘")) and cleaned.endswith(('"', "'", "”", "’")):
+            return False
+        if cleaned.startswith(("—", "-")) or cleaned.endswith((",", ";", "...")):
+            return False
 
     # Check preceding context: must be preceded by start of string or double newline
     if preceding_text:
@@ -52,9 +67,10 @@ def is_valid_heading_candidate(match_text: str, preceding_text: str, following_t
         if "\n" not in trailing_preceding:
             return False
 
-    # Check following context: must have at least 15 words of subsequent body text
+    # Check following context: explicit keyword/markdown headers require >= 1 word; bare numbers require >= 4 words
     following_words = len(following_text[:1000].split())
-    if following_words < 5:
+    min_following = 1 if has_keywords else 4
+    if following_words < min_following:
         return False
 
     return True
@@ -165,13 +181,26 @@ def segment_chapters_from_text(raw_text: str) -> List[Dict[str, Any]]:
         start = match.end()
         end = valid_splits[idx + 1].start() if idx + 1 < len(valid_splits) else len(raw_text)
         raw_slice = raw_text[start:end]
+
+        # Lookahead for 2-line title: e.g. "CHAPTER ONE\n\nThe Awakening" or "CHAPTER 1\nThe Voice"
+        first_para_match = re.match(r"^\s*\n+([^\n]{2,80})\n+(?=\S)", raw_slice)
+        if first_para_match:
+            cand_subtitle = first_para_match.group(1).strip()
+            is_not_heading = not re.match(COMBINED_CHAPTER_REGEX, cand_subtitle, flags=re.IGNORECASE)
+            has_no_terminal_punct = not cand_subtitle.endswith((".", "!", "?", "।"))
+            is_short = len(cand_subtitle.split()) <= 10
+            if is_not_heading and has_no_terminal_punct and is_short:
+                title = f"{title}: {cand_subtitle}"
+                start += first_para_match.end()
+                raw_slice = raw_text[start:end]
+
         lstrip_offset = len(raw_slice) - len(raw_slice.lstrip())
         content = raw_slice.strip()
         content_start = start + lstrip_offset
         content_end = content_start + len(content)
         word_count = len(content.split())
 
-        if word_count >= 5:
+        if word_count >= 1:
             chapters.append({
                 "title": title,
                 "content": content,
@@ -272,9 +301,16 @@ def _recursive_split_segments(
                     best_split_idx = match.start()
                     split_end = match.end()
 
-    # Priority 4: Sentence boundary (. , ? , ! , । ) in central 30%-70% zone
+    # Priority 4: Sentence boundary (. , ? , ! , । ) in central 30%-70% zone (excluding abbreviations/honorifics)
     if best_split_idx == -1:
-        for match in re.finditer(r"[\.\?\!\।]\s+", content):
+        for match in re.finditer(r"([\.\?\!\।])\s+", content):
+            punct = match.group(1)
+            punct_pos = match.start(1)
+            if punct == ".":
+                pre_slice = content[:punct_pos + 1]
+                # Skip if period belongs to an honorific or common abbreviation
+                if re.search(r"\b(?:Mr|Mrs|Ms|Dr|Prof|Capt|Lt|Col|Gen|Sgt|St|Jr|Sr|Rev|Hon|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec|vs|etc|no|e\.g|i\.e)\.$", pre_slice, re.IGNORECASE):
+                    continue
             pos = match.end()
             dist = abs(pos - mid_char)
             if 0.30 * len(content) <= pos <= 0.70 * len(content):

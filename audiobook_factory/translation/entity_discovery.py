@@ -83,11 +83,11 @@ class EntityDiscoveryEngine:
         # Refine candidate classification and Devanagari transliteration using LLM
         import os
         is_mock_offline = os.environ.get("MOCK_OFFLINE", "").lower() in ("true", "1")
-        if candidates and not is_mock_offline:
+        if candidates and (not is_mock_offline or call_llm_fn):
             try:
                 candidate_names = [c.name for c in candidates]
                 prompt = (
-                    f"Book Chapter Context (excerpt):\n\"\"\"\n{text[:4000]}\n\"\"\"\n\n"
+                    f"Book Chapter Context:\n\"\"\"\n{text[:60000]}\n\"\"\"\n\n"
                     f"Candidate Entities to Classify and Transliterate into Devanagari Hindi:\n"
                     f"{json.dumps(candidate_names, ensure_ascii=False)}\n\n"
                     "For each candidate entity, output a JSON array of objects:\n"
@@ -209,17 +209,14 @@ class ChapterEntityHarvester:
             if global_glossary:
                 bible.import_from_legacy_glossary(global_glossary)
 
-        # Skip LLM if offline or text is empty
+        # Skip LLM if offline (unless explicit call_llm_fn provided) or text is empty
         import os
         is_mock_offline = os.environ.get("MOCK_OFFLINE", "").lower() in ("true", "1")
-        if not chapter_text.strip() or is_mock_offline:
+        if not chapter_text.strip() or (is_mock_offline and not call_llm_fn):
             return bible.export_legacy_glossary()
 
-        # Prepare excerpt: first 8000 chars + middle 4000 chars if long
-        sample_excerpt = chapter_text[:8000]
-        if len(chapter_text) > 12000:
-            mid_start = len(chapter_text) // 2
-            sample_excerpt += "\n\n[...]\n\n" + chapter_text[mid_start : mid_start + 4000]
+        # Full chapter text ingestion (up to 100,000 characters) to ensure late-introduced characters are never dropped
+        sample_excerpt = chapter_text if len(chapter_text) <= 100000 else chapter_text[:100000]
 
         sys_prompt = (
             "You are an Expert Literary Lexicographer, Voice Casting Director, and Translation Dramaturge for prestige audiobooks.\n"

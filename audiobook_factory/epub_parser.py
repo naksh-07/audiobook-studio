@@ -12,6 +12,7 @@ Features:
 """
 
 from __future__ import annotations
+import html
 import os
 import re
 import zipfile
@@ -181,6 +182,32 @@ class EPUBStructuralHTMLParser(HTMLParser):
         return self.blocks
 
 
+def _safe_xml_fromstring(xml_bytes_or_str: bytes | str) -> ET.Element:
+    """
+    Safely parses XML content, automatically resolving unescaped HTML entities
+    (e.g., &mdash;, &nbsp;, &hellip;) to numeric character references if standard XML parsing fails.
+    """
+    if isinstance(xml_bytes_or_str, str):
+        raw_text = xml_bytes_or_str
+    else:
+        raw_text = xml_bytes_or_str.decode("utf-8", errors="ignore")
+
+    try:
+        return ET.fromstring(raw_text.encode("utf-8"))
+    except ET.ParseError:
+        def _repl_entity(m: re.Match) -> str:
+            name = m.group(1).lower()
+            if name in ("amp", "lt", "gt", "quot", "apos"):
+                return m.group(0)
+            char = html.unescape(m.group(0))
+            if char != m.group(0):
+                return f"&#{ord(char)};"
+            return m.group(0)
+
+        cleaned_xml = re.sub(r"&([a-zA-Z0-9]+);", _repl_entity, raw_text)
+        return ET.fromstring(cleaned_xml.encode("utf-8"))
+
+
 class ForensicEPUBParser:
     """
     Forensic structural parser for EPUB containers.
@@ -212,7 +239,7 @@ class ForensicEPUBParser:
             # 1. Locate OPF rootfile via META-INF/container.xml
             try:
                 container_xml = zf.read("META-INF/container.xml")
-                root = ET.fromstring(container_xml)
+                root = _safe_xml_fromstring(container_xml)
                 rootfile_path = None
                 for elem in root.iter():
                     if elem.tag.endswith("rootfile"):
@@ -235,15 +262,15 @@ class ForensicEPUBParser:
                 opf_dir = ""
 
             opf_content = zf.read(rootfile_path)
-            opf_root = ET.fromstring(opf_content)
+            opf_root = _safe_xml_fromstring(opf_content)
 
             # 2. Extract Metadata
             for elem in opf_root.iter():
                 if elem.tag.endswith("title") and elem.text and not metadata.get("found_title"):
-                    metadata["title"] = elem.text.strip()
+                    metadata["title"] = html.unescape(elem.text.strip())
                     metadata["found_title"] = True
                 elif elem.tag.endswith("creator") and elem.text and not metadata.get("found_author"):
-                    metadata["author"] = elem.text.strip()
+                    metadata["author"] = html.unescape(elem.text.strip())
                     metadata["found_author"] = True
                 elif elem.tag.endswith("language") and elem.text:
                     metadata["language"] = elem.text.strip()
@@ -251,16 +278,21 @@ class ForensicEPUBParser:
             metadata.pop("found_author", None)
 
             # 3. Parse Manifest
+            epub3_nav_href: Optional[str] = None
             for elem in opf_root.iter():
                 if elem.tag.endswith("item"):
-                    item_id = elem.attrib.get("id")
-                    href = elem.attrib.get("href")
+                    item_id = elem.attrib.get("id", "")
+                    href = elem.attrib.get("href", "")
                     media_type = elem.attrib.get("media-type", "")
+                    properties = elem.attrib.get("properties", "")
                     if item_id and href:
                         full_href = f"{opf_dir}/{href}".replace("\\", "/").lstrip("/") if opf_dir else href
                         manifest[item_id] = full_href
-                        if "ncx" in media_type.lower() or item_id.lower() in ("ncx", "toc"):
+                        if "ncx" in media_type.lower() or item_id.lower() in ("ncx", "toc.ncx"):
                             toc_href = full_href
+                        elif "nav" in properties.split() or item_id.lower() in ("nav", "toc", "toc_nav") or href.endswith("nav.xhtml") or href.endswith("toc.xhtml"):
+                            if not epub3_nav_href:
+                                epub3_nav_href = full_href
 
             # 4. Parse Spine reading order
             for elem in opf_root.iter():
@@ -269,109 +301,135 @@ class ForensicEPUBParser:
                     if idref in manifest:
                         spine_items.append(manifest[idref])
 
-            # 5. Locate TOC navigation points (EPUB 2 NCX or EPUB 3 Nav)
+            # 5. Locate TOC navigation points (EPUB 3 Nav or EPUB 2 NCX)
             nav_points: List[Tuple[str, str]] = []
-            if not toc_href:
-                for name in zf.namelist():
-                    if name.endswith(".ncx"):
-                        toc_href = name
-                        break
 
-            if toc_href and toc_href in zf.namelist():
+            # 5A. Check EPUB 3 Navigation Document (HTML5 <nav epub:type="toc">)
+            if epub3_nav_href and epub3_nav_href in zf.namelist():
                 try:
-                    toc_xml = zf.read(toc_href).decode("utf-8", errors="ignore")
-                    toc_root = ET.fromstring(toc_xml)
-                    for nav in toc_root.iter():
-                        if nav.tag.endswith("navPoint"):
-                            lbl_elem = None
-                            src_attr = None
-                            for child in nav.iter():
-                                if child.tag.endswith("text") and child.text and not lbl_elem:
-                                    lbl_elem = child.text.strip()
-                                elif child.tag.endswith("content") and "src" in child.attrib and not src_attr:
-                                    src_attr = child.attrib.get("src", "").strip()
-                            if lbl_elem and src_attr:
-                                if opf_dir and not src_attr.startswith(opf_dir):
-                                    full_src = f"{opf_dir}/{src_attr}".replace("\\", "/").lstrip("/")
-                                else:
-                                    full_src = src_attr
-                                nav_points.append((lbl_elem, full_src))
+                    nav_html = zf.read(epub3_nav_href).decode("utf-8", errors="ignore")
+                    matches = re.findall(
+                        r'<a\s+(?:[^>]*?\s+)?href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+                        nav_html,
+                        re.IGNORECASE | re.DOTALL,
+                    )
+                    nav_base_dir = str(Path(epub3_nav_href).parent).replace("\\", "/")
+                    if nav_base_dir == ".":
+                        nav_base_dir = ""
+
+                    for href_val, raw_label in matches:
+                        clean_label = re.sub(r"<[^>]+>", "", raw_label).strip()
+                        clean_label = html.unescape(clean_label)
+                        clean_label = " ".join(clean_label.split())
+                        if clean_label and href_val:
+                            if nav_base_dir and not href_val.startswith(nav_base_dir):
+                                full_src = f"{nav_base_dir}/{href_val}".replace("\\", "/").lstrip("/")
+                            elif opf_dir and not href_val.startswith(opf_dir):
+                                full_src = f"{opf_dir}/{href_val}".replace("\\", "/").lstrip("/")
+                            else:
+                                full_src = href_val.lstrip("/")
+                            nav_points.append((clean_label, full_src))
                 except Exception:
                     nav_points = []
 
-            # 6. Parse Content & Extract Blocks
+            # 5B. Fallback to EPUB 2 NCX (<navPoint>)
+            if not nav_points:
+                if not toc_href:
+                    for name in zf.namelist():
+                        if name.endswith(".ncx"):
+                            toc_href = name
+                            break
+
+                if toc_href and toc_href in zf.namelist():
+                    try:
+                        toc_xml = zf.read(toc_href).decode("utf-8", errors="ignore")
+                        toc_root = _safe_xml_fromstring(toc_xml)
+                        for nav in toc_root.iter():
+                            if nav.tag.endswith("navPoint"):
+                                lbl_elem = None
+                                src_attr = None
+                                for child in nav.iter():
+                                    if child.tag.endswith("text") and child.text and not lbl_elem:
+                                        lbl_elem = html.unescape(child.text.strip())
+                                    elif child.tag.endswith("content") and "src" in child.attrib and not src_attr:
+                                        src_attr = child.attrib.get("src", "").strip()
+                                if lbl_elem and src_attr:
+                                    if opf_dir and not src_attr.startswith(opf_dir):
+                                        full_src = f"{opf_dir}/{src_attr}".replace("\\", "/").lstrip("/")
+                                    else:
+                                        full_src = src_attr
+                                    nav_points.append((lbl_elem, full_src))
+                    except Exception:
+                        nav_points = []
+
+            # 6. Parse Content & Extract Blocks (Node-Level Isolation)
+            # Parse each spine document individually to eliminate cross-document tag bleeding
+            spine_blocks_map: Dict[str, List[CanonicalBlock]] = {}
+            global_order = 0
+            for sf in spine_items:
+                try:
+                    c = zf.read(sf).decode("utf-8", errors="ignore")
+                except Exception:
+                    c = ""
+                parser = EPUBStructuralHTMLParser(
+                    source_file=str(self.file_path),
+                    spine_item=sf,
+                    base_reading_order=global_order,
+                )
+                parser.feed(c)
+                blks = parser.finalize()
+                global_order += len(blks)
+                spine_blocks_map[sf] = blks
+
             chapters: List[CanonicalChapter] = []
             legacy_items: List[Dict[str, Any]] = []
 
             if nav_points:
-                # Map continuous spine content
-                file_offsets: Dict[str, int] = {}
-                file_lengths: Dict[str, int] = {}
-                spine_raw_map: Dict[str, str] = {}
-                current_pos = 0
-
+                # Build unified ordered block list with spine coordinates
+                ordered_blocks_with_loc: List[Tuple[str, int, CanonicalBlock]] = []
                 for sf in spine_items:
-                    try:
-                        c = zf.read(sf).decode("utf-8", errors="ignore")
-                    except Exception:
-                        c = ""
-                    file_offsets[sf] = current_pos
-                    file_lengths[sf] = len(c)
-                    spine_raw_map[sf] = c
-                    current_pos += len(c)
+                    for b_idx, blk in enumerate(spine_blocks_map.get(sf, [])):
+                        ordered_blocks_with_loc.append((sf, b_idx, blk))
 
-                full_html = "".join(spine_raw_map[sf] for sf in spine_items)
-
-                # Locate nav positions with anchor precision
-                all_nav_positions: List[Tuple[str, int, str]] = []
+                # Resolve nav positions to exact block index in ordered_blocks_with_loc
+                nav_block_starts: List[Tuple[str, int, str]] = []
                 for lbl, src in nav_points:
                     parts = src.split("#")
                     sf = parts[0]
                     anchor = parts[1] if len(parts) > 1 else ""
-                    if sf in file_offsets:
-                        base_offset = file_offsets[sf]
-                        file_slice = full_html[base_offset : base_offset + file_lengths.get(sf, 0)]
-                        if anchor:
-                            m = re.search(r'(?:id|name)=["\']' + re.escape(anchor) + r'["\']', file_slice)
-                            if m:
-                                last_open = file_slice.rfind('<', 0, m.start())
-                                last_close = file_slice.rfind('>', 0, m.start())
-                                if last_open != -1 and last_open > last_close:
-                                    pos = base_offset + last_open
-                                else:
-                                    pos = base_offset + m.start()
-                            else:
-                                pos = base_offset
-                        else:
-                            pos = base_offset
-                        all_nav_positions.append((lbl, pos, sf))
 
-                skip_keywords = ["extras", "meet the author", "preview", "copyright", "about the author", "cover", "toc"]
+                    # Find matching block in ordered_blocks_with_loc
+                    match_idx: Optional[int] = None
+                    if anchor:
+                        for g_idx, (b_sf, _, b_obj) in enumerate(ordered_blocks_with_loc):
+                            if b_sf == sf and b_obj.provenance.html_id == anchor:
+                                match_idx = g_idx
+                                break
+                    if match_idx is None:
+                        for g_idx, (b_sf, _, _) in enumerate(ordered_blocks_with_loc):
+                            if b_sf == sf:
+                                match_idx = g_idx
+                                break
 
-                for i, (title, pos, spine_file) in enumerate(all_nav_positions):
-                    if any(sk in title.lower() for sk in skip_keywords):
+                    if match_idx is not None:
+                        nav_block_starts.append((lbl, match_idx, sf))
+
+                skip_pattern = r"\b(?:extras|meet the author|preview|copyright|about the author|cover|toc)\b"
+
+                for i, (title, start_idx, spine_file) in enumerate(nav_block_starts):
+                    if re.search(skip_pattern, title, re.IGNORECASE):
                         continue
-                    end_pos = all_nav_positions[i + 1][1] if i + 1 < len(all_nav_positions) else len(full_html)
-                    chunk_html = full_html[pos:end_pos]
-                    if not chunk_html.strip():
+                    end_idx = nav_block_starts[i + 1][1] if i + 1 < len(nav_block_starts) else len(ordered_blocks_with_loc)
+                    chap_block_triples = ordered_blocks_with_loc[start_idx:end_idx]
+                    blocks = [b for _, _, b in chap_block_triples]
+                    if not blocks:
                         continue
 
-                    # Parse chunk with EPUBStructuralHTMLParser
-                    parser = EPUBStructuralHTMLParser(
-                        source_file=str(self.file_path),
-                        spine_item=spine_file,
-                        base_reading_order=len(chapters) * 1000,
-                    )
-                    parser.feed(chunk_html)
-                    blocks = parser.finalize()
-                    
                     # Generate chapter text from parsed blocks
                     clean_text = "\n\n".join(b.normalized_text for b in blocks if b.normalized_text.strip())
-                    clean_text = re.sub(r'^(?:id|name)=["\'][^"\']+["\']>\s*', '', clean_text).strip()
-                    clean_text = re.sub(r'^' + re.escape(title) + r'\s*', '', clean_text, flags=re.IGNORECASE).strip()
                     word_count = len(clean_text.split())
 
-                    if word_count >= 30:
+                    if word_count >= 5:
                         chap_num = len(chapters) + 1
                         canonical_chap = CanonicalChapter(
                             id=f"ch-{chap_num:03d}",
@@ -408,26 +466,15 @@ class ForensicEPUBParser:
 
             # Fallback to sequential spine document traversal
             if not chapters:
-                global_order = 0
                 lit_counter = 0
                 for item_path in spine_items:
-                    try:
-                        content = zf.read(item_path).decode("utf-8", errors="ignore")
-                    except Exception:
+                    blocks = spine_blocks_map.get(item_path, [])
+                    if not blocks:
                         continue
-
-                    parser = EPUBStructuralHTMLParser(
-                        source_file=str(self.file_path),
-                        spine_item=item_path,
-                        base_reading_order=global_order,
-                    )
-                    parser.feed(content)
-                    blocks = parser.finalize()
-                    global_order += len(blocks)
 
                     clean_text = "\n\n".join(b.normalized_text for b in blocks if b.normalized_text.strip())
                     word_count = len(clean_text.split())
-                    if word_count >= 30:
+                    if word_count >= 5:
                         chap_num = len(chapters) + 1
                         has_heading = bool(blocks and blocks[0].type == "heading")
                         if has_heading:
