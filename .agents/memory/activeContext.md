@@ -27,9 +27,10 @@
   - Loudness Range: **5.8 LU** (EBU R128 dynamic compliance).
 
 ## Extraction Subsystem: Standalone Architecture Migration (v5.3)
-- **Status**: 100% MERGED & VERIFIED (Branch merged into `main`).
+- **Status**: 100% MERGED, AUDITED & HARDENED (`main`).
 - **Pillar 1 Standalone**: Package `audiobook_factory/extraction/` with contracts, engine, parsers (epub, text, pdf), normalizer, segmenter, and quality gate.
-- **CLI & Isolation**: Standalone CLI (`cli.py`: `extract`, `audit`, `inspect`), PEP 562 lazy-loading root facade, zero downstream coupling.
-- **Verification**: 58/58 tests passing green across 10 test suites (0 regressions).
+- **CLI & Isolation**: Standalone CLI (`cli.py`), PEP 562 lazy-loading root facade, zero downstream coupling.
+- **Audit Hardening (v5.3.1)**: Sanitized `book_id` path traversal, added Devanagari abbreviations (`डॉ.`, `प्रो.`, `पं.`) to sentence splitting, added EPUB `<aside>` ignore filtering.
+- **Verification**: 61/61 tests passing green across 10 test suites (0 regressions).
 - **Ready for Next**: Standalone subsystem integration ready for sibling branches (`translation`, `tts-system`, `dramaturgy`, `research-system`).
 
