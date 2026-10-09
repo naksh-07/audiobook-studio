@@ -1,4 +1,4 @@
-# 🎙️ Audiobook Studio (Antigravity Plugin & Studio Engine v5.2)
+# 🎙️ Audiobook Studio (Antigravity Plugin & Studio Engine v5.3)
 
 > **Autonomous Studio-Grade Multi-Voice Audiobook Production Engine & Google Antigravity Plugin with Gemini Flash TTS, 4D Formant Actor Performance, Two-Pass Linear EBU R128 Mastering, Anti-Swap Dialogue Attribution & Interactive Sidecar Studio Panel.**
 
@@ -63,10 +63,13 @@ flowchart TD
         Critic --> Editorial["Dialogue Editorial Layer (DE-01 - DE-07)<br/>Endpoint Snapping, Hann Micro-Fades & Turn Latency"]
     end
 
-    subgraph Room5["🎛️ Room 5: Broadcast Vocal Mastering & Packaging"]
-        Editorial --> VocalMaster["Studio Vocal Mastering Engine<br/>SOXR 48kHz / 24-bit + Dual-Pass Loudnorm EBU R128 (-19 LUFS)"]
-        VocalMaster --> Packager["FFMETADATA1 Chapter Generator & AAC Packager"]
-        Packager --> Deliverable["Deliverable M4B Audiobook (Chapter Markers & Cover Art)"]
+    subgraph Room5["🎛️ Room 5: Pure Vocals-Only Audio Mixing & Production Subsystem"]
+        Editorial --> StreamComp["ChunkStreamComposer (<= 800 KB RAM Streaming)<br/>Direct premaster.wav Writer + Zero Disk Silence Files"]
+        StreamComp --> VocalMaster["MasteringEngineV2 (Stage 12 Canonical Core)<br/>Dual-Pass Linear EBU R128 (-19.0 LUFS) + Limiter (-2.0 dBFS, asc=0)<br/>Ban on Dynamic AGC Pumping on Pauses (AP-08)"]
+        VocalMaster --> AACDeliver["ChapterDeliveryEncoder (Single-Pass 192k AAC-LC)<br/>Post-Encode True Peak Verification (<= -1.5 dBTP)"]
+        AACDeliver --> M4BPack["M4BBookPackager (Lossless Stream Copy -c:a copy)<br/>Monotonic FFMETADATA1 Chapter Markers & Cover Art"]
+        M4BPack --> Deliverable["Studio Audiobook Deliverable (.m4b)"]
+        HotPatch["SingleSegmentHotPatcher & ChapterSegmentLedger<br/>Incremental DAG Caching & < 0.2s Sample-Accurate Splice"] -.-> StreamComp
     end
 
     Room1 --> Room2
@@ -74,6 +77,19 @@ flowchart TD
     Room3 --> Room4
     Room4 --> Room5
 ```
+
+### 🎛️ Room 5: Pure Vocals-Only Audio Mixing & Production Subsystem (`audiobook_factory/audio/`)
+
+Room 5 houses the decoupled, broadcast-compliant audio production pipeline engineered to transform raw synthesized speech into Audible-standard `.m4a` chapter deliverables and chapterized `.m4b` containers:
+
+- **Strongly Typed Audio Contracts ([`contracts.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/contracts.py))**: Immutable Pydantic v2 schemas ([`SegmentAudioContract`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/contracts.py#L26-L66), [`ChapterMasterContract`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/contracts.py#L68-L85), [`IngestionConfig`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/contracts.py#L15-L24)) defining strict interfaces across ingestion, editorial, mastering, and container packaging.
+- **Tier A Speech Ingestion & Normalization ([`ingestion.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/ingestion.py))**: Normalizes all incoming speech chunks to uniform **48,000 Hz 24-bit stereo PCM WAV**, strips RIFF wrapper static and C2PA digital watermark screech artifacts, rejects DC bias via 30Hz highpass filter, and enforces the **Single 5.0ms Raised-Cosine Hann Micro-Taper invariant (AP-06)** with boundary samples pinned strictly to 0.0.
+- **Streaming Pre-Master Composer ([`stream_composer.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/stream_composer.py))**: A block-based WAV writer ([`ChunkStreamComposer`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/stream_composer.py#L22-L338)) streaming normalized speech, syntax-aware pauses (clause: 180ms, sentence: 380ms, turn: 600ms), and DE-05 conversational overlaps directly into `premaster.wav`. Operates under a **constant $\le 800\text{ KB}$ RAM ceiling**, completely eliminating Android Termux OOM crashes on multi-hour audiobooks and generating zero standalone silence scratch files (AP-05).
+- **Dialogue Editorial Bridge ([`editorial.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/editorial.py))**: Unifies Ingestion, the Dialogue Editorial Layer (DE-01 - DE-07: dead-air clamping, breath regulation, inter-take leveling, azimuth spatial panning), and pre-master streaming composition into an automated pipeline ([`DialogueEditorialBridge`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/editorial.py#L18-L157)).
+- **Canonical Stage 12 Mastering Engine ([`mastering_engine.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/mastering_engine.py))**: The sole canonical mastering core (`MasteringEngineV2`). Implements two-pass linear EBU R128 (-19.0 LUFS target) with a calibrated **-2.0 dBFS brickwall limiter ceiling (`asc=0:level=0`)** and an architectural ban on single-pass dynamic loudnorm AGC pumping during dramatic pauses or near-silence (AP-08).
+- **Single-Pass Chapter Delivery Encoder ([`encoder.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/encoder.py))**: Guarantees the Zero-Generation-Loss invariant (AP-04) by executing exactly one lossy compression pass from master PCM WAV to **192k AAC-LC** (`chapter_XXX.m4a`). Followed by an automated **True Peak post-encode check ($\le -1.5\text{ dBTP}$)** with closed-loop gain trim remediation (-0.3 dB) to eradicate inter-sample codec clipping.
+- **Lossless Stream Copy M4B Packager ([`packager.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/packager.py))**: Assembles chapter deliverables into a final `.m4b` container using **lossless stream copy (`-c:a copy`)** with web-streaming faststart (`-movflags +faststart`), embedded cover art, atomic file promotion, and strictly monotonic **`FFMETADATA1` chapter markers** ($\text{START}_k = \text{END}_{k-1}$) to prevent audiobook player timeline desync (AP-10).
+- **Incremental DAG Caching & Hot-Patching ([`ledger.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/ledger.py), [`hot_patcher.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/hot_patcher.py))**: [`ChapterSegmentLedger`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/ledger.py#L83-L120) tracks cryptographic SHA-256 hashes of text, actor, and audio artifacts. [`SingleSegmentHotPatcher`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/hot_patcher.py#L33-L175) performs **sample-accurate timeline splicing in $< 0.2\text{s}$**, allowing instant surgical repair of mispronounced chunks without re-rendering entire multi-hour chapters (AP-07).
 
 ---
 
@@ -124,12 +140,14 @@ Audiobook Studio strictly adheres to international broadcast and Audible product
 
 | Parameter | Benchmark Target | Engine Implementation |
 |---|---|---|
-| **Integrated Loudness** | **-19.0 LUFS** ($\pm 0.5$ LUFS) | Two-pass measured linear loudnorm (`-f null -` pass 1, `linear=true` pass 2). |
-| **True Peak Ceiling** | $\le$ **-1.5 dBTP** | Hard limiter ceiling with Kaiser Sinc 48kHz / 24-bit post-loudnorm resampling. |
+| **Integrated Loudness** | **-19.0 LUFS** ($\pm 0.5$ LUFS) | Two-pass measured linear loudnorm (`-f null -` pass 1, `linear=true` pass 2); dynamic loudnorm AGC strictly banned during dramatic pauses/silence (AP-08). |
+| **True Peak Ceiling** | $\le$ **-1.5 dBTP** | Hard limiter ceiling calibrated to **-2.0 dBFS** (`asc=0:level=0`) absorbing AAC codec regrowth; verified via post-encode True Peak audit ($\le -1.5\text{ dBTP}$). |
+| **Streaming Memory** | $\le \mathbf{800\text{ KB}}$ RAM | Block-based `ChunkStreamComposer` writes directly to `premaster.wav`, eliminating Termux OOM crashes on Android. |
+| **Incremental DAG Recovery** | $< \mathbf{0.2\text{s}}$ hot-patch | `ChapterSegmentLedger` SHA-256 caching + `SingleSegmentHotPatcher` sample-accurate timeline splicing without full chapter re-rendering (AP-07). |
 | **Consonant Clarity** | Zero de-esser degradation | Dynamic sibilance de-essers are banned; crisp Hindi dental/aspirated consonants (स, श, छ, थ, ध) are preserved. |
 | **Phase Coherence** | Natural tempo phrasing | WSOLA time-stretching banned during playback; pacing modulated naturally via punctuation. |
-| **Micro-Fades** | Zero-crossing snapping | 12ms pre-speech fade-in and 18ms post-speech fade-out at -52 dBFS noise floor. |
-| **Output Container** | Audible-compatible `.m4b` | AAC-LC 128-192 kbps, embedded chapters (`FFMETADATA1`), and high-res cover art. |
+| **Micro-Tapering** | Zero-crossing snapping | Single 5.0ms raised-cosine Hann micro-taper at speech boundaries (AP-06) with initial and final samples strictly 0.0. |
+| **Output Container** | Audible-compatible `.m4b` | Single-pass 192 kbps AAC-LC chapter deliverable (`.m4a`), lossless stream copy assembly (`-c:a copy`), strictly monotonic `FFMETADATA1` markers, and high-res cover art. |
 
 ---
 
@@ -234,6 +252,7 @@ All quality gates are fail-closed:
 For exhaustive technical guides, visit the [`docs/`](docs/) directory:
 - [🏛️ Architecture Blueprint](docs/ARCHITECTURE.md)
 - [🎛️ Audio Engineering & Mastering](docs/AUDIO_ENGINEERING.md)
+- [🎛️ Pure Vocals-Only Audio Mixing & Production (v5.3)](docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
 - [🎙️ Gemini Flash TTS Synthesis & Directing](docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
 - [🎭 Voice Casting Director Guide](docs/VOICE_CASTING_DIRECTOR_GUIDE.md)
 - [🇮🇳 Complete Hindi Voice Catalog](docs/HINDI_VOICE_CATALOG.md)

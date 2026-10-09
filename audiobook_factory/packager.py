@@ -335,10 +335,10 @@ def package_m4b_audiobook(
 
     if has_cover:
         pack_cmd.extend(["-i", str(cover_image)])
-        pack_cmd.extend(["-map", "0:a", "-map", "2:v", "-map_metadata", "1"])
+        pack_cmd.extend(["-map", "0:a", "-map", "2:v", "-map_metadata", "1", "-map_chapters", "1"])
         pack_cmd.extend(["-c:a", "copy", "-c:v", "mjpeg", "-disposition:v", "attached_pic"])
     else:
-        pack_cmd.extend(["-map", "0:a", "-map_metadata", "1"])
+        pack_cmd.extend(["-map", "0:a", "-map_metadata", "1", "-map_chapters", "1"])
         pack_cmd.extend(["-c:a", "copy"])
 
     tmp_m4b = final_m4b.with_suffix(f".tmp_{os.getpid()}_{uuid.uuid4().hex[:6]}.m4b")
@@ -356,9 +356,9 @@ def package_m4b_audiobook(
 
             fb_pack_cmd = [ffmpeg, "-y", "-i", str(temp_concat), "-i", str(meta_txt)]
             if has_cover:
-                fb_pack_cmd.extend(["-i", str(cover_image), "-map", "0:a", "-map", "2:v", "-map_metadata", "1", "-c:a", "copy", "-c:v", "mjpeg", "-disposition:v", "attached_pic"])
+                fb_pack_cmd.extend(["-i", str(cover_image), "-map", "0:a", "-map", "2:v", "-map_metadata", "1", "-map_chapters", "1", "-c:a", "copy", "-c:v", "mjpeg", "-disposition:v", "attached_pic"])
             else:
-                fb_pack_cmd.extend(["-map", "0:a", "-map_metadata", "1", "-c:a", "copy"])
+                fb_pack_cmd.extend(["-map", "0:a", "-map_metadata", "1", "-map_chapters", "1", "-c:a", "copy"])
             fb_pack_cmd.extend(["-movflags", "+faststart"])
             fb_pack_cmd.append(str(tmp_m4b))
             try:

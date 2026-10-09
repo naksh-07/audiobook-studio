@@ -190,6 +190,10 @@ class MasteringEngineV2:
                 f"linear=true"
             )
             filter_chain_parts.append(loudnorm_filter)
+        elif is_silent:
+            # AP-08 Invariant: Never apply dynamic loudnorm AGC to near-silent audio or dramatic pauses.
+            # Dynamic AGC boosts subtle room tone or noise floor by up to +50dB, causing unnatural breathing.
+            filter_chain_parts.append("volume=0.0dB")
         else:
             # Fallback or silent pass
             loudnorm_filter = (
@@ -199,7 +203,7 @@ class MasteringEngineV2:
             filter_chain_parts.append(loudnorm_filter)
 
         filter_chain_parts.append(
-            f"alimiter=limit={lim_linear:.4f}:attack=5:release={profile.limiter_release_ms}:asc=0:level=0"
+            f"alimiter=limit={lim_linear:.4f}:attack=3:release={profile.limiter_release_ms}:asc=0:level=0"
         )
 
         if dither_method == "none":

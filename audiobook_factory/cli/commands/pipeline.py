@@ -187,14 +187,13 @@ def cmd_master(args):
         )
 
         out_file = mastered_dir / f"{chap_stem}_mastered.m4a"
-        ff = get_ffmpeg()
-        cmd_enc = [
-            ff, "-y",
-            "-i", str(vocal_wav),
-            "-c:a", "aac", "-b:a", "192k",
-            str(out_file),
-        ]
-        subprocess.run(cmd_enc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=300.0)
+        from audiobook_factory.audio.encoder import ChapterDeliveryEncoder
+        encoder = ChapterDeliveryEncoder()
+        encoder.encode_chapter_m4a(
+            input_wav=vocal_wav,
+            output_m4a=out_file,
+            target_bitrate="192k",
+        )
 
     print(f"\n[OK] All chapters mastered at: {mastered_dir}")
 

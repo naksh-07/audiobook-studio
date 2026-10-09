@@ -16,7 +16,7 @@ import datetime
 import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Literal, Union
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator, ValidationInfo
 
 
 class MasteringProfile(BaseModel):
@@ -29,12 +29,12 @@ class MasteringProfile(BaseModel):
     profile_name: str = Field(default="commercial_audiobook_standard", description="Profile identifier")
     target_lufs: float = Field(default=-19.0, ge=-24.0, le=-14.0, description="EBU R128 integrated loudness target in LUFS")
     tolerance_lu: float = Field(default=0.5, ge=0.1, le=2.0, description="Integrated loudness allowable tolerance in LU")
-    true_peak_ceiling_dbtp: float = Field(default=-1.6, ge=-3.0, le=-0.5, description="Inter-sample peak ceiling in dBTP")
+    true_peak_ceiling_dbtp: float = Field(default=-2.0, ge=-3.0, le=-0.5, description="Inter-sample peak ceiling in dBTP")
     target_lra: float = Field(default=8.5, ge=4.0, le=14.0, description="Target loudness range in LU")
     subsonic_highpass_hz: int = Field(default=28, ge=18, le=45, description="Subsonic rumble filter cutoff frequency in Hz")
     enable_dual_pass_linear: bool = Field(default=True, description="Enforce dual-pass linear loudnorm to prevent dynamic pumping")
-    limiter_ceiling_db: float = Field(default=-1.8, ge=-3.5, le=-0.8, description="Peak limiter ceiling threshold in dBFS")
-    limiter_release_ms: int = Field(default=50, ge=10, le=250, description="Peak limiter release time in milliseconds")
+    limiter_ceiling_db: float = Field(default=-2.0, ge=-3.5, le=-0.8, description="Peak limiter ceiling threshold in dBFS")
+    limiter_release_ms: int = Field(default=40, ge=10, le=250, description="Peak limiter release time in milliseconds")
     dither_type: str = Field(default="tpdf", description="Dither algorithm: tpdf, triangular_hp, none")
     output_sample_rate: int = Field(default=48000, description="Standard output sample rate in Hz")
     output_channels: int = Field(default=2, description="Output channel count (2 = stereo)")
@@ -426,7 +426,9 @@ class MasteringRequest(BaseModel):
     is_premaster: bool = Field(default=True, description="Enforces input must be a fresh premaster, preventing double-mastering")
 
     @model_validator(mode="after")
-    def validate_request(self) -> MasteringRequest:
+    def validate_request(self, info: ValidationInfo) -> MasteringRequest:
+        if info.context and info.context.get("allow_missing_premaster"):
+            return self
         p = Path(self.premaster_path)
         if not p.exists():
             raise FileNotFoundError(f"Premaster file does not exist: {self.premaster_path}")
@@ -490,4 +492,4 @@ class MasteringLedger(BaseModel):
         p = Path(target_path).resolve()
         if not p.exists():
             raise FileNotFoundError(f"Mastering ledger not found: {p}")
-        return cls.model_validate(json.loads(p.read_text(encoding="utf-8")))
+        return cls.model_validate(json.loads(p.read_text(encoding="utf-8")), context={"allow_missing_premaster": True})
