@@ -105,9 +105,9 @@ class PodcastScriptBuilder:
 
         current_speaker = host_a
 
-        for chapter in book.chapters:
+        for ch_idx, chapter in enumerate(book.chapters):
             # Section Landmark announcement
-            if chapter.title and chapter.title.lower() not in ("prologue", "prologue / introduction"):
+            if chapter.title and ch_idx > 0:
                 seg_idx += 1
                 section_prompt = f"Let's dive into {chapter.title}."
                 segments.append(

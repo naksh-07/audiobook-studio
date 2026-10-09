@@ -7,7 +7,7 @@ podcast scripts, host profiles, and verbalization segment units.
 
 from __future__ import annotations
 from typing import List, Dict, Any, Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, AliasChoices
 
 
 HostRole = Literal["lead_explainer", "inquisitive_cohost", "solo_narrator"]
@@ -16,23 +16,23 @@ VerbalizationStyle = Literal["conversational_podcast", "formal_lecture", "narrat
 
 class HostProfile(BaseModel):
     """Configuration profile for a podcast host or commentator."""
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    id: str
-    name: str
+    id: str = Field(validation_alias=AliasChoices("id", "character"))
+    name: str = Field(validation_alias=AliasChoices("name", "display_name"))
     role: HostRole = "lead_explainer"
-    default_voice: str = "Charon"
+    default_voice: str = Field(default="Charon", validation_alias=AliasChoices("default_voice", "voice"))
     acting_style: str = "engaging, articulate, measured, clear"
     formant_preset: Optional[str] = None
 
 
 class PodcastSegment(BaseModel):
     """Atomic spoken dialogue turn in a podcast script."""
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    segment_id: str
+    segment_id: str = Field(validation_alias=AliasChoices("segment_id", "id"))
     speaker: str
-    character_name: str
+    character_name: str = Field(default="", validation_alias=AliasChoices("character_name", "character", "display_name"))
     text: str
     acting_directive: str = "natural conversational delivery"
     source_block_id: Optional[str] = None
@@ -41,19 +41,21 @@ class PodcastSegment(BaseModel):
     words: int = 0
 
     def model_post_init(self, __context: Any) -> None:
+        if not self.character_name:
+            self.character_name = self.speaker
         if not self.words and self.text:
             self.words = len(self.text.split())
 
 
 class PodcastScript(BaseModel):
     """Complete structured dual-host or narrative podcast script."""
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    podcast_id: str
+    podcast_id: str = Field(validation_alias=AliasChoices("podcast_id", "chapter_id"))
     title: str
-    source_document_id: str
+    source_document_id: str = Field(default="")
     style: VerbalizationStyle = "conversational_podcast"
-    hosts: List[HostProfile] = Field(default_factory=list)
+    hosts: List[HostProfile] = Field(default_factory=list, validation_alias=AliasChoices("hosts", "cast"))
     segments: List[PodcastSegment] = Field(default_factory=list)
     total_words: int = 0
     total_segments: int = 0
@@ -98,3 +100,22 @@ class PodcastScript(BaseModel):
                 for s in self.segments
             ],
         }
+
+
+class PodcastProductionResult(BaseModel):
+    """Execution telemetry and output references for synthesized and mastered podcast audio."""
+    model_config = ConfigDict(extra="ignore")
+
+    podcast_id: str
+    status: Literal["SUCCESS", "FAILED"] = "SUCCESS"
+    total_segments: int = 0
+    total_words: int = 0
+    duration_sec: float = 0.0
+    dialogue_raw_path: Optional[str] = None
+    mastered_audio_path: Optional[str] = None
+    integrated_lufs: float = -19.0
+    true_peak_db: float = -1.5
+    loudness_range_lu: float = 0.0
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+    error_message: Optional[str] = None
+

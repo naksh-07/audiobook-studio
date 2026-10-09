@@ -26,11 +26,12 @@
   - True Peak: **-4.0 dBFS** (Hard ceiling: $\le$ -1.5 dBTP).
   - Loudness Range: **5.8 LU** (EBU R128 dynamic compliance).
 
-## Extraction Subsystem: Standalone Architecture & Scientific Upgrade (v5.4)
+## Extraction & Podcast Subsystem: Standalone Architecture & Scientific Audio (v5.5)
 - **Status**: 100% IMPLEMENTED, VERIFIED & DOCUMENTED (`main`).
 - **Pillar 1 Standalone**: Package `audiobook_factory/extraction/` with contracts, engine, parsers (epub, text, pdf), normalizer, segmenter, and quality gate.
-- **Scientific & Podcast Ready (v5.4)**: Added structured Markdown tables, LaTeX equations ($E=mc^2$), abstracts, and callouts (`BlockType: table, equation, abstract, callout`). Whitelisted Greek/math symbols in `PDFQualityAnalyzer` (0 false OCR halts). Upgraded `GeminiVisionPDFExtractor` multimodal technical prompt.
+- **Scientific & Podcast Ready**: Structured Markdown tables, LaTeX equations ($E=mc^2$), abstracts, and callouts (`BlockType: table, equation, abstract, callout`). Whitelisted Greek/math symbols in `PDFQualityAnalyzer` (0 false OCR halts). Upgraded `GeminiVisionPDFExtractor` multimodal technical prompt.
 - **Phase 1 Benchmark Validated**: Ingested `benchmarks/sample_research_paper.md` with 100% AST typing (`table`, `equation`, `abstract`, `callout`), full LaTeX metadata, and Gate 0.1 PASS.
-- **Phase 2 Technical Verbalization Bridge**: Implemented `audiobook_factory/podcast/` (`MathVerbalizer`, `TableVerbalizer`, `AbstractCalloutVerbalizer`, `PodcastScriptBuilder`) generating dual-host screenplay JSON with natural spoken math ($E=mc^2, \mathcal{L}$) and table insight verbalization.
-- **Verification**: 71/71 tests passing green across extraction, facade, and podcast test suites (0 regressions).
+- **Phase 2 Technical Verbalization Bridge**: Implemented `audiobook_factory/podcast/` (`MathVerbalizer`, `TableVerbalizer`, `AbstractCalloutVerbalizer`, `PodcastScriptBuilder`) generating dual-host screenplay JSON with spoken math and auditory table insights.
+- **Phase 3 Multi-Voice Audio Production & EBU R128 Mastering**: Implemented `PodcastAudioProducer` (`audiobook_factory/podcast/producer.py`) with 12ms/18ms Hann micro-fading, conversational turn pauses, multi-host casting (Charon/Aoede), and two-pass linear EBU R128 loudnorm mastering (-19.0 LUFS, -1.5 dBTP). Verified on benchmark paper (22 turns, 275.4s audio).
+- **Verification**: 37/37 targeted podcast and extraction tests PASSING (100% green).
 
