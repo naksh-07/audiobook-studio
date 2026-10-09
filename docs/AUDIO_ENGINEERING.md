@@ -33,7 +33,7 @@ In legacy audiobook production, music often drowns out whispers, abrupt volume s
 
 * **Stage 11: Cinematic Mix**: Produces the **Cinematic Mix Premaster** (`CINEMATIC_MIX_PREMASTER`) by balancing narrative elements, focusing listener attention via `SceneMixIntent` and `AttentionMap`, and generating discrete DME broadcast stems (`DX`, `MX`, `FX`, `AMB`, `ME`).
 * **Stage 12: Mastering**: Performs final EBU R128 loudness normalization ($-19.0$ LUFS $\pm 0.5$ LU), true peak limiting ($-1.5$ dBTP), SOXR 48kHz sinc resampling, dithering, chapter concatenation, and multi-format audio packaging (M4B / MP3 / AAC).
-* For detailed architecture, see [Stage 11 Cinematic Mix Architecture](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/docs/CINEMATIC_MIX_ARCHITECTURE.md).
+* For detailed architecture, see [Stage 11 Cinematic Mix Architecture](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/docs/CINEMATIC_MIX_ARCHITECTURE.md).
 
 ---
 
@@ -422,6 +422,78 @@ In v5.0, the chapter vocal mastering chain was completely overhauled to eradicat
 ### D. Elimination of WSOLA `atempo` Flange
 - Waveform Similarity Overlap-Add (WSOLA) algorithms (`atempo=...`) slice waveforms into grains and crossfade them to adjust speed. On synthetic neural speech, this produces phase cancellation, metallic comb filtering, and robotic flanging.
 - In v5.0, `atempo` time-stretching was eliminated from `dispatcher.py`. Pacing is controlled naturally out-of-band via punctuation cadence, dramatic hesitation pauses, and Gemini `speechMetadata.style` directives.
+
+---
+
+## 🎛️ 15. Pro-Grade AI Vocal Mastering Workstation v5.4
+
+The v5.4 release elevates the audio engineering pipeline into an autonomous, studio-grade AI mastering workstation organized across 4 discrete phases:
+
+```text
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        PRO-GRADE AI VOCAL MASTERING WORKSTATION (v5.4)                 │
+├──────────────────────────┬──────────────────────────┬──────────────────────────────────┤
+│ PHASE 1: C++ JUCE DSP    │ PHASE 2: FORENSIC QA     │ PHASE 3: NEURAL POLISH & MATCH   │
+├──────────────────────────┼──────────────────────────┼──────────────────────────────────┤
+│ • Spotify Pedalboard     │ • AudioQAAuditor         │ • NeuralVocalEnhancer            │
+│ • Pyloudnorm BS.1770-4   │ • VAD Dead-Air Checks    │ • DeepFilterNet3 (48kHz)         │
+│ • 4-Band Parametric EQ   │ • WPM Pacing Bounds      │ • >45dB SNR Selective Bypass     │
+│ • Optical Compression    │ • Speech Quality MOS     │ • ReferenceSpectrumMatcher       │
+│ • Lookahead Limiter      │ • Tiered Hard/Soft Gates │ • Matchering 2.0 (±3.0dB clamp)  │
+│ • Headless VST3 Loader   │ • Fail-Closed Defense    │ • NumPy / SciPy STFT Fallbacks   │
+└──────────────────────────┴──────────────────────────┴──────────────────────────────────┘
+                                           │
+                                           ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 4: ANTIGRAVITY AUDIO MCP SERVER & CLI BRIDGE                                     │
+│ • 6 Standardized MCP Tools (apply_vocal_dsp, audit_audio_quality, match_ref, etc.)     │
+│ • CLI Commands: dsp, qa-audit, enhance, match-ref                                      │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### A. Phase 1: C++ JUCE DSP Foundation ([`audiobook_factory/audio/dsp.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/dsp.py) / ADR-021)
+- **`VocalDSPProcessor`**: Integrates **Spotify Pedalboard (C++ JUCE)** for microsecond in-memory audio processing:
+  - **4-Band Parametric Vocal EQ**:
+    - `HighpassFilter(75.0 Hz)`: Eradicates subsonic air-conditioner rumbles and desk thumps without sacrificing narrator baritone warmth.
+    - `PeakFilter(320.0 Hz, -1.5 dB, Q=1.2)`: Surgically dips chest resonance and domestic room boxiness.
+    - `PeakFilter(3200.0 Hz, +0.8 dB, Q=1.0)`: Lifts vocal presence and consonants in the critical speech intelligibility corridor.
+  - **Optical Vocal Compression**:
+    - `Compressor(threshold=-18.0 dB, ratio=2.5:1, attack=25ms, release=120ms)`: Delivers smooth, transparent dialogue dynamic leveling.
+  - **Headless VST3 Hosting**:
+    - Supports dynamic insertion of professional 64-bit VST3 plugins (`load_plugin`) for studio mastering chains.
+  - **Lookahead True Peak Brickwall Limiting**:
+    - Clamped strictly to `-1.5 dBTP` with a 40ms release window.
+  - **Deterministic FFmpeg Dual-Pass Fallback**:
+    - In environments lacking `pedalboard`, the processor automatically falls back to FFmpeg linear dual-pass `loudnorm`.
+
+### B. Phase 2: AI-Assisted Acoustic & Script QA Auditor ([`audiobook_factory/audio/qa_auditor.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/qa_auditor.py) / ADR-022)
+- **`AudioQAAuditor`**: Forensically verifies speech takes before assembly:
+  - **VAD & Dead-Air Detection**: Flags leading dead air $> 800\text{ms}$ or trailing silence $> 1200\text{ms}$.
+  - **Text-Grounded Speaking Rate**:
+    - Detects TTS dropouts and truncations ($> 320\text{ WPM}$ or $< 0.4\text{s}$ for $> 30\text{ characters}$) $\rightarrow$ Hard `FAIL`.
+    - Detects TTS hallucination loops ($< 40\text{ WPM}$ on short text over $> 4.0\text{s}$) $\rightarrow$ Hard `FAIL`.
+    - Flags pacing variances ($< 75\text{ WPM}$ or $> 240\text{ WPM}$) as advisory `WARN`.
+  - **Speech Quality MOS (Mean Opinion Score)**:
+    - Calculates non-intrusive Acoustic Quality Index evaluating crest factor, DC offset, and clipping (target $\ge 3.5$).
+
+### C. Phase 3: Neural Vocal Polish & Reference Spectrum Matching ([`audiobook_factory/audio/enhancer.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/enhancer.py), [`reference_matcher.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/reference_matcher.py) / ADR-023)
+- **`NeuralVocalEnhancer` (DeepFilterNet3)**:
+  - 48kHz full-band deep filtering removing generative neural hash and room tone.
+  - **Selective Auto-Bypass**: Stems with $\text{SNR} \ge 45\text{ dB}$ bypass neural inference to preserve pristine consonants.
+  - **Energy Difference Clamp**: Discards enhancement if $|\Delta\text{RMS}| > 2.0\text{ dB}$.
+  - **Pure NumPy Fallback**: Soft-knee spectral gate with $-55\text{ dBFS}$ threshold.
+- **`ReferenceSpectrumMatcher` (Matchering 2.0)**:
+  - Transplants tonal balance of golden reference masters onto synthesized chapters.
+  - **Hard Clamping Invariant**: EQ correction strictly clamped to $\max \pm 3.0\text{ dB}$.
+  - **SciPy STFT Fallback**: 1/3-octave smoothed FFT envelope matching.
+
+### D. Phase 4: Antigravity Audio MCP Server & CLI Bridge ([`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/mcp/server.py) / ADR-024)
+- Exposes 6 standardized tools: `apply_vocal_dsp`, `audit_audio_quality`, `match_reference_spectrum`, `enhance_vocal_stem`, `measure_ebu_r128_loudness`, and `audit_chapter_qa`.
+- Detailed operational guides:
+  - [Pure Vocals-Only Audio Mixing & Production (v5.4)](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
+  - [CLI Reference Manual](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/docs/CLI_REFERENCE.md)
+  - [AI Agent & MCP Integration Guide](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/docs/MCP_AGENT_INTEGRATION.md)
+
 
 
 

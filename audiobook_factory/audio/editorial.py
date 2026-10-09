@@ -10,21 +10,29 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional, Union
 
 from audiobook_factory.logger import logger
-from audiobook_factory.audio.contracts import IngestionConfig, SegmentAudioContract
+from audiobook_factory.audio.contracts import IngestionConfig, SegmentAudioContract, AudioQAConfig, ChapterQAReport
 from audiobook_factory.audio.ingestion import AudioIngestionManager
 from audiobook_factory.audio.stream_composer import ChunkStreamComposer
+from audiobook_factory.audio.qa_auditor import AudioQAAuditor
 
 
 class DialogueEditorialBridge:
     """
-    Coordinates Ingestion -> Dialogue Editing (Endpoints, Breaths, Pauses) -> Streaming Pre-Master.
+    Coordinates Ingestion -> Dialogue Editing (Endpoints, Breaths, Pauses) -> Forensic QA Audit -> Streaming Pre-Master.
     """
 
-    def __init__(self, config: Optional[IngestionConfig] = None, project_dir: Optional[Union[Path, str]] = None):
+    def __init__(
+        self,
+        config: Optional[IngestionConfig] = None,
+        qa_config: Optional[AudioQAConfig] = None,
+        project_dir: Optional[Union[Path, str]] = None,
+    ):
         self.config = config or IngestionConfig()
+        self.qa_config = qa_config or AudioQAConfig()
         self.project_dir = Path(project_dir).resolve() if project_dir else Path(".")
         self.ingestion_manager = AudioIngestionManager(config=self.config, project_dir=self.project_dir)
         self.composer = ChunkStreamComposer(config=self.config)
+        self.qa_auditor = AudioQAAuditor(config=self.qa_config)
 
     def prepare_premaster(
         self,

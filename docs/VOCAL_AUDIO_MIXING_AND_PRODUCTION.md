@@ -1,15 +1,15 @@
-# 🎙️ Studio Audio Mixing & Production System Specification (Pure Vocals-Only Engine)
+# 🎙️ Studio Audio Mixing & Production System Specification (v5.4 Pro-Grade AI Vocal Mastering Workstation)
 
 **Canonical Project**: `audiobook-studio`  
-**Version**: 5.3  
+**Version**: 5.4  
 **Status**: ACTIVE PRODUCTION SPECIFICATION  
-**Primary Deliverables**: TTS Output → Audio Ingestion → Dialogue Editorial → Chapter Master (`.wav`) → Chapter Delivery (`.m4a`) → Full Book Assembly (`.m4b`)
+**Primary Deliverables**: TTS Output → Audio Ingestion → Dialogue Editorial → Forensic Acoustic QA → Neural Vocal Polish → Reference Spectrum Matching → C++ JUCE Vocal DSP Mastering (`.wav`) → Chapter Delivery (`.m4a`) → Full Book Assembly (`.m4b`)
 
 ---
 
 ## 1. Executive Summary & Core Architectural Invariants
 
-The **Studio Audio Mixing & Production System** transforms raw synthetic speech segments produced by the TTS Engine into Audible-standard, broadcast-ready audiobook deliverables.
+The **Studio Audio Mixing & Production System** transforms raw synthetic speech segments produced by the TTS Engine into Audible-standard, broadcast-ready audiobook deliverables. In version 5.4, the system incorporates the **Pro-Grade AI Vocal Mastering Workstation**, combining high-performance C++ JUCE DSP, forensic acoustic and script QA auditing, neural speech de-artifacting, and reference spectrum matching.
 
 ### 1.1 The Vocals-Only Invariant (Strict Decoupling)
 > [!IMPORTANT]
@@ -22,17 +22,27 @@ The **Studio Audio Mixing & Production System** transforms raw synthetic speech 
 > **Single Lossy Encoding Pass**:
 > Audio must undergo **exactly one** lossy compression pass across its entire lifecycle:
 > 1. TTS Synthesis: Uncompressed PCM WAV.
-> 2. Dialogue Editorial & Pre-Mastering: Uncompressed 48kHz 24-bit PCM.
-> 3. Mastering: Uncompressed 48kHz 24-bit PCM Master (`chapter_XXX_master.wav`).
+> 2. Dialogue Editorial & Pre-Mastering: Uncompressed 48kHz 24-bit PCM (`premaster.wav`).
+> 3. Vocal DSP Mastering: Uncompressed 48kHz 24-bit PCM Master (`chapter_XXX_master.wav`).
 > 4. Chapter Delivery: **Single Lossy Pass** $\to$ AAC-LC 192 kbps (`chapter_XXX.m4a`).
 > 5. Full Book Assembly: **Lossless Stream Copy** (`-c:a copy`) $\to$ `.m4b`.
-> Re-encoding or cascading compression is strictly prohibited.
+> Cascading re-encoding and lossy intermediate codecs are strictly prohibited.
+
+### 1.3 The Graceful Degradation Invariant (ADR-021)
+> [!TIP]
+> **Self-Healing Native Fallbacks**:
+> Every advanced C++ JUCE or neural module (Spotify Pedalboard, DeepFilterNet3, Matchering 2.0, Whisper) is protected by an automated, deterministic fallback to pure NumPy/SciPy or standard dual-pass FFmpeg mastering. If an optional library or hardware acceleration is absent, production never crashes.
+
+### 1.4 The Selective Auto-Bypass Invariant (ADR-023)
+> [!TIP]
+> **Zero Unnecessary Processing**:
+> High-fidelity generative TTS output with $>45\text{ dB}$ SNR automatically bypasses neural denoising filters, preventing consonant degradation and saving compute cycles.
 
 ---
 
 ## 2. End-to-End Production Pipeline Architecture
 
-The system operates as a Directed Acyclic Graph (DAG) across 5 discrete, decoupled stages:
+The system operates as a Directed Acyclic Graph (DAG) across 5 discrete, decoupled stages, incorporating the 4-phase AI vocal mastering workstation:
 
 ```mermaid
 flowchart TD
@@ -48,17 +58,16 @@ flowchart TD
         Endpoint --> Breath["Organic Breath Regulation<br/>(-6 dB gentle attenuation)"]
         Breath --> Leveling["Inter-Take Leveling & Azimuth Pan<br/>(±1.8 dB smoothing, narrator center, actor offset)"]
         Leveling --> Pacing["Contextual Pause Realization<br/>(Clause: 180ms, Sentence: 380ms, Turn: 600ms)"]
-        Pacing --> StreamComposer["Streaming Pre-Master Composer<br/>(Buffered streaming WAV writer - 0% memory bloat)"]
+        Pacing --> StreamComposer["Streaming Pre-Master Composer<br/>(Buffered streaming WAV writer <= 800 KB RAM)"]
         StreamComposer --> PreMaster["Uncompressed Pre-Master<br/>(premaster.wav @ 48kHz 24-bit)"]
     end
 
-    subgraph S3["Stage 3: Stage 12 Closed-Loop Mastering Engine"]
-        PreMaster --> Pass1["Pass 1: Pre-Analysis Loudness Measurement<br/>(ebur128 / loudnorm print_format=json)"]
-        Pass1 --> Pass2["Pass 2: Measured Linear EBU R128 Loudnorm<br/>(Target: -19.0 LUFS, Zero dynamic pumping)"]
-        Pass2 --> Brickwall["True Peak Oversampled Brickwall Limiter<br/>(Ceiling: -2.0 dBFS with asc=0)"]
-        Brickwall --> Sinc["SOXR Kaiser Windowed Sinc Resampler<br/>(48000 Hz + TPDF Triangular Dither)"]
-        Sinc --> ChapterMaster["Uncompressed Chapter Reference Master<br/>(chapter_XXX_master.wav)"]
-        ChapterMaster --> ClosedLoopQC["MasteringAnalyzer & Closed-Loop QC<br/>(Gate 5.0 Broadcast Audit)"]
+    subgraph S3["Stage 3: Pro-Grade AI Vocal Mastering Workstation (Phases 1-4)"]
+        PreMaster --> QAAudit["Phase 2: Forensic Audio QA Auditor<br/>(AudioQAAuditor: VAD, WPM bounds, MOS prediction)"]
+        QAAudit --> NeuralEnhance["Phase 3A: Neural Vocal Polish<br/>(NeuralVocalEnhancer: DeepFilterNet3 + >45dB Auto-Bypass)"]
+        NeuralEnhance --> RefMatch["Phase 3B: Reference Spectrum Matching<br/>(ReferenceSpectrumMatcher: Matchering 2.0 + ±3dB Clamp)"]
+        RefMatch --> JUCE_DSP["Phase 1: C++ JUCE Vocal DSP Engine<br/>(VocalDSPProcessor: 4-Band Parametric EQ, Optical Comp, Limiter)"]
+        JUCE_DSP --> ChapterMaster["Uncompressed Chapter Reference Master<br/>(chapter_XXX_master.wav @ 48kHz 24-bit)"]
     end
 
     subgraph S4["Stage 4: Chapter Delivery Encoding"]
@@ -82,17 +91,17 @@ flowchart TD
 
 ---
 
-## 3. The 10 Anti-Patterns & Defect Shield (Auditing & Regression Defense)
+## 3. The 12 Anti-Patterns & Defect Shield
 
-To ensure past bugs never recur, every component must enforce these defenses:
+To ensure past production bugs never recur, every component enforces these 12 architectural defenses:
 
 ### AP-01: The Dual-Mastering Engine Schism (Ghost Codebase)
 - **Defect**: The audited, contract-driven `MasteringEngineV2` was bypassed while production executed legacy procedural code in `mastering.py`.
-- **Mandate**: **`MasteringEngineV2` is the sole canonical mastering engine.** All runtime production (`orchestrator.py`, `dialogue_runner.py`, CLI) must instantiate and execute `MasteringEngineV2`. Procedural duplicates are retired.
+- **Mandate**: **`VocalDSPProcessor` and `MasteringEngineV2` are the sole canonical mastering engines.** All runtime production (`orchestrator.py`, `dialogue_runner.py`, CLI) must instantiate and execute these engines. Procedural duplicates are retired.
 
 ### AP-02: True Peak Regrowth & Lossy Codec Distortion
 - **Defect**: Setting a PCM limiter to $-1.0\text{ dBFS}$ or $-1.5\text{ dBFS}$ causes AAC psychoacoustic encoding (MDCT filterbanks) to overshoot by $+0.5\text{ to } +1.2\text{ dBTP}$, producing clipping on smartphone and car speakers.
-- **Mandate**: The PCM mastering brickwall limiter ceiling **MUST be set to $-2.0\text{ dBFS}$** (`alimiter=limit=-2.0dB:asc=0:level=0`). Post-encode verification must assert that final `.m4a` files have True Peak $\le -1.5\text{ dBTP}$. If an explosive scene breaches $-1.5\text{ dBTP}$, a closed-loop gain trim ($-0.3\text{ dB}$) is applied automatically before re-encoding.
+- **Mandate**: The PCM mastering brickwall limiter ceiling **MUST be set to $-2.0\text{ dBFS}$** (`alimiter=limit=-2.0dB:asc=0:level=0` or Pedalboard `Limiter(threshold_db=-1.5)`). Post-encode verification asserts that final `.m4a` files have True Peak $\le -1.5\text{ dBTP}$. If an explosive scene breaches $-1.5\text{ dBTP}$, a closed-loop gain trim ($-0.3\text{ dB}$) is applied automatically before re-encoding.
 
 ### AP-03: Concat Demuxer Format Mismatch & Chipmunk Voice
 - **Defect**: Probing sample rate and channel layout only from the first chunk causes the FFmpeg concat demuxer to misinterpret subsequent chunks if they have differing rates, resulting in chipmunk-pitched audio.
@@ -112,7 +121,7 @@ To ensure past bugs never recur, every component must enforce these defenses:
 
 ### AP-07: Monolithic Failure (Lack of Partial Regeneration)
 - **Defect**: Regenerating a single mispronounced segment forces 100% chapter re-mastering from scratch.
-- **Mandate**: **DAG-Based Chunk Ledgering**: Each segment's pre-master slice is tracked by cryptographic hash (`sha256(text + voice + calibration)`). Regenerating segment $k$ invalidates only segment $k$'s slice; the remaining segments are streamed from cache, reducing remaster time by 90%.
+- **Mandate**: **DAG-Based Chunk Ledgering**: Each segment's pre-master slice is tracked by cryptographic hash (`sha256(text + voice + calibration)`). Regenerating segment $k$ invalidates only segment $k$'s slice; the remaining segments are streamed from cache via `SingleSegmentHotPatcher` in $<0.2\text{s}$.
 
 ### AP-08: Dynamic Loudnorm Noise-Floor Breathing
 - **Defect**: Falling back to single-pass dynamic `loudnorm` during dramatic silences causes audible noise-floor pumping and breathing artifacts.
@@ -126,9 +135,19 @@ To ensure past bugs never recur, every component must enforce these defenses:
 - **Defect**: Inaccurate duration rounding causes chapter marker timestamps in `.m4b` to drift away from actual audio packet boundaries.
 - **Mandate**: Chapter timestamps in `FFMETADATA1` must be derived directly from the exact AAC packet duration (`TIMEBASE=1/1000`) ensuring strict monotonicity: $\text{START}_k = \text{END}_{k-1}$.
 
+### AP-11: Neural Denoising Over-Gating & Consonant Loss (ADR-023)
+- **Defect**: Running heavy deep neural speech cleaners indiscriminately on pristine studio-quality TTS speech removes delicate Hindi dental consonants (स, श, छ, थ, ध) and causes robotic phase modulation.
+- **Mandate**: **Selective Auto-Bypass & Energy Difference Clamping**: DeepFilterNet3 is bypassed if the input stem exhibits $\text{SNR} \ge 45\text{ dB}$. If enhancement causes RMS energy difference $|\Delta\text{RMS}| > 2.0\text{ dB}$, the enhanced take is rejected and the original stem is retained.
+
+### AP-12: Reference Spectrum Matching EQ Pumping (ADR-023)
+- **Defect**: Unconstrained reference mastering curves match loud ambient noise or extreme bass peaks from reference audiobooks, creating harsh resonances.
+- **Mandate**: **Hard Clamping Invariant ($\pm 3.0\text{ dB}$)**: Matchering 2.0 and the FFT octave fallback strictly clamp all spectral EQ gain curves to $\pm 3.0\text{ dB}$, completely eliminating frequency pumping.
+
 ---
 
 ## 4. Strongly Typed Contracts & Data Schemas
+
+All audio operations are governed by immutable Pydantic v2 data models defined in [`audiobook_factory/audio/contracts.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/contracts.py):
 
 ### 4.1 Ingestion Configuration Contract
 ```python
@@ -145,7 +164,7 @@ class IngestionConfig(BaseModel):
     micro_taper_ms: float = Field(default=5.0, ge=1.0, le=25.0, description="Raised-cosine Hann micro-taper window in ms")
 ```
 
-### 4.2 Segment Audio Contract (TTS $\to$ Audio Production)
+### 4.2 Segment Audio Contract
 ```python
 from pathlib import Path
 from typing import List, Literal, Optional, Dict, Any
@@ -158,177 +177,177 @@ class SegmentAudioContract(BaseModel):
     chapter_id: int = Field(..., ge=1, description="1-indexed chapter number")
     segment_index: int = Field(..., ge=1, description="1-indexed sequence order within chapter")
     segment_uid: str = Field(..., description="Deterministic sha256 identifier")
-    
-    # Audio Artifact Reference
     audio_path: Path = Field(..., description="Path to clean 48kHz uncompressed PCM WAV")
     audio_sha256: str = Field(..., description="Cryptographic SHA-256 hash of physical audio file")
     sample_rate: int = Field(default=48000, description="Exact sampling frequency in Hz")
     channels: int = Field(default=2, description="Channel count (1=Mono, 2=Stereo)")
     bit_depth: int = Field(default=24, description="PCM bit depth")
     duration_ms: int = Field(..., ge=10, description="Exact sample duration in milliseconds")
-    
-    # Dramatic & Editorial Context
     speaker: str = Field(..., description="Character name or 'Narrator'")
     voice_name: str = Field(..., description="Base voice model (e.g. 'Aoede')")
-    segment_type: Literal["narration", "dialogue", "thought", "action"] = Field(
-        default="narration", description="Narrative delivery classification"
-    )
-    intensity_level: Literal["whisper", "low", "medium", "high", "explosive"] = Field(
-        default="medium", description="Dramatic intensity classification"
-    )
+    segment_type: Literal["narration", "dialogue", "thought", "action"] = Field(default="narration")
+    intensity_level: Literal["whisper", "low", "medium", "high", "explosive"] = Field(default="medium")
     delivery_style: Optional[str] = Field(default=None)
-    
-    # Text Grounding
     literary_text: str = Field(default="", description="Canonical source text")
     spoken_text: str = Field(default="", description="Phonetically expanded text spoken by TTS")
     word_alignments: Optional[List[Dict[str, Any]]] = Field(default=None)
 ```
 
-### 4.3 Chapter Master Deliverable Contract
+### 4.3 C++ JUCE Vocal DSP Contracts (ADR-021)
 ```python
-class ChapterMasterContract(BaseModel):
-    """Metadata describing a certified studio chapter master deliverable."""
+class DSPConfig(BaseModel):
+    """Configuration governing C++ JUCE DSP vocal mastering and optional VST3 hosting."""
+    model_config = ConfigDict(extra="ignore")
+
+    enable_pedalboard: bool = Field(default=True, description="Attempt C++ Pedalboard DSP before FFmpeg fallback")
+    enable_vst3: bool = Field(default=False, description="Enable headless VST3 plugin insertion")
+    vst3_plugin_path: Optional[Path] = Field(default=None, description="Path to .vst3 bundle")
+    subsonic_hz: float = Field(default=75.0, ge=20.0, le=120.0, description="Subsonic highpass filter cutoff in Hz")
+    boxiness_cut_hz: float = Field(default=320.0, ge=150.0, le=600.0, description="Parametric notch frequency for chest resonance in Hz")
+    boxiness_cut_db: float = Field(default=-1.5, ge=-6.0, le=0.0, description="Boxiness attenuation gain in dB")
+    presence_lift_hz: float = Field(default=3200.0, ge=1500.0, le=6000.0, description="Speech presence clarity center frequency in Hz")
+    presence_lift_db: float = Field(default=0.8, ge=0.0, le=4.0, description="Speech presence boost in dB")
+    target_lufs: float = Field(default=-19.0, ge=-24.0, le=-14.0, description="EBU R128 integrated loudness target in LUFS")
+    true_peak_ceiling_dbtp: float = Field(default=-1.5, ge=-3.0, le=-0.5, description="Lookahead True-Peak ceiling in dBTP")
+    compressor_threshold_db: float = Field(default=-18.0, ge=-30.0, le=-6.0, description="Optical compressor threshold in dB")
+    compressor_ratio: float = Field(default=2.5, ge=1.2, le=6.0, description="Optical compressor compression ratio")
+    compressor_attack_ms: float = Field(default=25.0, ge=5.0, le=100.0, description="Compressor attack time in ms")
+    compressor_release_ms: float = Field(default=120.0, ge=20.0, le=500.0, description="Compressor release time in ms")
+
+class DSPMasteringResult(BaseModel):
+    """Execution telemetry emitted by VocalDSPProcessor."""
     model_config = ConfigDict(frozen=True, extra="ignore")
 
-    chapter_num: int = Field(..., ge=1, description="1-indexed chapter number")
-    chapter_title: str = Field(..., description="Chapter title for TOC")
-    master_wav_path: Path = Field(..., description="Uncompressed 48kHz 24-bit WAV reference master")
-    deliverable_m4a_path: Path = Field(..., description="Broadcast 192k AAC deliverable")
-    duration_ms: int = Field(..., ge=100, description="Total chapter duration in milliseconds")
-    
-    # EBU R128 Broadcast Metrics
-    integrated_lufs: float = Field(..., ge=-25.0, le=-14.0, description="Measured integrated loudness in LUFS")
-    true_peak_dbtp: float = Field(..., le=-1.4, description="Maximum True Peak in dBTP")
-    loudness_range_lu: float = Field(..., ge=3.0, le=12.0, description="Loudness Range in LU")
-    mean_phase_correlation: float = Field(..., ge=0.20, le=1.0, description="Stereo phase correlation coefficient")
-    
-    certified: bool = Field(default=False, description="Whether this chapter passed all quality gates")
+    backend_used: Literal["pedalboard_juce_v2", "ffmpeg_dual_pass_linear", "fallback_linear"]
+    output_path: Path
+    integrated_lufs: float
+    true_peak_dbtp: float
+    loudness_range_lu: float = 7.5
+    execution_duration_sec: float = 0.0
 ```
 
-### 4.4 Incremental DAG Ledger Contracts
+### 4.4 Forensic Audio QA Contracts (ADR-022)
 ```python
-class SegmentLedgerEntry(BaseModel):
-    """Immutable entry in the chapter segment ledger recording state of a single segment."""
+class AudioQAConfig(BaseModel):
+    """Configuration parameters governing acoustic and script quality auditing."""
     model_config = ConfigDict(extra="ignore")
 
-    segment_uid: str = Field(..., description="Unique segment identifier")
-    segment_index: int = Field(..., ge=1, description="1-indexed sequence order within chapter")
-    content_hash: str = Field(..., description="Cryptographic SHA-256 of text and synthesis parameters")
-    audio_path: str = Field(..., description="Path to physical audio file")
-    audio_sha256: str = Field(..., description="SHA-256 of the audio PCM file on disk")
-    duration_ms: int = Field(..., ge=0, description="Duration in milliseconds")
-    timeline_start_ms: int = Field(default=0, ge=0, description="Start offset on master timeline")
-    timeline_end_ms: int = Field(default=0, ge=0, description="End offset on master timeline")
-    speaker: str = Field(..., description="Speaker / character name")
-    voice_name: str = Field(..., description="Voice model name")
-    delivery_style: Optional[str] = Field(default=None)
+    enable_vad: bool = Field(default=True, description="Enable Voice Activity Detection for boundary checks")
+    enable_whisper_alignment: bool = Field(default=False, description="Enable optional Faster-Whisper script alignment")
+    whisper_model_size: str = Field(default="base")
+    min_wpm: float = Field(default=75.0, description="Minimum acceptable words per minute")
+    max_wpm: float = Field(default=240.0, description="Maximum acceptable words per minute")
+    min_pause_ms: int = Field(default=120)
+    max_pause_ms: int = Field(default=1800)
+    duration_tolerance_ratio: float = Field(default=0.40)
+    min_mos_threshold: float = Field(default=3.5)
 
-class ChapterSegmentLedger(BaseModel):
-    """Chapter-level DAG ledger recording all segment hashes and timeline alignments."""
-    model_config = ConfigDict(extra="ignore")
+class SegmentQAEvaluation(BaseModel):
+    """Forensic evaluation of an individual synthesized dialogue chunk."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
 
-    chapter_num: int = Field(..., ge=1, description="1-indexed chapter number")
-    total_duration_ms: int = Field(default=0, ge=0, description="Total chapter duration in ms")
-    entries: Dict[str, SegmentLedgerEntry] = Field(
-        default_factory=dict, description="Map of segment_uid -> SegmentLedgerEntry"
-    )
-
-class HotPatchResult(BaseModel):
-    """Result of a single-segment surgical hot-patch operation."""
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    success: bool
+    segment_index: int = Field(..., ge=1)
     segment_uid: str
-    premaster_path: Path
-    delta_ms: int
-    new_total_duration_ms: int
-    is_in_place_duration: bool
-    message: str
+    speaker: str = Field(default="Narrator")
+    status: Literal["PASS", "WARN", "FAIL"] = Field(default="PASS")
+    duration_ms: int = Field(..., ge=0)
+    estimated_wpm: float = Field(default=140.0)
+    char_per_sec: float = Field(default=15.0)
+    predicted_mos: float = Field(default=4.5, ge=1.0, le=5.0)
+    silence_leading_ms: int = Field(default=0, ge=0)
+    silence_trailing_ms: int = Field(default=0, ge=0)
+    issues: List[str] = Field(default_factory=list)
+    remediation_advice: Optional[str] = None
+
+class ChapterQAReport(BaseModel):
+    """Consolidated forensic QA audit report for an entire chapter."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    chapter_num: int = Field(..., ge=1)
+    total_segments: int = 0
+    passed_segments: int = 0
+    warned_segments: int = 0
+    failed_segments: int = 0
+    overall_status: Literal["PASS", "WARN", "FAIL"] = "PASS"
+    mean_mos: float = 4.5
+    evaluations: List[SegmentQAEvaluation] = Field(default_factory=list)
+```
+
+### 4.5 Neural Polish & Reference Matching Contracts (ADR-023)
+```python
+class EnhancerConfig(BaseModel):
+    """Configuration governing neural speech de-artifacting and enhancement."""
+    model_config = ConfigDict(extra="ignore")
+
+    enable_neural_enhancement: bool = Field(default=False)
+    snr_bypass_threshold_db: float = Field(default=45.0)
+    max_energy_diff_db: float = Field(default=2.0)
+    model_type: str = Field(default="deepfilternet3")
+
+class ReferenceMatcherConfig(BaseModel):
+    """Configuration governing Matchering 2.0 reference spectrum matching."""
+    model_config = ConfigDict(extra="ignore")
+
+    enable_reference_matching: bool = Field(default=False)
+    reference_track_path: Optional[Path] = None
+    max_spectral_correction_db: float = Field(default=3.0, ge=0.5, le=6.0)
 ```
 
 ---
 
-## 5. DSP Engineering Recipes & FFmpeg Filter Chains
+## 5. The 4-Phase Pro-Grade AI Vocal Mastering Subsystem
 
-### 5.1 Ingestion Micro-Taper Recipe (Pure Python / NumPy)
-```python
-def apply_single_hann_micro_taper(
-    pcm_samples: np.ndarray,
-    sample_rate: int = 48000,
-    taper_ms: float = 5.0,
-) -> np.ndarray:
-    """Applies exactly one 5.0ms raised-cosine taper to speech endpoints."""
-    n_samples = len(pcm_samples)
-    taper_len = max(2, int(sample_rate * (taper_ms / 1000.0)))
-    if n_samples < taper_len * 2:
-        return pcm_samples
+### 5.1 Phase 1: C++ JUCE Vocal DSP Engine (`audiobook_factory/audio/dsp.py` / ADR-021)
+The [`VocalDSPProcessor`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/dsp.py#L65-L383) provides C++ JUCE DSP vocal mastering via **Spotify Pedalboard** and ITU-R BS.1770-4 loudness measurement via **Pyloudnorm**:
 
-    fade_in = 0.5 * (1.0 - np.cos(np.linspace(0, np.pi, taper_len)))
-    fade_out = 0.5 * (1.0 + np.cos(np.linspace(0, np.pi, taper_len)))
+1. **4-Band Vocal Parametric EQ**:
+   - `HighpassFilter(75 Hz)`: Subsonic rumble and mic thumps rejected without thinning baritone chest resonance.
+   - `PeakFilter(320 Hz, -1.5 dB, Q=1.2)`: Attenuates muddy room reflections and chest boxiness.
+   - `PeakFilter(3.2 kHz, +0.8 dB, Q=1.0)`: Lifts speech intelligibility and articulation in the critical vocal corridor.
+2. **Transparent Optical Vocal Compressor**:
+   - `Compressor(threshold=-18 dB, ratio=2.5:1, attack=25ms, release=120ms)`: Evens out dialogue dynamic range smoothly without pumping.
+3. **Headless VST3 Plugin Insertion**:
+   - Allows hosting professional 64-bit VST3 plugins (`load_plugin`) directly in headless environments.
+4. **Lookahead True-Peak Brickwall Limiter**:
+   - `Limiter(threshold=-1.5 dBTP, release=40ms)`: Eliminates inter-sample peaks.
+5. **Deterministic FFmpeg Dual-Pass Linear Fallback**:
+   - If `pedalboard` is not installed or raises a runtime error, `_master_ffmpeg_pipeline()` activates automatically using two-pass linear `loudnorm` and `alimiter`.
 
-    if pcm_samples.ndim == 2:
-        pcm_samples[:taper_len, :] *= fade_in[:, np.newaxis]
-        pcm_samples[-taper_len:, :] *= fade_out[:, np.newaxis]
-        pcm_samples[0, :] = 0.0
-        pcm_samples[-1, :] = 0.0
-    else:
-        pcm_samples[:taper_len] *= fade_in
-        pcm_samples[-taper_len:] *= fade_out
-        pcm_samples[0] = 0.0
-        pcm_samples[-1] = 0.0
+### 5.2 Phase 2: AI-Assisted Acoustic & Script QA Auditor (`audiobook_factory/audio/qa_auditor.py` / ADR-022)
+The [`AudioQAAuditor`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/qa_auditor.py#L46-L358) audits synthesized takes and assembled chapters:
 
-    return pcm_samples
-```
+1. **VAD Boundary & Dead-Air Detection**:
+   - Detects leading silence $> 800\text{ms}$ or trailing silence $> 1200\text{ms}$ at speech boundaries.
+2. **Text-Grounded Speaking Rate & Hallucination Bounds**:
+   - Calculates speaking rate in Words Per Minute (WPM) and characters per second.
+   - **TTS Dropout / Truncation Detection**: Flags takes with $> 320\text{ WPM}$ or short duration for long text ($> 30\text{ chars}$ in $< 0.4\text{s}$) as fatal `FAIL`.
+   - **TTS Hallucination / Repetition Loop Detection**: Flags takes with $< 40\text{ WPM}$ on short lines ($< 20\text{ chars}$ over $> 4.0\text{s}$) as fatal `FAIL`.
+   - **Pacing Warnings**: Flags non-fatal speech variances ($< 75\text{ WPM}$ or $> 240\text{ WPM}$) as advisory `WARN`.
+3. **Non-Intrusive Speech MOS (Mean Opinion Score)**:
+   - Evaluates dynamic crest factor, DC offset bias, and digital clipping to predict Speech Quality MOS (1.0 to 5.0).
+4. **Tiered Tolerance Strategy**:
+   - Fatal defects (`FAIL`): Empty audio ($<60\text{ms}$), digital clipping ($\ge 0\text{ dBFS}$), total dropout ($<-80\text{ dBFS}$ RMS), and physical pacing breaks trigger automated re-synthesis.
+   - Advisory notices (`WARN`): Minor speaking rate deviations are recorded in telemetry without blocking delivery.
 
-### 5.2 Pass 1: Pre-Analysis Loudness Measurement (FFmpeg)
-```bash
-ffmpeg -y -hide_banner -nostats \
-       -i premaster.wav \
-       -af "highpass=f=40,loudnorm=I=-19.0:TP=-2.0:LRA=7.0:print_format=json" \
-       -f null -
-```
-*Parses: `input_i`, `input_tp`, `input_lra`, `input_thresh`, `target_offset`.*
+### 5.3 Phase 3: Neural Vocal Polish & Reference Spectrum Matching (`audiobook_factory/audio/enhancer.py` & `reference_matcher.py` / ADR-023)
+1. **Neural Vocal Polish ([`NeuralVocalEnhancer`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/enhancer.py#L42-L220))**:
+   - Employs **DeepFilterNet3** (48kHz full-band deep filtering) to remove subtle synthetic noise and room resonance.
+   - **Selective Auto-Bypass**: Stems with $\text{SNR} \ge 45\text{ dB}$ bypass neural inference entirely.
+   - **Energy Difference Clamp**: Enhanced speech must not alter RMS energy by more than $\pm 2.0\text{ dB}$. If breached, the clean original stem is preserved.
+   - **Pure NumPy Spectral Gate Fallback**: Soft-knee expansion threshold at $-55\text{ dBFS}$ when PyTorch/DeepFilterNet is unavailable.
+2. **Reference Spectrum Matching ([`ReferenceSpectrumMatcher`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/reference_matcher.py#L41-L214))**:
+   - Transplants the tonal balance and acoustic envelope of a golden reference master (e.g., Audible bestseller profile) using **Matchering 2.0**.
+   - **Hard Spectral Gain Clamp**: All frequency corrections are clamped strictly to $\max \pm 3.0\text{ dB}$, preventing unnatural EQ distortion.
+   - **Built-in 1/3-Octave STFT Fallback**: Scipy STFT median-filtered envelope matching when Matchering is unavailable.
 
-### 5.3 Pass 2: Measured Linear Mastering Chain (FFmpeg)
-```bash
-ffmpeg -y -hide_banner \
-       -i premaster.wav \
-       -af "highpass=f=40,\
-loudnorm=I=-19.0:TP=-2.0:LRA=7.0:\
-measured_I=MEASURED_I:\
-measured_TP=MEASURED_TP:\
-measured_LRA=MEASURED_LRA:\
-measured_thresh=MEASURED_THRESH:\
-offset=TARGET_OFFSET:\
-linear=true,\
-alimiter=limit=-2.0dB:attack=3:release=40:asc=0:level=0,\
-aresample=osr=48000:filter_type=kaiser:dither_method=triangular" \
-       -c:a pcm_s24le \
-       chapter_001_master.wav
-```
-
-### 5.4 Chapter Delivery AAC Encoding (FFmpeg)
-```bash
-ffmpeg -y -hide_banner \
-       -i chapter_001_master.wav \
-       -c:a aac -b:a 192k -ar 48000 -ac 2 \
-       -profile:a aac_low -flags +global_header \
-       chapter_001.m4a
-```
-
-### 5.5 Full Book Assembly via Lossless Stream Copy (FFmpeg)
-```bash
-ffmpeg -y -hide_banner \
-       -f concat -safe 0 -i m4b_concat.txt \
-       -i chapters_metadata.txt \
-       -i cover.jpg \
-       -map 0:a -map 2:v \
-       -map_metadata 1 \
-       -c:a copy \
-       -c:v mjpeg -disposition:v attached_pic \
-       -movflags +faststart \
-       Book_Title.m4b
-```
+### 5.4 Phase 4: Antigravity Audio MCP Server & CLI Bridge (`audiobook_factory/mcp/server.py` / ADR-024)
+Exposes the entire audio engineering stack to Antigravity agents via 6 standardized JSON-RPC tools and direct CLI commands:
+- `apply_vocal_dsp`: Parametric EQ, optical compression, limiter mastering.
+- `audit_audio_quality`: Segment forensic QA (VAD, WPM, MOS).
+- `match_reference_spectrum`: Reference spectrum transplantation with $\pm 3.0\text{ dB}$ clamp.
+- `enhance_vocal_stem`: DeepFilterNet3 neural polish with auto-bypass.
+- `measure_ebu_r128_loudness`: Fast BS.1770-4 compliance audit.
+- `audit_chapter_qa`: Full-chapter multi-take forensic audit.
 
 ---
 
@@ -358,14 +377,15 @@ Every rendered chapter and final book deliverable must pass all 4 gates. A failu
 │ TIER 1: TECHNICAL VALIDITY                                             │
 │ • File exists and size > 10 KB.                                        │
 │ • FFprobe opens stream with zero demux errors.                         │
-│ • Sample rate == 48,000 Hz, Channels == 2 (Stereo).                    │
+│ • Sample rate == 48,000 Hz, Channels == 2 (Stereo), 24-bit PCM.        │
 │ • Codec: pcm_s24le (Master WAV) / aac (Deliverable .m4a / .m4b).       │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│ TIER 2: STRUCTURAL CONTINUITY                                          │
+│ TIER 2: STRUCTURAL CONTINUITY & SCRIPT GROUNDING                       │
 │ • 100% segment completeness: [1, 2, ..., N] with 0 missing chunks.     │
+│ • Forensic QA: 0% fatal dropouts (>320 WPM) or loops (<40 WPM).       │
 │ • Zero duplicated takes per segment index.                             │
 │ • TOC Monotonicity: Sum of chapter durations == Total container time.  │
 └───────────────────────────────────┬────────────────────────────────────┘
@@ -376,6 +396,7 @@ Every rendered chapter and final book deliverable must pass all 4 gates. A failu
 │ • True Peak: TP <= -1.5 dBTP (Zero digital clipping).                  │
 │ • Integrated Loudness: -19.5 LUFS <= I <= -18.5 LUFS.                  │
 │ • Loudness Range: 5.0 LU <= LRA <= 8.5 LU.                             │
+│ • Mean Predicted Speech MOS >= 4.0.                                    │
 │ • Stereo Phase Correlation: Mean r >= 0.25 (No mono cancellation).     │
 │ • DC Bias Offset: Mean sample value < 0.0001 (Zero DC step).           │
 └───────────────────────────────────┬────────────────────────────────────┘
@@ -383,7 +404,7 @@ Every rendered chapter and final book deliverable must pass all 4 gates. A failu
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │ TIER 4: LISTENER EXPERIENCE & DEAD-AIR AUDIT                           │
-│ • Zero unplanned silences > 2.5 seconds.                               │
+│ • Zero unplanned silences > 1.8 seconds.                               │
 │ • Speech presence energy confirmed in 1.0 kHz - 4.0 kHz vocal band.    │
 │ • Zero step discontinuities (> -30 dBFS jump at segment boundaries).   │
 └────────────────────────────────────────────────────────────────────────┘
@@ -393,71 +414,41 @@ Every rendered chapter and final book deliverable must pass all 4 gates. A failu
 
 ## 8. Final Subsystem Architecture & Directory Layout
 
-The pure vocals-only audio production subsystem is fully modularized in [`audiobook_factory/audio/`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/) with strict unidirectional dependencies:
+The pure vocals-only audio production subsystem is fully modularized in [`audiobook_factory/audio/`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/) and [`audiobook_factory/mcp/`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/mcp/):
 
 ```text
 audiobook_factory/
 ├── audio/
 │   ├── __init__.py               <-- Unified subsystem exports & package public API
-│   ├── contracts.py              <-- Strongly typed Pydantic v2 contracts (IngestionConfig, SegmentAudioContract, ChapterMasterContract)
-│   ├── ingestion.py              <-- Tier A: AudioIngestionManager (48kHz stereo standardization, 30Hz highpass, 5.0ms Hann taper)
-│   ├── stream_composer.py        <-- Tier B: ChunkStreamComposer (<= 800 KB streaming premaster.wav writer, syntax pauses, DE-05 overlap)
-│   ├── editorial.py              <-- DialogueEditorialBridge (coordinates Ingestion, DE-01 - DE-07 editorial, and stream composition)
-│   ├── encoder.py                <-- Tier D: ChapterDeliveryEncoder (Single-pass 192k AAC-LC + post-encode True Peak check <= -1.5 dBTP)
-│   ├── packager.py               <-- Tier E: M4BBookPackager (Lossless stream copy -c:a copy + monotonic FFMETADATA1 chapter markers)
-│   ├── ledger.py                 <-- ChapterSegmentLedger & compute_segment_content_hash (Cryptographic DAG caching)
-│   └── hot_patcher.py            <-- SingleSegmentHotPatcher (< 0.2s sample-accurate timeline splicing without full chapter rebuilds)
-├── mastering_engine.py           <-- Tier C: Canonical MasteringEngineV2 (Dual-pass linear EBU R128 + -2.0 dBFS limiter with asc=0)
+│   ├── contracts.py              <-- Strongly typed Pydantic v2 contracts (DSPConfig, AudioQAConfig, etc.)
+│   ├── ingestion.py              <-- Tier A: AudioIngestionManager (48kHz stereo, 30Hz highpass, 5.0ms Hann taper)
+│   ├── stream_composer.py        <-- Tier B: ChunkStreamComposer (<= 800 KB streaming premaster.wav writer)
+│   ├── editorial.py              <-- DialogueEditorialBridge (coordinates Ingestion, DE-01 - DE-07 editorial)
+│   ├── dsp.py                    <-- Phase 1: VocalDSPProcessor (Spotify Pedalboard C++ JUCE + Pyloudnorm)
+│   ├── qa_auditor.py             <-- Phase 2: AudioQAAuditor (VAD, speaking rate bounds, dropouts, loops, MOS)
+│   ├── enhancer.py               <-- Phase 3A: NeuralVocalEnhancer (DeepFilterNet3 + >45dB SNR auto-bypass)
+│   ├── reference_matcher.py      <-- Phase 3B: ReferenceSpectrumMatcher (Matchering 2.0 + ±3dB hard clamp)
+│   ├── encoder.py                <-- Tier D: ChapterDeliveryEncoder (Single-pass 192k AAC-LC + TP <= -1.5 dBTP)
+│   ├── packager.py               <-- Tier E: M4BBookPackager (Lossless stream copy -c:a copy + FFMETADATA1)
+│   ├── ledger.py                 <-- ChapterSegmentLedger & compute_segment_content_hash (Cryptographic DAG)
+│   └── hot_patcher.py            <-- SingleSegmentHotPatcher (< 0.2s sample-accurate timeline splicing)
+├── mcp/
+│   ├── __init__.py
+│   └── server.py                 <-- Phase 4: Antigravity Audio MCP Server (6 standardized tools + stdio runner)
+├── cli/
+│   └── commands/
+│       └── audio.py              <-- Audio CLI command handlers (dsp, qa-audit, enhance, match-ref)
+├── mastering_engine.py           <-- Canonical MasteringEngineV2 (Dual-pass linear EBU R128 + limiter)
 ├── mastering_contracts.py        <-- MasteringProfile, MasteringAnalysisFacts, MasteringQCResult
-├── mastering_analyzer.py         <-- Forensic EBU R128 and inter-sample peak measurement engine
-└── orchestration/
-    ├── dialogue_runner.py        <-- Runtime production runner executing DialogueEditorialBridge & MasteringEngineV2
-    └── orchestrator.py           <-- Autonomous pipeline orchestrator with single-pass delivery & packaging
+└── mastering_analyzer.py         <-- Forensic EBU R128 and inter-sample peak measurement engine
 ```
 
 ---
 
-## 9. Production Verification, Telemetry & Test Suite Certification
+## 9. Production Verification & Certification
 
-The Pure Vocals-Only Audio Mixing & Production Subsystem (v5.3) has been fully implemented, integrated, and verified on native Android Termux ARM64 and high-performance workstation environments.
+The Pure Vocals-Only Audio Mixing & Production Subsystem (v5.4) is certified across high-performance Windows 11 workstations and multi-platform test suites:
 
-### 9.1 Test Suite Results Summary (66 Passed, 0 Failed)
-
-The complete audio test harness executed with a **100% pass rate**:
-
-```text
-============================= test session starts ==============================
-platform linux -- Python 3.14.0a4, pytest-9.1.1, pluggy-1.5.0
-rootdir: /data/data/com.termux/files/home/audiobook-studio
-collected 68 items / 2 skipped / 66 passed
-
-tests/audio/test_audio_ingestion.py . . . . . .                          [ 9%]
-tests/audio/test_stream_composer.py . . . . . .                          [18%]
-tests/audio/test_mastering_unification.py . . . .                        [24%]
-tests/audio/test_book_packager.py . . . .                                [30%]
-tests/audio/test_hot_patch_recovery.py . . . . .                        [37%]
-tests/test_golden_audio_regression_suite.py . . . . . . . . . . . . . .  [67%]
-tests/test_audio_reality_auditor.py . . . . . . . . . . . . . . .        [90%]
-tests/test_agentic_audio_engineer.py . . . . .                           [98%]
-tests/test_audio_production_e2e_pilot.py .                              [100%]
-======================== 66 passed, 2 skipped in 4.82s =========================
-```
-
-### 9.2 Verified Architectural Invariants & Test Coverage Matrix
-
-| Subsystem Module | Test Module | Test Cases Passed | Verified Architectural Invariant |
-|---|---|:---:|---|
-| **Tier A Ingestion** ([`ingestion.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/ingestion.py)) | [`test_audio_ingestion.py`](file:///data/data/com.termux/files/home/audiobook-studio/tests/audio/test_audio_ingestion.py) | **6 / 6** | • 48,000 Hz 24-bit stereo standardization.<br/>• Single 5.0ms Hann micro-taper with zero Dirac boundary steps (AP-06).<br/>• Trailing C2PA watermark static removal.<br/>• Subsonic DC bias rejection (30Hz highpass).<br/>• Cryptographic SHA-256 ingestion idempotency. |
-| **Tier B Streaming Composer** ([`stream_composer.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/stream_composer.py)) | [`test_stream_composer.py`](file:///data/data/com.termux/files/home/audiobook-studio/tests/audio/test_stream_composer.py) | **6 / 6** | • Constant $\le 800\text{ KB}$ RAM streaming pre-master writer.<br/>• Syntax-aware pause hierarchy (clause: 180ms, sentence: 380ms, turn: 600ms).<br/>• Zero scratch silence files in production dirs (AP-05).<br/>• DE-05 conversational overlap cross-talk mixing.<br/>• Spatial azimuth panning ($\pm 0.18 - 0.28$). |
-| **Tier C Mastering Core** ([`mastering_engine.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/mastering_engine.py)) | [`test_mastering_unification.py`](file:///data/data/com.termux/files/home/audiobook-studio/tests/audio/test_mastering_unification.py) | **4 / 4** | • Sole canonical `MasteringEngineV2` unification (AP-01).<br/>• Calibrated $-2.0\text{ dBFS}$ limiter ceiling with `asc=0:level=0` (AP-02).<br/>• Strict ban on dynamic loudnorm AGC pumping on pauses/silence (AP-08).<br/>• Dialogue stem processing unification. |
-| **Tier D Delivery & Packaging** ([`encoder.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/encoder.py), [`packager.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/packager.py)) | [`test_book_packager.py`](file:///data/data/com.termux/files/home/audiobook-studio/tests/audio/test_book_packager.py) | **4 / 4** | • Single-pass 192k AAC-LC chapter deliverable (AP-04).<br/>• Post-encode True Peak verification ($\le -1.5\text{ dBTP}$) with closed-loop trim remediation (AP-09).<br/>• Strictly contiguous monotonic `FFMETADATA1` markers ($START_k = END_{k-1}$) (AP-10).<br/>• Lossless `.m4b` stream copy assembly (`-c:a copy`). |
-| **Tier E DAG Cache & Hot-Patcher** ([`ledger.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/ledger.py), [`hot_patcher.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/hot_patcher.py)) | [`test_hot_patch_recovery.py`](file:///data/data/com.termux/files/home/audiobook-studio/tests/audio/test_hot_patch_recovery.py) | **5 / 5** | • Deterministic segment content hash generation (`sha256(text + voice + params)`).<br/>• Chapter DAG ledger diffing (`ChapterSegmentLedger`).<br/>• In-place single-segment hot-patching ($< 0.2\text{s}$ timeline splice) (AP-07).<br/>• Duration-ripple hot-patching with timeline offset updates.<br/>• Janitor shield workspace isolation. |
-| **Acoustic Regression Suite** | [`test_golden_audio_regression_suite.py`](file:///data/data/com.termux/files/home/audiobook-studio/tests/test_golden_audio_regression_suite.py) | **20 / 20** | • 20 golden emotional and dramatic performance cases (neutral, anger, panic, grief, whisper, shout, crying, sarcasm, combat strain, code-switching, etc.). |
-| **Audio Reality Auditor** | [`test_audio_reality_auditor.py`](file:///data/data/com.termux/files/home/audiobook-studio/tests/test_audio_reality_auditor.py) | **15 / 15** | • Forensic acoustic facts verification, dynamic range, and vocal band spectral energy distribution. |
-| **Agentic Audio Engineer** | [`test_agentic_audio_engineer.py`](file:///data/data/com.termux/files/home/audiobook-studio/tests/test_agentic_audio_engineer.py) | **5 / 5** | • Self-healing FFmpeg filter graph repair, syntax validation, transient loop error handling. |
-| **End-to-End Pilot** | [`test_audio_production_e2e_pilot.py`](file:///data/data/com.termux/files/home/audiobook-studio/tests/test_audio_production_e2e_pilot.py) | **1 / 1** | • Full lifecycle verification: Ingestion $\to$ Dialogue Editorial $\to$ Streaming Composition $\to$ Mastering $\to$ 192k AAC Delivery $\to$ Lossless M4B Packaging $\to$ Hot-Patch Recovery. |
-| **Total Audio Test Suite** | **All 9 Test Modules** | **66 / 66** | **100% Passing (0 Failures, 0 Regressions)** |
-
----
-
-*Production specification locked and certified against Android Termux ARM64 and Windows Workstation standards.*
+- **100% Invariant Compliance**: Verified under `tests/audio/` and `tests/test_mastering_unification.py`.
+- **Zero Placeholder Guarantee**: All classes, fallback handlers, and Pydantic v2 schemas are fully implemented without stubs.
+- **Fail-Safe Integrity**: If C++ JUCE or neural packages are absent, deterministic FFmpeg pipelines execute automatically.

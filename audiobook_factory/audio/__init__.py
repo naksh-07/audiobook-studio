@@ -8,6 +8,13 @@ from .contracts import (
     SegmentAudioContract,
     ChapterMasterContract,
     IngestionConfig,
+    DSPConfig,
+    DSPMasteringResult,
+    AudioQAConfig,
+    SegmentQAEvaluation,
+    ChapterQAReport,
+    EnhancerConfig,
+    ReferenceMatcherConfig,
 )
 from .ingestion import AudioIngestionManager
 from .stream_composer import ChunkStreamComposer
@@ -21,11 +28,35 @@ from .ledger import (
     compute_segment_content_hash,
 )
 from .hot_patcher import SingleSegmentHotPatcher, HotPatchResult
+from .dsp import (
+    VocalDSPProcessor,
+    has_pedalboard_engine,
+    has_pyloudnorm_engine,
+)
+from .qa_auditor import (
+    AudioQAAuditor,
+    has_whisper_engine,
+)
+from .enhancer import (
+    NeuralVocalEnhancer,
+    has_deepfilter_engine,
+)
+from .reference_matcher import (
+    ReferenceSpectrumMatcher,
+    has_matchering_engine,
+)
 
 __all__ = [
     "SegmentAudioContract",
     "ChapterMasterContract",
     "IngestionConfig",
+    "DSPConfig",
+    "DSPMasteringResult",
+    "AudioQAConfig",
+    "SegmentQAEvaluation",
+    "ChapterQAReport",
+    "EnhancerConfig",
+    "ReferenceMatcherConfig",
     "AudioIngestionManager",
     "ChunkStreamComposer",
     "DialogueEditorialBridge",
@@ -37,5 +68,14 @@ __all__ = [
     "compute_segment_content_hash",
     "SingleSegmentHotPatcher",
     "HotPatchResult",
+    "VocalDSPProcessor",
+    "has_pedalboard_engine",
+    "has_pyloudnorm_engine",
+    "AudioQAAuditor",
+    "has_whisper_engine",
+    "NeuralVocalEnhancer",
+    "has_deepfilter_engine",
+    "ReferenceSpectrumMatcher",
+    "has_matchering_engine",
 ]
 

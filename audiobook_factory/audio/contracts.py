@@ -82,3 +82,104 @@ class ChapterMasterContract(BaseModel):
     mean_phase_correlation: float = Field(..., ge=0.20, le=1.0, description="Stereo phase correlation coefficient")
 
     certified: bool = Field(default=False, description="Whether this chapter passed all quality gates")
+
+
+class DSPConfig(BaseModel):
+    """Configuration governing C++ JUCE DSP vocal mastering and optional VST3 hosting."""
+    model_config = ConfigDict(extra="ignore")
+
+    enable_pedalboard: bool = Field(default=True, description="Attempt C++ Pedalboard DSP before FFmpeg fallback")
+    enable_vst3: bool = Field(default=False, description="Enable headless VST3 plugin insertion")
+    vst3_plugin_path: Optional[Path] = Field(default=None, description="Path to .vst3 bundle")
+    subsonic_hz: float = Field(default=75.0, ge=20.0, le=120.0, description="Subsonic highpass filter cutoff in Hz")
+    boxiness_cut_hz: float = Field(default=320.0, ge=150.0, le=600.0, description="Parametric notch frequency for chest resonance in Hz")
+    boxiness_cut_db: float = Field(default=-1.5, ge=-6.0, le=0.0, description="Boxiness attenuation gain in dB")
+    presence_lift_hz: float = Field(default=3200.0, ge=1500.0, le=6000.0, description="Speech presence clarity center frequency in Hz")
+    presence_lift_db: float = Field(default=0.8, ge=0.0, le=4.0, description="Speech presence boost in dB")
+    target_lufs: float = Field(default=-19.0, ge=-24.0, le=-14.0, description="EBU R128 integrated loudness target in LUFS")
+    true_peak_ceiling_dbtp: float = Field(default=-1.5, ge=-3.0, le=-0.5, description="Lookahead True-Peak ceiling in dBTP")
+    compressor_threshold_db: float = Field(default=-18.0, ge=-30.0, le=-6.0, description="Optical compressor threshold in dB")
+    compressor_ratio: float = Field(default=2.5, ge=1.2, le=6.0, description="Optical compressor compression ratio")
+    compressor_attack_ms: float = Field(default=25.0, ge=5.0, le=100.0, description="Compressor attack time in ms")
+    compressor_release_ms: float = Field(default=120.0, ge=20.0, le=500.0, description="Compressor release time in ms")
+
+
+class DSPMasteringResult(BaseModel):
+    """Execution telemetry emitted by VocalDSPProcessor."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    backend_used: Literal["pedalboard_juce_v2", "ffmpeg_dual_pass_linear", "fallback_linear"] = Field(
+        ..., description="Mastering engine backend that rendered the artifact"
+    )
+    output_path: Path = Field(..., description="Rendered 48kHz 24-bit PCM master WAV")
+    integrated_lufs: float = Field(..., description="Measured post-master integrated loudness in LUFS")
+    true_peak_dbtp: float = Field(..., description="Measured post-master True Peak in dBTP")
+    loudness_range_lu: float = Field(default=7.5, description="Measured Loudness Range in LU")
+    execution_duration_sec: float = Field(default=0.0, ge=0.0, description="Processing wall-clock time in seconds")
+
+
+class AudioQAConfig(BaseModel):
+    """Configuration parameters governing acoustic and script quality auditing."""
+    model_config = ConfigDict(extra="ignore")
+
+    enable_vad: bool = Field(default=True, description="Enable Voice Activity Detection for boundary checks")
+    enable_whisper_alignment: bool = Field(default=False, description="Enable optional Faster-Whisper script alignment")
+    whisper_model_size: str = Field(default="base", description="Whisper model tier: tiny, base, small, medium")
+    min_wpm: float = Field(default=75.0, description="Minimum acceptable words per minute (below indicates stalled speech)")
+    max_wpm: float = Field(default=240.0, description="Maximum acceptable words per minute (above indicates rushed speech)")
+    min_pause_ms: int = Field(default=120, description="Minimum natural inter-phrase pause in ms")
+    max_pause_ms: int = Field(default=1800, description="Maximum natural pause before dead-air alert in ms")
+    duration_tolerance_ratio: float = Field(default=0.40, description="Maximum allowable duration mismatch relative to text length")
+    min_mos_threshold: float = Field(default=3.5, description="Minimum Mean Opinion Score before warning")
+
+
+class SegmentQAEvaluation(BaseModel):
+    """Forensic evaluation of an individual synthesized dialogue chunk."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    segment_index: int = Field(..., ge=1, description="1-indexed sequence order")
+    segment_uid: str = Field(..., description="Unique segment identifier")
+    speaker: str = Field(default="Narrator", description="Character or narrator name")
+    status: Literal["PASS", "WARN", "FAIL"] = Field(default="PASS", description="Audit verdict")
+    duration_ms: int = Field(..., ge=0, description="Physical audio duration in milliseconds")
+    estimated_wpm: float = Field(default=140.0, description="Estimated speaking rate in words per minute")
+    char_per_sec: float = Field(default=15.0, description="Character-to-duration speed in characters per second")
+    predicted_mos: float = Field(default=4.5, ge=1.0, le=5.0, description="Predicted Speech Quality MOS")
+    silence_leading_ms: int = Field(default=0, ge=0, description="Leading dead air in ms")
+    silence_trailing_ms: int = Field(default=0, ge=0, description="Trailing dead air in ms")
+    issues: List[str] = Field(default_factory=list, description="Detected anomalies or quality notices")
+    remediation_advice: Optional[str] = Field(default=None, description="Actionable correction recommendation")
+
+
+class ChapterQAReport(BaseModel):
+    """Consolidated forensic QA audit report for an entire chapter."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    chapter_num: int = Field(..., ge=1, description="Chapter index")
+    total_segments: int = Field(default=0, ge=0, description="Total audited speech segments")
+    passed_segments: int = Field(default=0, ge=0, description="Count of passed takes")
+    warned_segments: int = Field(default=0, ge=0, description="Count of takes with non-blocking warnings")
+    failed_segments: int = Field(default=0, ge=0, description="Count of rejected/fatal takes")
+    overall_status: Literal["PASS", "WARN", "FAIL"] = Field(default="PASS", description="Overall chapter QA status")
+    mean_mos: float = Field(default=4.5, ge=1.0, le=5.0, description="Average predicted speech MOS")
+    evaluations: List[SegmentQAEvaluation] = Field(default_factory=list, description="Individual segment evaluations")
+
+
+class EnhancerConfig(BaseModel):
+    """Configuration governing neural speech de-artifacting and enhancement."""
+    model_config = ConfigDict(extra="ignore")
+
+    enable_neural_enhancement: bool = Field(default=False, description="Enable DeepFilterNet3 neural vocal cleaning")
+    snr_bypass_threshold_db: float = Field(default=45.0, description="SNR threshold above which neural filter is bypassed")
+    max_energy_diff_db: float = Field(default=2.0, description="Maximum allowable RMS energy difference before rejection")
+    model_type: str = Field(default="deepfilternet3", description="Neural enhancer model architecture")
+
+
+class ReferenceMatcherConfig(BaseModel):
+    """Configuration governing Matchering 2.0 reference spectrum matching."""
+    model_config = ConfigDict(extra="ignore")
+
+    enable_reference_matching: bool = Field(default=False, description="Enable reference spectrum matching")
+    reference_track_path: Optional[Path] = Field(default=None, description="Path to golden reference WAV master")
+    max_spectral_correction_db: float = Field(default=3.0, ge=0.5, le=6.0, description="Hard clamp on spectral EQ adjustment in dB")
+

@@ -51,14 +51,18 @@ from audiobook_factory.perceptual_critic import PerceptualCritic
 from audiobook_factory.reference_mastering import ReferenceMasteringAuditor
 from audiobook_factory.scene_aware_engine import SceneAwareDecisionEngine
 from audiobook_factory.mastering_certification import MasteringCertifier
+from audiobook_factory.audio.dsp import VocalDSPProcessor, has_pedalboard_engine
+from audiobook_factory.audio.reference_matcher import ReferenceSpectrumMatcher, has_matchering_engine
 
-MASTERING_ENGINE_VERSION = "2.2.0"
+MASTERING_ENGINE_VERSION = "2.4.0"
 
 
 class MasteringEngineV2:
     """
     Stage 12 Mastering Engine executing deterministic dual-pass mastering
     and closed-loop QC verification for audio drama production.
+    Supports high-speed C++ JUCE DSP (Pedalboard), Reference Spectrum Matching (Matchering 2.0),
+    and automatic FFmpeg fallback.
     """
 
     def __init__(
@@ -72,6 +76,8 @@ class MasteringEngineV2:
         perceptual_critic: Optional[PerceptualCritic] = None,
         reference_auditor: Optional[ReferenceMasteringAuditor] = None,
         certifier: Optional[MasteringCertifier] = None,
+        dsp_processor: Optional[VocalDSPProcessor] = None,
+        reference_matcher: Optional[ReferenceSpectrumMatcher] = None,
         ffmpeg_bin: Optional[str] = None,
     ):
         self.ffmpeg = ffmpeg_bin or shutil.which("ffmpeg") or "ffmpeg"
@@ -84,6 +90,8 @@ class MasteringEngineV2:
         self.perceptual_critic = perceptual_critic or PerceptualCritic()
         self.reference_auditor = reference_auditor or ReferenceMasteringAuditor()
         self.certifier = certifier or MasteringCertifier()
+        self.dsp = dsp_processor or VocalDSPProcessor(ffmpeg_bin=self.ffmpeg)
+        self.reference_matcher = reference_matcher or ReferenceSpectrumMatcher()
         self.version = MASTERING_ENGINE_VERSION
         self._ffmpeg_version = self._detect_ffmpeg_version()
 

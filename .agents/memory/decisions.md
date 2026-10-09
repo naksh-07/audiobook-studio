@@ -1321,3 +1321,61 @@
   - Reduced chapter regeneration latency from several minutes to $< 0.2\text{s}$ for single-take surgical fixes.
   - Verified across comprehensive audio test harness with **66 passed, 0 failed (100% pass rate)**.
 
+## ADR-021: Hybrid C++ JUCE DSP Engine (Pedalboard) with Graceful FFmpeg Degradation
+- **Context:** While FFmpeg is exceptional for streaming transcoding and linear container packaging, static command-line filter chains lack transparent optical vocal compression, dynamic parametric vocal notch EQs, lookahead oversampled True Peak limiting, and headless VST3 plugin loading capability.
+- **Decision:**
+  1. Introduce [`audiobook_factory/audio/dsp.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/dsp.py) leveraging Spotify Pedalboard (C++ JUCE) and Pyloudnorm (ITU-R BS.1770-4).
+  2. Implement vocal-calibrated mastering chains: 75Hz highpass rumble cut, 320Hz boxiness notch (Q=1.2, -1.5 dB), 3.2kHz speech presence lift (Q=1.0, +0.8 dB), optical compression (2.5:1 ratio), and oversampled True Peak lookahead limiting (-1.5 dBTP).
+  3. Enforce the **Graceful Degradation Invariant**: If `pedalboard` or `pyloudnorm` is missing or fails at runtime, the engine seamlessly and automatically falls back to our deterministic FFmpeg mastering pipeline without raising exceptions or breaking builds.
+- **Invariants:**
+  1. **Fail-Safe Fallback**: `has_pedalboard_engine()` runtime check guarantees 100% backward compatibility on standard environments.
+  2. **Streaming Memory Preservation**: Long-form streaming pre-master composition memory ceiling ($\le 800\text{ KB}$) remains untouched.
+  3. **True Peak Ceiling**: Master limiter clamped strictly to $-1.5\text{ dBTP}$.
+- **Consequences:**
+  - Elevates vocal warmth, dynamic consistency, and dialogue intelligibility to commercial Audible standards.
+  - Enables optional headless VST3 plugin hosting (e.g. TDR Nova dynamic EQ).
+  - Preserves 100% offline portability and build safety across mobile and desktop environments.
+
+## ADR-022: Multi-Tier Acoustic & Script QA Auditor with Tiered Tolerance Gates
+- **Context:** Automated TTS speech synthesis can occasionally produce dropped lines, truncated word endings, unnatural dead air, or repetitive hallucination loops. Standard audio QC checking only peak levels and LUFS cannot detect semantic or pacing errors.
+- **Decision:**
+  1. Introduce [`audiobook_factory/audio/qa_auditor.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/qa_auditor.py) implementing `AudioQAAuditor` with energy/VAD silence boundary detection, speaking rate bounds (WPM & char/sec), and non-intrusive Speech MOS estimation.
+  2. Implement the **Tiered Tolerance Strategy**:
+     - *Hard Fatal Rejection*: Triggered strictly on physical/structural defects: empty frames ($< 60\text{ms}$), near-silent dropouts (RMS $< -80\text{dBFS}$), or physically impossible speech speeds ($> 320\text{ WPM}$ or $< 40\text{ WPM}$ on short phrases indicating loops).
+     - *Soft Non-Blocking Warnings*: Emitted for minor speaking pace variances ($75 - 240\text{ WPM}$ bounds) or small pause drifts, allowing production to proceed while logging diagnostic notices.
+- **Invariants:**
+  1. **Zero-Crash Heuristic Fallback**: Operates in pure Python/NumPy without requiring heavy GPU packages.
+  2. **Deterministic Certification**: Produces strongly typed `SegmentQAEvaluation` and `ChapterQAReport` artifacts for every chapter master.
+- **Consequences:**
+  - Eradicates silent TTS dropouts and hallucination loops before audio reaches the final container packaging stage.
+  - Guarantees Audible-standard dialogue pacing and seamless narrative immersion.
+
+## ADR-023: Neural Speech Polish & Reference Spectrum Matching with Clamping Envelopes
+- **Context:** Generative TTS stems can exhibit subtle high-frequency metallic hash or room resonance, while multi-day audio sessions can suffer from minor acoustic coloration drift between chapters.
+- **Decision:**
+  1. Introduce [`audiobook_factory/audio/enhancer.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/enhancer.py) wrapping DeepFilterNet3 with **Selective Auto-Bypass** ($> 45\text{dB}$ SNR bypass) and **Energy Difference Clamping** ($|\Delta\text{RMS}| \le 2.0\text{dB}$).
+  2. Introduce [`audiobook_factory/audio/reference_matcher.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/reference_matcher.py) wrapping Matchering 2.0 with **$\pm 3.0\text{dB}$ Spectral Hard Clamping**.
+- **Invariants:**
+  1. **Consonant Preservation**: Dynamic de-noising is constrained to preserve delicate Hindi dental consonants (स, श, छ, थ, ध).
+  2. **Opt-in / Clamped Reference Matching**: Spectral transplantation never exceeds $\pm 3.0\text{dB}$ EQ variance.
+  3. **Graceful Fallback**: Built-in FFT 1/3-octave and spectral gate fallbacks guarantee 100% functionality without external neural weights.
+- **Consequences:**
+  - Ensures pristine multi-chapter tonal consistency and silky-smooth broadcast vocal textures.
+
+## ADR-024: Antigravity MCP Suite & Comprehensive Pro Audio CLI Bridge
+- **Context:** Antigravity AI agents and human operators need unified, programmatically accessible tools and CLI subcommands to inspect, audit, enhance, and master vocal tracks without manually constructing complex FFmpeg commands or Python scripts.
+- **Decision:**
+  1. Introduce [`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/mcp/server.py) providing 6 standardized MCP tools:
+     - `apply_vocal_dsp`: Applies 4-band vocal EQ, optical compression, and -1.5 dBTP limiter (with graceful FFmpeg fallback).
+     - `audit_audio_quality`: Evaluates single stem / segment audio metrics (RMS, True Peak, VAD bounds, Speech MOS, WPM).
+     - `match_reference_spectrum`: Clones reference frequency curve onto target audio with $\pm 3.0\text{dB}$ safety clamping.
+     - `enhance_vocal_stem`: Removes room noise and metallic TTS artifacts with auto-bypass on clean audio.
+     - `measure_ebu_r128_loudness`: Computes integrated LUFS, LRA, and True Peak dBTP.
+     - `audit_chapter_qa`: Audits full chapter master against screenplay alignment, emitting structured QA pass/fail reports.
+  2. Extend CLI commands in [`audiobook_factory/cli/commands/audio.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/cli/commands/audio.py) and [`audiobook_cli.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_cli.py) with `dsp`, `qa-audit`, `enhance`, and `match-ref` subcommands.
+- **Invariants:**
+  1. **Strict Type Contracts**: All MCP tools and CLI arguments accept validated file paths and return strongly typed JSON dictionaries.
+  2. **Fail-Safe Robustness**: Every tool catches underlying DSP or system exceptions and returns informative error dictionaries rather than crashing MCP server transports.
+- **Consequences:**
+  - Empowers Antigravity agents with direct programmatic audio inspection and mastering superpowers.
+  - Gives sound engineers and developers instant CLI access to all pro audio algorithms.

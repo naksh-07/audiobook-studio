@@ -1,13 +1,14 @@
-# 🎙️ Audiobook Studio (Antigravity Plugin & Studio Engine v5.3)
+# 🎙️ Audiobook Studio (Antigravity Plugin & Studio Engine v5.4)
 
-> **Autonomous Studio-Grade Multi-Voice Audiobook Production Engine & Google Antigravity Plugin with Gemini Flash TTS, 4D Formant Actor Performance, Two-Pass Linear EBU R128 Mastering, Anti-Swap Dialogue Attribution & Interactive Sidecar Studio Panel.**
+> **Autonomous Studio-Grade Multi-Voice Audiobook Production Engine & Google Antigravity Plugin with Gemini Flash TTS, 4D Formant Actor Performance, Pro-Grade AI Vocal Mastering Workstation, Anti-Swap Dialogue Attribution & Interactive Sidecar Studio Panel.**
 
 [![Antigravity Plugin](https://img.shields.io/badge/Antigravity-Plugin%20v1.0.0-blueviolet.svg)](plugin.json)
 [![Python](https://img.shields.io/badge/Python-3.10%2B%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-6.0%2B%20%7C%208.0-red.svg)](https://ffmpeg.org/)
 [![TTS Engine](https://img.shields.io/badge/TTS-Google%20Gemini%20Flash%20TTS-green.svg)](docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
-[![Voice Casting](https://img.shields.io/badge/Voice%20Casting-4D%20Acoustic%20Formant%20Matrix-blue.svg)](docs/VOICE_CASTING_DIRECTOR_GUIDE.md)
-[![Broadcast Standard](https://img.shields.io/badge/Broadcast-Two--Pass%20Linear%20EBU%20R128%20(-19%20LUFS)-purple.svg)](docs/AUDIO_ENGINEERING.md)
+[![Vocal DSP](https://img.shields.io/badge/DSP-Spotify%20Pedalboard%20(C%2B%2B%20JUCE)-orange.svg)](docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
+[![Neural Audio](https://img.shields.io/badge/Neural-DeepFilterNet3%20%7C%20Matchering%202.0-yellow.svg)](docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
+[![Broadcast Standard](https://img.shields.io/badge/Broadcast-EBU%20R128%20(-19%20LUFS)%20%7C%20-1.5%20dBTP-purple.svg)](docs/AUDIO_ENGINEERING.md)
 [![Tests](https://img.shields.io/badge/Tests-100%25%20Passing-brightgreen.svg)](tests/)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
@@ -15,10 +16,16 @@
 
 ## 📖 Overview
 
-**Audiobook Studio** is an enterprise-grade, autonomous audiobook production system and a first-class **Google Antigravity Plugin**. Engineered specifically for **grounded, natural multi-voice character acting and pristine vocal narration** modeled after the benchmark standards of **Audible Studios**, it transforms raw literature (**EPUB, PDF, TXT, Markdown**) into chapterized, broadcast-compliant `.m4b` audiobooks with zero corporate fluff or tedious manual editing.
+**Audiobook Studio (v5.4)** is an enterprise-grade, autonomous audiobook production system and a first-class **Google Antigravity Plugin**. Engineered specifically for **grounded, natural multi-voice character acting and pristine vocal narration** modeled after the benchmark standards of **Audible Studios**, it transforms raw literature (**EPUB, PDF, TXT, Markdown**) into chapterized, broadcast-compliant `.m4b` audiobooks with zero corporate fluff or tedious manual editing.
+
+Version 5.4 introduces the **Pro-Grade AI Vocal Mastering Workstation**:
+- **C++ JUCE Vocal DSP Engine (ADR-021)**: Powered by Spotify Pedalboard and Pyloudnorm (BS.1770-4), offering 4-band parametric vocal EQ, optical compression (2.5:1 ratio), lookahead True Peak limiting (-1.5 dBTP), and headless VST3 hosting.
+- **Forensic Audio QA Auditor (ADR-022)**: Automated VAD boundary validation, text-grounded speaking rate checking (WPM and char/sec) catching dropouts (>320 WPM) and loops (<40 WPM), and non-intrusive Speech MOS prediction.
+- **Neural Vocal Polish & Spectrum Matcher (ADR-023)**: DeepFilterNet3 (48kHz full-band) with >45dB SNR selective auto-bypass and Matchering 2.0 with ±3.0dB hard spectral clamping.
+- **Antigravity Audio MCP Server & CLI Bridge (ADR-024)**: Standardized JSON-RPC tools and CLI subcommands (`dsp`, `qa-audit`, `enhance`, `match-ref`).
 
 Audiobook Studio operates both as:
-1. **A Native Antigravity Plugin**: Direct with conversational directing via the `@audiobook-director` agent, interactive Webview Studio Panel sidecar, and full multi-skill workflows.
+1. **A Native Antigravity Plugin**: Direct conversational directing via the `@audiobook-director` agent, interactive Webview Studio Panel sidecar, and full multi-skill workflows.
 2. **A Standalone CLI & Python Framework**: Programmatic scripting, batch processing, and headless production pipelines.
 
 ---
@@ -63,10 +70,12 @@ flowchart TD
         Critic --> Editorial["Dialogue Editorial Layer (DE-01 - DE-07)<br/>Endpoint Snapping, Hann Micro-Fades & Turn Latency"]
     end
 
-    subgraph Room5["🎛️ Room 5: Pure Vocals-Only Audio Mixing & Production Subsystem"]
+    subgraph Room5["🎛️ Room 5: Pro-Grade AI Vocal Mastering Workstation"]
         Editorial --> StreamComp["ChunkStreamComposer (<= 800 KB RAM Streaming)<br/>Direct premaster.wav Writer + Zero Disk Silence Files"]
-        StreamComp --> VocalMaster["MasteringEngineV2 (Stage 12 Canonical Core)<br/>Dual-Pass Linear EBU R128 (-19.0 LUFS) + Limiter (-2.0 dBFS, asc=0)<br/>Ban on Dynamic AGC Pumping on Pauses (AP-08)"]
-        VocalMaster --> AACDeliver["ChapterDeliveryEncoder (Single-Pass 192k AAC-LC)<br/>Post-Encode True Peak Verification (<= -1.5 dBTP)"]
+        StreamComp --> QAAudit["Phase 2: AudioQAAuditor (VAD, WPM bounds, MOS)"]
+        QAAudit --> NeuralEnhance["Phase 3: Neural Vocal Polish & Matchering 2.0"]
+        NeuralEnhance --> VocalDSP["Phase 1: VocalDSPProcessor (C++ JUCE Pedalboard)<br/>4-Band Parametric EQ + Optical Comp + Limiter (-1.5 dBTP)"]
+        VocalDSP --> AACDeliver["ChapterDeliveryEncoder (Single-Pass 192k AAC-LC)<br/>Post-Encode True Peak Verification (<= -1.5 dBTP)"]
         AACDeliver --> M4BPack["M4BBookPackager (Lossless Stream Copy -c:a copy)<br/>Monotonic FFMETADATA1 Chapter Markers & Cover Art"]
         M4BPack --> Deliverable["Studio Audiobook Deliverable (.m4b)"]
         HotPatch["SingleSegmentHotPatcher & ChapterSegmentLedger<br/>Incremental DAG Caching & < 0.2s Sample-Accurate Splice"] -.-> StreamComp
@@ -78,18 +87,21 @@ flowchart TD
     Room4 --> Room5
 ```
 
-### 🎛️ Room 5: Pure Vocals-Only Audio Mixing & Production Subsystem (`audiobook_factory/audio/`)
+### 🎛️ Room 5: Pro-Grade AI Vocal Mastering Workstation ([`audiobook_factory/audio/`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/))
 
-Room 5 houses the decoupled, broadcast-compliant audio production pipeline engineered to transform raw synthesized speech into Audible-standard `.m4a` chapter deliverables and chapterized `.m4b` containers:
+Room 5 houses the broadcast-compliant audio production pipeline engineered to transform raw synthesized speech into Audible-standard `.m4a` chapter deliverables and chapterized `.m4b` containers:
 
-- **Strongly Typed Audio Contracts ([`contracts.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/contracts.py))**: Immutable Pydantic v2 schemas ([`SegmentAudioContract`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/contracts.py#L26-L66), [`ChapterMasterContract`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/contracts.py#L68-L85), [`IngestionConfig`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/contracts.py#L15-L24)) defining strict interfaces across ingestion, editorial, mastering, and container packaging.
-- **Tier A Speech Ingestion & Normalization ([`ingestion.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/ingestion.py))**: Normalizes all incoming speech chunks to uniform **48,000 Hz 24-bit stereo PCM WAV**, strips RIFF wrapper static and C2PA digital watermark screech artifacts, rejects DC bias via 30Hz highpass filter, and enforces the **Single 5.0ms Raised-Cosine Hann Micro-Taper invariant (AP-06)** with boundary samples pinned strictly to 0.0.
-- **Streaming Pre-Master Composer ([`stream_composer.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/stream_composer.py))**: A block-based WAV writer ([`ChunkStreamComposer`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/stream_composer.py#L22-L338)) streaming normalized speech, syntax-aware pauses (clause: 180ms, sentence: 380ms, turn: 600ms), and DE-05 conversational overlaps directly into `premaster.wav`. Operates under a **constant $\le 800\text{ KB}$ RAM ceiling**, completely eliminating Android Termux OOM crashes on multi-hour audiobooks and generating zero standalone silence scratch files (AP-05).
-- **Dialogue Editorial Bridge ([`editorial.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/editorial.py))**: Unifies Ingestion, the Dialogue Editorial Layer (DE-01 - DE-07: dead-air clamping, breath regulation, inter-take leveling, azimuth spatial panning), and pre-master streaming composition into an automated pipeline ([`DialogueEditorialBridge`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/editorial.py#L18-L157)).
-- **Canonical Stage 12 Mastering Engine ([`mastering_engine.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/mastering_engine.py))**: The sole canonical mastering core (`MasteringEngineV2`). Implements two-pass linear EBU R128 (-19.0 LUFS target) with a calibrated **-2.0 dBFS brickwall limiter ceiling (`asc=0:level=0`)** and an architectural ban on single-pass dynamic loudnorm AGC pumping during dramatic pauses or near-silence (AP-08).
-- **Single-Pass Chapter Delivery Encoder ([`encoder.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/encoder.py))**: Guarantees the Zero-Generation-Loss invariant (AP-04) by executing exactly one lossy compression pass from master PCM WAV to **192k AAC-LC** (`chapter_XXX.m4a`). Followed by an automated **True Peak post-encode check ($\le -1.5\text{ dBTP}$)** with closed-loop gain trim remediation (-0.3 dB) to eradicate inter-sample codec clipping.
-- **Lossless Stream Copy M4B Packager ([`packager.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/packager.py))**: Assembles chapter deliverables into a final `.m4b` container using **lossless stream copy (`-c:a copy`)** with web-streaming faststart (`-movflags +faststart`), embedded cover art, atomic file promotion, and strictly monotonic **`FFMETADATA1` chapter markers** ($\text{START}_k = \text{END}_{k-1}$) to prevent audiobook player timeline desync (AP-10).
-- **Incremental DAG Caching & Hot-Patching ([`ledger.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/ledger.py), [`hot_patcher.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/hot_patcher.py))**: [`ChapterSegmentLedger`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/ledger.py#L83-L120) tracks cryptographic SHA-256 hashes of text, actor, and audio artifacts. [`SingleSegmentHotPatcher`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/audio/hot_patcher.py#L33-L175) performs **sample-accurate timeline splicing in $< 0.2\text{s}$**, allowing instant surgical repair of mispronounced chunks without re-rendering entire multi-hour chapters (AP-07).
+- **Strongly Typed Audio Contracts ([`contracts.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/contracts.py))**: Immutable Pydantic v2 schemas ([`DSPConfig`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/contracts.py#L87-L106), [`AudioQAConfig`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/contracts.py#L121-L135), [`SegmentAudioContract`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/contracts.py#L26-L67), [`ChapterMasterContract`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/contracts.py#L68-L86)) defining strict interfaces across ingestion, editorial, mastering, and container packaging.
+- **C++ JUCE Vocal DSP Engine ([`dsp.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/dsp.py))**: [`VocalDSPProcessor`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/dsp.py#L65-L383) wrapping Spotify Pedalboard and Pyloudnorm (BS.1770-4). Applies 4-band parametric EQ (75Hz rumble cut, 320Hz notch, 3.2kHz presence lift), optical compression (2.5:1 ratio), lookahead True-Peak limiting (-1.5 dBTP), and headless VST3 hosting, with automatic fallback to deterministic dual-pass FFmpeg mastering.
+- **Forensic Audio QA Auditor ([`qa_auditor.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/qa_auditor.py))**: [`AudioQAAuditor`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/qa_auditor.py#L46-L358) detects dead-air boundaries, verifies speaking rates (WPM and char/sec) against text to catch TTS dropouts (>320 WPM) and hallucination loops (<40 WPM), and predicts Speech MOS.
+- **Neural Vocal Polish & Restoration ([`enhancer.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/enhancer.py))**: [`NeuralVocalEnhancer`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/enhancer.py#L42-L220) wrapping DeepFilterNet3 (48kHz full-band) with $>45\text{ dB}$ SNR selective auto-bypass and energy difference clamping ($|\Delta\text{RMS}| \le 2.0\text{ dB}$).
+- **Reference Spectrum Matching ([`reference_matcher.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/reference_matcher.py))**: [`ReferenceSpectrumMatcher`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/reference_matcher.py#L41-L214) wrapping Matchering 2.0 with a hard $\pm 3.0\text{ dB}$ spectral clamp.
+- **Antigravity Audio MCP Server ([`mcp/server.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/mcp/server.py))**: 6 standardized MCP tools (`apply_vocal_dsp`, `audit_audio_quality`, `match_reference_spectrum`, `enhance_vocal_stem`, `measure_ebu_r128_loudness`, `audit_chapter_qa`).
+- **Tier A Speech Ingestion & Normalization ([`ingestion.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/ingestion.py))**: Standardizes incoming speech chunks to uniform **48,000 Hz 24-bit stereo PCM WAV**, strips C2PA digital watermark artifacts, rejects DC bias via 30Hz highpass filter, and enforces a **Single 5.0ms Raised-Cosine Hann Micro-Taper (AP-06)** with boundary samples pinned strictly to 0.0.
+- **Streaming Pre-Master Composer ([`stream_composer.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/stream_composer.py))**: Block-based WAV writer streaming speech, syntax pauses, and DE-05 overlaps directly into `premaster.wav` under a **constant $\le 800\text{ KB}$ RAM ceiling**.
+- **Single-Pass Chapter Delivery Encoder ([`encoder.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/encoder.py))**: Single-pass 192k AAC-LC delivery (`chapter_XXX.m4a`) with automated post-encode True Peak verification ($\le -1.5\text{ dBTP}$).
+- **Lossless Stream Copy M4B Packager ([`packager.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/packager.py))**: Assembles chapter deliverables into `.m4b` via **lossless stream copy (`-c:a copy`)** with monotonic `FFMETADATA1` markers.
+- **Incremental DAG Caching & Hot-Patching ([`ledger.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/ledger.py), [`hot_patcher.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/hot_patcher.py))**: Performs sample-accurate timeline splicing in $<0.2\text{s}$ for single-segment repairs without full chapter rebuilds (AP-07).
 
 ---
 
@@ -120,17 +132,14 @@ audiobook-studio/
 ```
 
 ### 1. The `@audiobook-director` Agent
-Eliminate memorizing CLI flags. Speak directly to the director:
+Speak directly to the director:
 - *"Produce next chapter with multi-cast Gemini Flash voices"*
-- *"Show active audiobook projects and progress"*
-- *"Audition character voices and verify cast roster"*
-- *"Run Gate 6 loudness and speech attribution audit on chapter 3"*
+- *"Run forensic speech QA audit on synthesized chapter 1 takes"*
+- *"Apply C++ JUCE vocal DSP mastering to chapter 2 pre-master"*
+- *"Check EBU R128 loudness compliance on deliverable M4A"*
 
 ### 2. The Interactive Studio Panel (Sidecar Webview)
-The embedded Webview runs in Antigravity's auxiliary side pane, providing:
-- **Live SSE Event Stream**: Real-time progress bars for translation, scripting, TTS chunking, and mastering.
-- **Character Casting Matrix**: Visual character roster, assigned acoustic formants (pitch shift, tempo, EQ contour), and 0% collision verification.
-- **Waveform Audition Soundboard**: Preview raw takes vs mastered speech segments directly inside the IDE.
+The embedded Webview runs in Antigravity's auxiliary side pane, providing real-time progress bars, visual character casting matrix, and live waveform soundboard auditioning.
 
 ---
 
@@ -140,13 +149,14 @@ Audiobook Studio strictly adheres to international broadcast and Audible product
 
 | Parameter | Benchmark Target | Engine Implementation |
 |---|---|---|
-| **Integrated Loudness** | **-19.0 LUFS** ($\pm 0.5$ LUFS) | Two-pass measured linear loudnorm (`-f null -` pass 1, `linear=true` pass 2); dynamic loudnorm AGC strictly banned during dramatic pauses/silence (AP-08). |
-| **True Peak Ceiling** | $\le$ **-1.5 dBTP** | Hard limiter ceiling calibrated to **-2.0 dBFS** (`asc=0:level=0`) absorbing AAC codec regrowth; verified via post-encode True Peak audit ($\le -1.5\text{ dBTP}$). |
-| **Streaming Memory** | $\le \mathbf{800\text{ KB}}$ RAM | Block-based `ChunkStreamComposer` writes directly to `premaster.wav`, eliminating Termux OOM crashes on Android. |
+| **Integrated Loudness** | **-19.0 LUFS** ($\pm 0.5$ LUFS) | `VocalDSPProcessor` (Pedalboard C++ JUCE + Pyloudnorm) or two-pass measured linear loudnorm (`-f null -` pass 1, `linear=true` pass 2); dynamic loudnorm AGC strictly banned during pauses/silence (AP-08). |
+| **True Peak Ceiling** | $\le$ **-1.5 dBTP** | Lookahead True Peak limiter ceiling calibrated to **-1.5 dBTP** (or -2.0 dBFS PCM) absorbing AAC codec regrowth; verified via post-encode True Peak audit ($\le -1.5\text{ dBTP}$). |
+| **Acoustic QA & MOS** | $\ge \mathbf{4.0}$ Predicted MOS | Forensic `AudioQAAuditor` auditing speech boundaries, WPM bounds, dropouts, and non-intrusive MOS. |
+| **Neural Speech Polish** | $>45\text{ dB}$ Auto-Bypass | DeepFilterNet3 neural polish with auto-bypass on clean takes and $|\Delta\text{RMS}| \le 2.0\text{ dB}$ energy clamping. |
+| **Reference Matching** | $\pm \mathbf{3.0\text{ dB}}$ Clamped | Matchering 2.0 spectral profile transplantation with hard gain clamping. |
+| **Streaming Memory** | $\le \mathbf{800\text{ KB}}$ RAM | Block-based `ChunkStreamComposer` writes directly to `premaster.wav`, eliminating memory bloat. |
 | **Incremental DAG Recovery** | $< \mathbf{0.2\text{s}}$ hot-patch | `ChapterSegmentLedger` SHA-256 caching + `SingleSegmentHotPatcher` sample-accurate timeline splicing without full chapter re-rendering (AP-07). |
 | **Consonant Clarity** | Zero de-esser degradation | Dynamic sibilance de-essers are banned; crisp Hindi dental/aspirated consonants (स, श, छ, थ, ध) are preserved. |
-| **Phase Coherence** | Natural tempo phrasing | WSOLA time-stretching banned during playback; pacing modulated naturally via punctuation. |
-| **Micro-Tapering** | Zero-crossing snapping | Single 5.0ms raised-cosine Hann micro-taper at speech boundaries (AP-06) with initial and final samples strictly 0.0. |
 | **Output Container** | Audible-compatible `.m4b` | Single-pass 192 kbps AAC-LC chapter deliverable (`.m4a`), lossless stream copy assembly (`-c:a copy`), strictly monotonic `FFMETADATA1` markers, and high-res cover art. |
 
 ---
@@ -184,13 +194,11 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ### 3. Install into Google Antigravity
 To install as a local Antigravity plugin:
 ```bash
-# Link or copy to Antigravity plugin directory:
 # On Windows:
 xcopy /E /I /Y . "%USERPROFILE%\.gemini\config\plugins\audiobook-studio"
 # On Linux / macOS:
 # cp -r . ~/.gemini/config/plugins/audiobook-studio
 ```
-Restart Antigravity or open Plugins Manager to see **Audiobook Studio** live!
 
 ---
 
@@ -209,6 +217,12 @@ audiobook-studio script <book_slug> --hindi --dramatized
 audiobook-studio synthesize <book_slug> --voice Aoede --workers 3
 audiobook-studio master <book_slug>
 audiobook-studio package <book_slug> --cover "cover.jpg"
+
+# Pro-Grade AI Vocal Mastering & QA subcommands:
+audiobook-studio dsp -i raw_chapter.wav -o mastered_chapter.wav --target-lufs -19.0 --true-peak -1.5
+audiobook-studio qa-audit -i c01_s001.wav -t "Spoken text line" -s "Narrator"
+audiobook-studio enhance -i noisy_take.wav -o cleaned_take.wav
+audiobook-studio match-ref -t my_chapter.wav -r golden_ref.wav -o matched.wav
 ```
 
 ### Command Matrix
@@ -225,6 +239,10 @@ audiobook-studio package <book_slug> --cover "cover.jpg"
 | **`package`** | Delivery | Packages all mastered chapters into a chapterized `.m4b` container with cover art. |
 | **`audit`** | QA (Chapter) | Runs Multi-Gate Independent Verification (Gates 0, 1, 2, 2.5, 2.8) on a specific chapter. |
 | **`audit-book`** | QA (Macro) | Runs Macro-Tier Gate 6 certification (Voice Continuity, Loudness, TOC Monotonicity). |
+| **`dsp`** | Pro Audio | Applies C++ JUCE parametric vocal EQ, optical compression, and True-Peak limiting. |
+| **`qa-audit`** | Acoustic QA | Forensically audits speech chunks for dead air, WPM bounds, dropouts, loops, and MOS. |
+| **`enhance`** | AI Polish | DeepFilterNet3 neural speech de-artifacting with selective >45dB SNR auto-bypass. |
+| **`match-ref`** | Mastering | Matches frequency spectrum to golden master with ±3.0dB hard spectral clamping. |
 
 ---
 
@@ -252,14 +270,16 @@ All quality gates are fail-closed:
 For exhaustive technical guides, visit the [`docs/`](docs/) directory:
 - [🏛️ Architecture Blueprint](docs/ARCHITECTURE.md)
 - [🎛️ Audio Engineering & Mastering](docs/AUDIO_ENGINEERING.md)
-- [🎛️ Pure Vocals-Only Audio Mixing & Production (v5.3)](docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
+- [🎛️ Pro-Grade AI Vocal Mastering & Production (v5.4)](docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
+- [💻 CLI Reference Manual](docs/CLI_REFERENCE.md)
+- [🤖 AI Agent & MCP Integration Guide](docs/MCP_AGENT_INTEGRATION.md)
+- [📚 API Reference & Data Contracts](docs/API_REFERENCE.md)
 - [🎙️ Gemini Flash TTS Synthesis & Directing](docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
 - [🎭 Voice Casting Director Guide](docs/VOICE_CASTING_DIRECTOR_GUIDE.md)
 - [🇮🇳 Complete Hindi Voice Catalog](docs/HINDI_VOICE_CATALOG.md)
 - [🧠 Literary Translation Intelligence](docs/LITERARY_TRANSLATION_INTELLIGENCE.md)
 - [🎭 Dramatic Adaptation & Screenplay](docs/DRAMATIC_ADAPTATION_AND_SCREENPLAY.md)
 - [✂️ Dialogue Editorial Layer](docs/DIALOGUE_EDITORIAL_LAYER.md)
-- [💻 CLI Reference Manual](docs/CLI_REFERENCE.md)
 - [🛡️ Quality Gates Specifications](docs/QUALITY_GATES.md)
 
 ---
