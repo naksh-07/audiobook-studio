@@ -22,22 +22,39 @@ WORKSPACE_DIR = Path(__file__).resolve().parent
 PROJECTS_DIR = WORKSPACE_DIR / "audiobooks" / "projects"
 
 # Modular command handlers from audiobook_factory.cli
-from audiobook_factory.cli.commands.pipeline import (
-    cmd_extract,
-    cmd_translate,
-    cmd_script,
-    cmd_synthesize,
-    cmd_master,
-    cmd_produce,
-    cmd_auto,
+try:
+    from audiobook_factory.cli.commands.pipeline import (
+        cmd_extract,
+        cmd_translate,
+        cmd_script,
+        cmd_synthesize,
+        cmd_master,
+        cmd_produce,
+        cmd_auto,
+    )
+except ImportError:
+    cmd_extract = cmd_translate = cmd_script = cmd_synthesize = cmd_master = cmd_produce = cmd_auto = None
+
+try:
+    from audiobook_factory.cli.commands.audio import (
+        cmd_package,
+    )
+except ImportError:
+    cmd_package = None
+
+try:
+    from audiobook_factory.cli.commands.audit import (
+        cmd_audit_book,
+        cmd_audit,
+    )
+except ImportError:
+    cmd_audit_book = cmd_audit = None
+
+from audiobook_factory.cli.commands.keys import (
+    cmd_keys,
 )
-from audiobook_factory.cli.commands.audio import (
-    cmd_package,
-)
-from audiobook_factory.cli.commands.audit import (
-    cmd_audit_book,
-    cmd_audit,
-)
+
+
 
 __all__ = [
     "cmd_extract",
@@ -152,6 +169,12 @@ def main():
     p_podcast.add_argument("--script-only", action="store_true", help="Generate podcast_script.json only")
     p_podcast.add_argument("--force-gate", action="store_true", help="Force bypass of extraction quality gate review")
 
+    # keys
+    p_keys = subparsers.add_parser("keys", help="Inspect and audit API key inventory, leases, and quota fleet status")
+    p_keys.add_argument("keys_action", nargs="?", default="status", choices=["status", "audit", "reset"], help="Action: status, audit, reset (default: status)")
+    p_keys.add_argument("--provider", default="gemini", help="Provider filter (default: gemini)")
+    p_keys.add_argument("--limit", type=int, default=25, help="Number of audit log records to display (default: 25)")
+
     args = parser.parse_args()
 
     if not args.subcommand:
@@ -188,7 +211,9 @@ def main():
         "audit": cmd_audit,
         "audit-book": cmd_audit_book,
         "podcast": _handle_podcast,
+        "keys": cmd_keys,
     }
+
     try:
         cmds[args.subcommand](args)
     except KeyboardInterrupt:

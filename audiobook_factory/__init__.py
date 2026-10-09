@@ -46,6 +46,20 @@ __version__ = "5.2.0"
 
 # Mapping of symbol names to (submodule_relative_path, symbol_name)
 _LAZY_IMPORTS: Dict[str, Tuple[str, str]] = {
+    # Control Plane / Models & Keys (Pillar 3)
+    "ModelGateway": (".core.models", "ModelGateway"),
+    "get_model_gateway": (".core.models", "get_model_gateway"),
+    "KeyLeaseManager": (".core.models", "KeyLeaseManager"),
+    "get_key_lease_manager": (".core.models", "get_key_lease_manager"),
+    "ModelRegistry": (".core.models", "ModelRegistry"),
+    "get_model_registry": (".core.models", "get_model_registry"),
+    "AntiBanGuard": (".core.models", "AntiBanGuard"),
+    "get_anti_ban_guard": (".core.models", "get_anti_ban_guard"),
+    "PersistentKeyPool": (".key_manager", "PersistentKeyPool"),
+    "get_persistent_key_pool": (".key_manager", "get_persistent_key_pool"),
+    "ModelManager": (".model_manager", "ModelManager"),
+    "get_model_manager": (".model_manager", "get_model_manager"),
+
     # Extraction / Pillar 1
     "process_book_file": (".extractor", "process_book_file"),
     "extract_chapters": (".extractor", "extract_chapters"),

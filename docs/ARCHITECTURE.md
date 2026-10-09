@@ -98,6 +98,125 @@ flowchart TD
 
 ---
 
+## 🎛️ Pillar 3: Model & Keys Manager Control Plane (Option C Architecture)
+
+The **Model & Keys Manager Control Plane** ([`audiobook_factory.core.models`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/)) implements **Option C: Shared Core with Specialized Modules + Unified Gateway Facade**. It eliminates direct API key handling, quota race conditions, and Google Cloud edge mass-bans across all 5 production rooms.
+
+```mermaid
+flowchart TD
+    subgraph Rooms["🎬 Downstream Production Rooms"]
+        R1["Room 1: Extraction & Ingestion"]
+        R2["Room 2: Translation Collective"]
+        R3["Room 3: Screenplay & Anti-Swap"]
+        R4["Room 4: Multi-Voice TTS Performance"]
+        R5["Room 5: Vocal Mastering & Telemetry"]
+    end
+
+    subgraph Facade["🚪 Unified Production Facade"]
+        Gateway["ModelGateway<br/>(generate_text, synthesize_speech, lease_session)"]
+    end
+
+    subgraph CorePlane["⚙️ Core Control Plane Subsystems"]
+        Router["RequestRouter<br/>(Task Matching & Fallback Ladder)"]
+        Registry["ModelRegistry<br/>(50+ Canonical Models & Capabilities)"]
+        AntiBan["AntiBanGuard<br/>(The 7 Iron Shields Protection Engine)"]
+        LeaseMgr["KeyLeaseManager<br/>(ACID SQLite Mutex & Crash Recovery)"]
+        Breaker["CircuitBreaker<br/>(CLOSED / OPEN / HALF_OPEN States)"]
+        PolicyEngine["Universal Policy Engine<br/>(Error Normalizer & Quota Rollover)"]
+    end
+
+    subgraph Persistence["💾 ACID Persistence"]
+        SQLite[("audiobooks/keys_inventory.db<br/>• key_inventory<br/>• key_leases<br/>• model_quota_ledger<br/>• key_audit_log")]
+    end
+
+    subgraph Adapters["🔌 Polymorphic Provider Adapters"]
+        AdGemini["GeminiProviderAdapter<br/>(Official GenAI SDK / REST v1beta)"]
+        AdOpenAI["OpenAICompatibleAdapter<br/>(Cerebras / Groq / OpenAI / OpenRouter)"]
+        AdLocal["LocalGpuAdapter<br/>(RTX 4050 6GB PyTorch / Transformers)"]
+    end
+
+    R1 -->|"generate_text(task='extraction')"| Gateway
+    R2 -->|"generate_text(task='translation')"| Gateway
+    R3 -->|"lease_session() & generate_text()"| Gateway
+    R4 -->|"synthesize_speech(task='tts')"| Gateway
+    R5 -->|"get_fleet_status()"| Gateway
+
+    Gateway --> Router
+    Router --> Registry
+    Router --> Breaker
+    Router --> LeaseMgr
+    Gateway --> AntiBan
+    Gateway --> PolicyEngine
+    LeaseMgr <--> SQLite
+
+    Gateway --> AdGemini
+    Gateway --> AdOpenAI
+    Gateway --> AdLocal
+```
+
+---
+
+### The 5 Core Modules
+
+#### 1. [`KeyLeaseManager`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py) (ACID Inventory & Atomic Leases)
+- **ACID SQLite Inventory**: Manages API key inventory, lease reservations, per-model daily quota ledgers, and tamper-evident audit logs via atomic `BEGIN IMMEDIATE` transactions in SQLite (`audiobooks/keys_inventory.db`).
+- **0% Concurrent Double-Leasing**: Enforces strict mutual exclusion (Concurrency = 1 per free API key). A key can only be leased to a single active worker thread or process at any instant.
+- **Autonomous Dead PID Crash Recovery**: Uses a dual liveness sweep. In addition to rolling lease TTL (default 60s), it probes the OS process table via POSIX signal 0 ([`is_pid_alive`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L64)) to immediately reclaim orphaned leases if a worker crashes.
+- **One User = One Active Key per Workload**: Strict per-user quota enforcement ([`CallerIdentity`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L106)) prevents single-user resource monopolization across text and TTS workloads.
+- **Zero-Secret Public Aliases**: Plaintext keys are never logged or exposed in telemetry. Keys are identified via deterministic salted public aliases (`key_a8f2`) and SHA-256 hashes.
+- **Dual Timezone Quota Rollovers**: Automatically handles midnight quota resets according to provider policies: Midnight US Pacific Time (`America/Los_Angeles`) for Google AI Studio quotas, and UTC Midnight for other providers.
+
+#### 2. [`AntiBanGuard`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py) (The 7 Iron Shields)
+Protects large pools of free API keys (100+ keys) against edge mass-bans and bot-detection heuristics:
+- **Shield 1: Strict Request Mutual Exclusion**: Guarantees zero overlapping requests per key via atomic leasing in `KeyLeaseManager`.
+- **Shield 2: Session Affinity Sticky Binding** ([`SessionAffinityTracker`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L320)): Binds a production session or scene to the same key for 8–15 sequential segments, eliminating suspicious key-hopping patterns at provider edge routers.
+- **Shield 3: Anti-Correlation Key-Switch Pause**: Enforces a randomized 18.0s – 32.0s delay whenever a worker must switch keys on the same IP address, breaking TCP/TLS and request-frequency correlation across distinct accounts.
+- **Shield 4: Content-Aware Human Cadence & Director Breaks** ([`HumanCadenceController`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L80)): Shapes inter-request latency modeled on a human director review workflow:
+  $$\Delta t_{\text{wait}} = t_{\text{read}}(\text{words}) + t_{\text{review}}(\text{audio}) + t_{\text{jitter}} + t_{\text{director\_break}}$$
+  Applies log-normal human pause distributions (1.5s – 7.0s) and injects 15–30s director breaks every 14 segments.
+- **Shield 5: Conservative 75% Rate Limiting** ([`TokenBucketRateLimiter`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L179)): Clamps requests to a conservative 11.0 RPM per key (73% of Google's 15 RPM free ceiling) with an absolute minimum burst separation of 3.5 seconds.
+- **Shield 6: Official Stealth SDK Headers** (`get_stealth_sdk_headers`): Injects stealth HTTP headers identical to official provider SDKs (`google-genai-sdk-python/0.8.3` with Python and platform tags), eliminating custom bot user agents.
+- **Shield 7: Emergency Global Tripwire** ([`EmergencyTripwire`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L248)): Monitors fleet health across all keys. If 5 consecutive 429 (Resource Exhausted) or 503 (Unavailable) errors occur within a 60-second sliding window, activates emergency pool quarantine for 45.0s to halt requests before accounts are suspended.
+
+#### 3. [`ModelRegistry`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py) (Canonical Model Catalog)
+- **Comprehensive Registry (50+ Models)**: Canonical catalog spanning Google Gemini (`gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.8-flash-tts`), Cerebras (Llama 3.3 70B, Llama 3.1 8B), Groq, OpenAI, Anthropic, and Local GPU (RTX 4050 6GB).
+- **Capability Profiles** ([`ModelCapability`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L48)): Explicit context windows (up to 1M tokens), max output limits, rate ceilings (RPM, TPM, RPD), thinking budget support, structured output flags, and timezone reset schedules.
+- **Quality Tiers** ([`ModelTier`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L20)): Hierarchical taxonomy categorizing models into `TIER_1_FLAGSHIP`, `TIER_2_BALANCED`, `TIER_3_UTILITY`, `TIER_AUDIO`, and `TIER_LOCAL`.
+- **Task-Based Resolution**: Maps pipeline requirements (`translation`, `screenplay`, `dramaturgy`, `extraction`, `tts`) to optimal verified models.
+
+#### 4. [`RequestRouter`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/router.py) (Intelligent Router & Fallback)
+- **Capability Matching**: Resolves requests into concrete [`ExecutionPlan`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/router.py#L40) blueprints containing model capabilities, leased keys, and matched provider adapters.
+- **Circuit Breaker Integration** ([`CircuitBreaker`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/policy_engine.py#L242)): Maintains per-(provider, model) circuit breakers with `CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN` state transitions, automatically bypassing models undergoing provider outages.
+- **Dynamic Fallback Ladder**: Automatically escalates to secondary models within the eligible tier if primary candidate models encounter outages or key exhaustion.
+
+#### 5. [`ModelGateway`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/gateway.py) (Unified Production Facade)
+- **Single Public Entry Point**: Exposes high-level operations: `generate_text()`, `synthesize_speech()`, `lease_session()`, and `get_fleet_status()`.
+- **Automatic Failover & Retry Loop**: Intercepts HTTP errors, classifies root causes via [`NormalizedApiError`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/policy_engine.py#L43), marks exhausted keys/models in SQLite, applies anti-correlation pauses, and retries seamlessly on alternative keys.
+- **Guaranteed Lease Release**: All operations employ `try ... finally` release blocks, ensuring 0% lease leaks under normal completion, rate limit backoff, or unexpected exceptions.
+
+---
+
+### Downstream Pipeline Room Integration (Zero Boundary Leakage)
+
+All 5 production rooms interface strictly with [`ModelGateway`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/gateway.py), maintaining clean boundary isolation:
+
+1. **Room 1 (Pre-Production & Extraction)**:
+   - Requests `gateway.generate_text(task="extraction", min_tier=ModelTier.TIER_2_BALANCED)` for geometric PDF XY-cut layout reconstruction and OCR validation.
+   - Requires zero knowledge of underlying Gemini or fallback provider keys.
+2. **Room 2 (Translation Collective)**:
+   - Dispatches translation prompts through `gateway.generate_text(task="translation", min_tier=ModelTier.TIER_1_FLAGSHIP)`.
+   - The 4 translation agents (`LiteraryDraftTranslator`, `HindustaniCadenceSpecialist`, etc.) receive raw text output without managing rate-limiting delays or rotating key pools.
+3. **Room 3 (Screenplay & Anti-Swap Attribution)**:
+   - Encloses scene chunking within `with gateway.lease_session(session_id=scene_id):`.
+   - Maintains sticky key affinity across 8–15 continuous dialogue turns, avoiding edge ban heuristics while analyzing speaker attribution.
+4. **Room 4 (Multi-Voice TTS Performance)**:
+   - Dispatches speech generation through `gateway.synthesize_speech(text=..., voice_name=..., task="tts")`.
+   - The gateway leases keys explicitly for the `gemini-3.8-flash-tts` audio model, enforces the strict 10 RPD daily quota ceilings, and transparently rotates to fresh keys upon exhaustion.
+5. **Room 5 (Mastering & Verification)**:
+   - Queries `gateway.get_fleet_status()` for diagnostic reporting and quota telemetry without opening direct connections to `keys_inventory.db`.
+
+---
+
 ## 📦 Decoupled & Archived Subsystems
 
 The legacy 5-track cinematic audio engine (dynamic BGM scoring, SQLite FTS5 sound bank harvesting, and multitrack stem mixdowns) has been safely decoupled and archived in `archive/cinematic_audio/`.

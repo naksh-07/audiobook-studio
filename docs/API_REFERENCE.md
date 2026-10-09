@@ -1777,6 +1777,464 @@ def get_dramatic_fiction_framing(title: Optional[str] = None, author: Optional[s
 
 ---
 
+## 🎛️ Model & Keys Manager Subsystem ([`audiobook_factory.core.models`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/))
+
+The `audiobook_factory.core.models` package provides the production control plane governing LLM generation, speech synthesis (TTS), key leasing, rate-limiting, and error resiliency across all 5 production rooms.
+
+---
+
+### 1. Data Structures & Types
+
+#### [`CallerIdentity`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L106)
+*Cryptographic and operational tuple identifying a caller process, thread, or user session.*
+
+```python
+@dataclass(frozen=True)
+class CallerIdentity:
+    workstation_id: str = field(default_factory=lambda: os.environ.get("WORKSTATION_ID", "local_workstation"))
+    user_id: str = field(default_factory=lambda: os.environ.get("USER", os.environ.get("USERNAME", "default_user")))
+    process_id: int = field(default_factory=os.getpid)
+    worker_id: str = field(default_factory=lambda: f"thr_{threading.get_ident()}")
+    session_id: str = field(default_factory=lambda: os.environ.get("CURRENT_SESSION_ID") or "session_default")
+    workload_type: str = "text"  # "text" or "tts"
+```
+
+#### [`KeyLease`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L117)
+*Active lease handle guaranteeing exclusive single-request mutual exclusion.*
+
+```python
+@dataclass
+class KeyLease:
+    lease_id: str
+    key_hash: str
+    key_alias: str
+    api_key: str
+    provider: str
+    workload_type: str
+    leased_at: str
+    expires_at: str
+    status: str = "ACTIVE"
+```
+
+#### [`GenerationResult`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/adapters/base.py#L16)
+*Standardized payload returned by text generation adapters.*
+
+```python
+@dataclass
+class GenerationResult:
+    text: str
+    finish_reason: str
+    tokens_used: int
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    thoughts: str = ""
+    raw_response: Dict[str, Any] = field(default_factory=dict)
+    model_id: str = ""
+    provider: str = ""
+```
+
+#### [`SpeechResult`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/adapters/base.py#L30)
+*Standardized payload returned by speech synthesis adapters.*
+
+```python
+@dataclass
+class SpeechResult:
+    audio_bytes: bytes
+    mime_type: str = "audio/wav"
+    sample_rate: int = 24000
+    duration_sec: float = 0.0
+    tokens_used: int = 0
+    model_id: str = ""
+    provider: str = ""
+```
+
+#### [`ModelCapability`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L48)
+*Complete technical specification and capability profile for a model.*
+
+```python
+@dataclass(frozen=True)
+class ModelCapability:
+    model_id: str
+    provider: str
+    tier: ModelTier
+    modalities: List[Modality]
+    context_window: int
+    max_output_tokens: int
+    free_rpm: float
+    free_tpm: float
+    free_rpd: int
+    supports_thinking: bool = False
+    default_thinking_budget: int = 0
+    supports_structured_output: bool = True
+    supports_system_instruction: bool = True
+    recommended_tasks: List[str] = field(default_factory=list)
+    reset_schedule: str = "google_pt"   # "google_pt" or "utc_midnight"
+    is_local_gpu: bool = False
+    notes: str = ""
+```
+
+#### [`ModelTier`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L20), [`Modality`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L29) & [`TaskCategory`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L36)
+
+```python
+class ModelTier(Enum):
+    TIER_1_FLAGSHIP = "flagship"      # Flagship reasoning (Gemini 3.8/3.7 Flash, Gemini 2.5 Pro)
+    TIER_2_BALANCED = "balanced"      # Fast, balanced extraction & QA (Gemini 3.6 Flash, 2.5 Flash)
+    TIER_3_UTILITY = "utility"        # High-throughput formatting (Gemini 3.1 Flash-Lite)
+    TIER_AUDIO = "audio"              # Speech synthesis models (Gemini 3.8 Flash-TTS)
+    TIER_LOCAL = "local"              # Local GPU inference (RTX 4050 6GB)
+
+class Modality(Enum):
+    TEXT = "text"
+    AUDIO = "audio"
+    VISION = "vision"
+
+class TaskCategory(Enum):
+    TRANSLATION = "translation"        # Room 2: Hindustani literary translation
+    SCREENPLAY = "screenplay"          # Room 3: Screenplay dramatization & beat-splitting
+    DRAMATURGY = "dramaturgy"          # Room 3: Character DNA, dialect, anti-swap attribution
+    EXTRACTION = "extraction"          # Room 1: PDF/EPUB structure, XY-cut layout
+    TTS = "tts"                        # Room 4: 4D Vocal Speech Synthesis
+    UTILITY = "utility"                # Fast JSON cleanup, validation, token pings
+    ALIGNMENT = "alignment"            # Forced alignment phoneme sync
+```
+
+#### [`NormalizedApiError`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/policy_engine.py#L43)
+*Normalized error metadata returned by policy classifier.*
+
+```python
+class NormalizedApiError(NamedTuple):
+    category: str              # DAILY_QUOTA_EXHAUSTED, RPM_RATE_LIMIT, TPM_RATE_LIMIT, CONCURRENCY_LIMIT, etc.
+    wait_sec: float            # Recommended backoff in seconds
+    message: str               # Diagnostic description
+    is_retryable: bool         # Whether retrying could succeed (on same or next key/model)
+    suggested_action: str      # "ROTATE_KEY", "ROTATE_MODEL", "COOL_DOWN", "ABORT_PAYLOAD", "HALT_POOL"
+```
+
+#### [`ExecutionPlan`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/router.py#L40)
+*Execution blueprint emitted by RequestRouter.*
+
+```python
+@dataclass
+class ExecutionPlan:
+    model_capability: ModelCapability
+    provider: str
+    adapter: BaseProviderAdapter
+    lease: KeyLease
+    key_alias: str
+    api_key: str
+    model_id: str
+```
+
+---
+
+### 2. Exceptions & Circuit Breaker States
+
+```python
+class KeyLeaseError(RuntimeError):
+    """Base exception for Key Lease errors."""
+
+class KeyLeaseQuotaExceededError(KeyLeaseError):
+    """Raised when a user breaches 'One User = One Key per Workload' policy."""
+
+class NoAvailableKeyError(KeyLeaseError):
+    """Raised when all keys are currently leased, cooling down, or busy."""
+
+class AllKeysExhaustedTodayError(KeyLeaseError):
+    """Raised when all configured API keys have exhausted their daily quota for today."""
+
+class EmergencyTripwireActiveError(Exception):
+    """Raised when Emergency Global Tripwire is active due to edge-wide 429/503 cascades."""
+
+class ApiHttpError(Exception):
+    """Raised by provider adapters upon upstream HTTP failure."""
+    def __init__(self, status_code: int, error_body: str = "", headers: Optional[Dict[str, str]] = None): ...
+```
+
+#### Circuit Breaker Lifecycle ([`CircuitBreaker`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/policy_engine.py#L242))
+- `CLOSED`: Normal operation. Requests flow unimpeded.
+- `OPEN`: Tripped after 2 consecutive server failures (500/502/503/504). Blocks requests to that `(provider, model)` pair for a 30.0s cooldown.
+- `HALF_OPEN`: Cooldown expired. Allows a single canary request to test upstream provider recovery.
+
+---
+
+### 3. Core Engine Classes
+
+#### [`ModelGateway`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/gateway.py#L61)
+*Unified thread-safe production facade used by all 5 rooms.*
+
+```python
+class ModelGateway:
+    def __init__(
+        self,
+        registry: Optional[ModelRegistry] = None,
+        lease_manager: Optional[KeyLeaseManager] = None,
+        anti_ban_guard: Optional[AntiBanGuard] = None,
+        router: Optional[RequestRouter] = None,
+    ): ...
+
+    def generate_text(
+        self,
+        prompt: str,
+        task: str = "translation",
+        system_instruction: Optional[str] = None,
+        model: Optional[str] = None,
+        min_tier: Optional[ModelTier] = None,
+        preferred_provider: str = "gemini",
+        thinking_budget: Optional[int] = None,
+        temperature: float = 0.7,
+        max_output_tokens: Optional[int] = None,
+        response_json: bool = False,
+        session_id: Optional[str] = None,
+        word_count: int = 0,
+        user_id: str = "user_default",
+        fast_mode: bool = False,
+        max_retries: int = 3,
+        **kwargs,
+    ) -> GenerationResult:
+        """
+        Executes text generation request through the control plane:
+        1. Resolves execution plan & leases key.
+        2. Applies Anti-Ban Gate (pacing, rate limit, anti-correlation).
+        3. Dispatches request via adapter.
+        4. Handles failover on 429 quota exhaustion or server error.
+        5. Records metrics and safely releases lease.
+        """
+
+    def synthesize_speech(
+        self,
+        text: str,
+        voice_name: str = "Puck",
+        model: Optional[str] = None,
+        preferred_provider: str = "gemini",
+        session_id: Optional[str] = None,
+        user_id: str = "user_default",
+        fast_mode: bool = False,
+        max_retries: int = 3,
+        **kwargs,
+    ) -> SpeechResult:
+        """
+        Executes speech synthesis (Room 4) adhering to strict 10 RPD daily quota ceilings:
+        1. Resolves audio model (gemini-3.8-flash-tts).
+        2. Leases key specifically for TTS workload.
+        3. Applies cadence pacing and rate limit.
+        4. Synthesizes and decodes audio into raw WAV bytes.
+        """
+
+    @contextmanager
+    def lease_session(
+        self,
+        session_id: str,
+        task: str = "screenplay",
+        user_id: str = "user_default",
+        provider: str = "gemini",
+    ) -> Generator[str, None, None]:
+        """
+        Shield 2: Context manager holding sticky session affinity across a whole scene (8-15 segments).
+        """
+
+    def get_fleet_status(self) -> Dict[str, Any]:
+        """Returns comprehensive diagnostic summary of keys, models, and breakers."""
+
+    def reset_pool(self, provider: str = "gemini") -> None:
+        """Administratively resets exhausted keys, quota ledgers, and tripwires for today."""
+```
+
+#### [`KeyLeaseManager`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L130)
+*High-performance ACID SQLite Key Inventory & Lease Manager.*
+
+```python
+class KeyLeaseManager:
+    def __init__(self, db_path: Optional[Path] = None, keys: Optional[List[str]] = None): ...
+
+    def register_keys(
+        self,
+        keys: List[str],
+        provider: str = "gemini",
+        allowed_services: Optional[List[str]] = None,
+        tier: str = "free",
+    ) -> None:
+        """Registers or syncs API keys in key_inventory without wiping quota history."""
+
+    def acquire_lease(
+        self,
+        workload_type: str = "text",
+        provider: str = "gemini",
+        identity: Optional[CallerIdentity] = None,
+        ttl_seconds: float = 60.0,
+        model: Optional[str] = None,
+        allow_multi_lease: bool = False,
+        preferred_key_alias: Optional[str] = None,
+    ) -> KeyLease:
+        """
+        Atomically acquires an exclusive lease for an eligible API key.
+        Guarantees:
+        - Mutual exclusion (0% double-allocations).
+        - Dead PID crash reclamation.
+        - User quota enforcement.
+        - Quota rollover and model isolation.
+        """
+
+    def renew_lease(self, lease_id: str, extend_seconds: float = 60.0) -> bool:
+        """Extends an active lease expiration timestamp (heartbeat)."""
+
+    def release_lease(self, lease_id: str) -> bool:
+        """Releases an active lease handle and records audit completion."""
+
+    def revoke_lease(self, lease_id: str, reason: str = "error") -> bool:
+        """Revokes an active lease (e.g. on 429 quota exhaustion or critical failure)."""
+
+    def mark_daily_quota_exhausted(
+        self,
+        api_key_or_hash: str,
+        error_msg: str,
+        model: Optional[str] = None,
+        provider: str = "gemini",
+    ) -> None:
+        """Marks a key or model as exhausted for today (e.g. 10 RPD reached on TTS)."""
+
+    def mark_temporary_backoff(
+        self,
+        api_key_or_hash: str,
+        backoff_seconds: float,
+        error_msg: str = "",
+        model: Optional[str] = None,
+        provider: str = "gemini",
+    ) -> None:
+        """Marks a key for temporary backoff without burning it for the whole day."""
+
+    def mark_invalid(
+        self,
+        api_key_or_hash: str,
+        error_msg: str,
+        provider: str = "gemini",
+    ) -> None:
+        """Marks a key as permanently INVALID."""
+
+    def sweep_stale_and_dead_leases(self, conn: sqlite3.Connection) -> int:
+        """Sweeps expired TTL leases and reclaims orphaned leases from dead PIDs."""
+
+    def reset_all_for_today(self, provider: str = "gemini") -> None:
+        """Forces administrative reset of all keys and models back to ACTIVE state."""
+
+    def get_status_summary(self, provider: str = "gemini") -> Dict[str, Any]:
+        """Returns live statistics of inventory and active leases."""
+```
+
+#### [`AntiBanGuard`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L379)
+*The Central Control Plane for Anti-Ban Protection (The 7 Iron Shields).*
+
+```python
+class AntiBanGuard:
+    def __init__(
+        self,
+        key_switch_min_cooldown: float = 18.0,
+        key_switch_max_cooldown: float = 32.0,
+        max_rpm: float = 11.0,
+    ): ...
+
+    def pre_request_gate(
+        self,
+        key_alias: str,
+        prev_key_alias: Optional[str] = None,
+        word_count: int = 0,
+        prev_audio_duration_sec: float = 0.0,
+        session_id: Optional[str] = None,
+        fast_mode: bool = False,
+    ) -> Dict[str, float]:
+        """
+        Executes pre-request validation, pacing, and rate limiting:
+        1. Checks Emergency Global Tripwire (Shield 7).
+        2. Enforces Anti-Correlation Key-Switch Cooldown if key changed (Shield 3).
+        3. Enforces Token Bucket 11.0 RPM clamping (Shield 5).
+        4. Applies Content-Aware Human Cadence (Shield 4).
+        """
+
+    def post_request_audit(
+        self,
+        key_alias: str,
+        status_code: int,
+        error_body: str = "",
+        headers: Optional[Dict[str, str]] = None,
+        provider: str = "gemini",
+        model: str = "",
+        session_id: Optional[str] = None,
+    ) -> NormalizedApiError:
+        """Audits response status, updates Tripwire, Circuit Breaker, and Session Affinity."""
+
+    def enforce_key_switch_cooldown(
+        self,
+        prev_key_alias: Optional[str],
+        new_key_alias: str,
+        fast_mode: bool = False,
+    ) -> float:
+        """Shield 3: Mandatory 18.0s - 32.0s pause when switching keys on the same IP."""
+
+    def get_headers(self, api_key: str, provider: str = "gemini") -> Dict[str, str]:
+        """Shield 6: Injects official stealth SDK headers."""
+
+    def reset_all(self) -> None:
+        """Resets all internal states, tripwires, and limiters."""
+```
+
+#### [`ModelRegistry`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L422)
+*Canonical Model Registry & Capability Specification.*
+
+```python
+class ModelRegistry:
+    def get_model(self, model_id: str) -> Optional[ModelCapability]:
+        """Resolves ModelCapability by exact ID or case-insensitive prefix match."""
+
+    def list_models(self, provider: Optional[str] = None) -> List[ModelCapability]:
+        """Lists all registered models, optionally filtered by provider."""
+
+    def filter_models(
+        self,
+        task: Optional[str] = None,
+        min_tier: Optional[ModelTier] = None,
+        modality: Optional[Modality] = None,
+        provider: Optional[str] = None,
+    ) -> List[ModelCapability]:
+        """Filters models matching required constraints."""
+
+    def resolve_best_model(
+        self,
+        task: str,
+        preferred_provider: str = "gemini",
+        min_tier: Optional[ModelTier] = None,
+        modality: Modality = Modality.TEXT,
+    ) -> ModelCapability:
+        """Dynamically resolves the best eligible model for a given task and tier requirement."""
+
+    def register_model(self, capability: ModelCapability) -> None:
+        """Registers a new model capability profile."""
+```
+
+#### [`RequestRouter`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/router.py#L51)
+*Intelligent Request Router matching task requirements to eligible healthy resources.*
+
+```python
+class RequestRouter:
+    def resolve_plan(
+        self,
+        task: str,
+        preferred_provider: str = "gemini",
+        min_tier: Optional[ModelTier] = None,
+        modality: Modality = Modality.TEXT,
+        identity: Optional[CallerIdentity] = None,
+        model_override: Optional[str] = None,
+        preferred_key_alias: Optional[str] = None,
+    ) -> ExecutionPlan:
+        """
+        Builds an ExecutionPlan:
+        1. Selects healthy candidate model matching constraints.
+        2. Bypasses models whose Circuit Breaker is OPEN.
+        3. Acquires an exclusive ACID lease on a matching key.
+        4. Links the correct polymorphic provider adapter.
+        """
+```
+
+---
+
 ## 📊 Production Telemetry Ledger ([`audiobook_factory.telemetry`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/telemetry.py))
 
 ```python

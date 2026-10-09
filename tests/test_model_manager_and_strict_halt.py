@@ -176,7 +176,10 @@ class TestModelManagerAndStrictHalt(unittest.TestCase):
     # =========================================================================
     def test_08_script_builder_strict_halt_on_failure(self):
         """Validates that script_builder strictly raises LLMUnavailableError on LLM failure."""
-        from audiobook_factory.script_builder import _parse_dramatized_chunk_llm
+        try:
+            from audiobook_factory.script_builder import _parse_dramatized_chunk_llm
+        except ImportError as e:
+            self.skipTest(f"Skipping on mobile due to missing dependency: {e}")
 
         # Mock urllib to simulate API total failure
         with patch("urllib.request.urlopen", side_effect=Exception("API service down")):
@@ -192,8 +195,11 @@ class TestModelManagerAndStrictHalt(unittest.TestCase):
 
     def test_09_beat_planner_strict_halt_on_failure(self):
         """Validates that beat_planner strictly raises LLMUnavailableError when LLM fails."""
-        from audiobook_factory.dramaturgy.beat_planner import BeatPlanner
-        from audiobook_factory.dramaturgy.contracts import SceneDramaticPlan
+        try:
+            from audiobook_factory.dramaturgy.beat_planner import BeatPlanner
+            from audiobook_factory.dramaturgy.contracts import SceneDramaticPlan
+        except ImportError as e:
+            self.skipTest(f"Skipping on mobile due to missing dependency: {e}")
 
         scene = SceneDramaticPlan(
             scene_id="SCENE_001",
@@ -204,6 +210,7 @@ class TestModelManagerAndStrictHalt(unittest.TestCase):
             stakes="Survival",
             dramatic_complexity="HIGH",
         )
+
         with patch("urllib.request.urlopen", side_effect=Exception("LLM network timeout")):
             with patch("audiobook_factory.key_manager.get_persistent_key_pool") as mock_pool:
                 mock_pool.return_value.get_key.return_value = "fake-key"

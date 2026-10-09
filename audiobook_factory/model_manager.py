@@ -415,3 +415,34 @@ def get_model_manager() -> ModelManager:
     if _MODEL_MANAGER_INSTANCE is None:
         _MODEL_MANAGER_INSTANCE = ModelManager()
     return _MODEL_MANAGER_INSTANCE
+
+
+# Re-exports for Pillar 3 Control Plane Facade & Model Registry
+from audiobook_factory.core.models.gateway import (
+    ModelGateway,
+    get_model_gateway,
+)
+from audiobook_factory.core.models.registry import (
+    ModelRegistry,
+    get_model_registry,
+    ModelCapability,
+)
+
+__all__ = [
+    "ModelTier",
+    "TaskType",
+    "TASK_MINIMUM_TIERS",
+    "CREATIVE_TASKS",
+    "CREATIVE_BLACKLIST",
+    "LLMUnavailableError",
+    "AntigravitySessionFallbackRequired",
+    "ModelTierFloorBreachError",
+    "ModelManager",
+    "get_model_manager",
+    "ModelGateway",
+    "get_model_gateway",
+    "ModelRegistry",
+    "get_model_registry",
+    "ModelCapability",
+]
+
