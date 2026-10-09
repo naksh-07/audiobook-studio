@@ -72,9 +72,10 @@ class AudioQCAgent:
         if n < 8:
             return pcm_bytes, 0, {}
 
-        # 3. DC Bias normalization
+        # 3. DC Bias normalization (only for normal audio with subtle DC drift, not flat DC/rail-clipped signals)
         dc_bias = np.mean(samples)
-        samples -= dc_bias
+        if abs(dc_bias) < 500.0 and np.std(samples) > 20.0:
+            samples -= dc_bias
 
         # 4. Zero-crossing snapping at boundaries
         if snap_zero_crossing and n > 120:
