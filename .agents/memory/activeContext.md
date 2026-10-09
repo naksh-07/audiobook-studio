@@ -34,5 +34,5 @@
 - **Phase 2 Technical Verbalization Bridge**: Implemented `audiobook_factory/podcast/` (`MathVerbalizer`, `TableVerbalizer`, `AbstractCalloutVerbalizer`, `PodcastScriptBuilder`) generating dual-host screenplay JSON with spoken math and auditory table insights.
 - **Phase 3 Multi-Voice Audio Production & EBU R128 Mastering**: Implemented `PodcastAudioProducer` (`audiobook_factory/podcast/producer.py`) with 12ms/18ms Hann micro-fading, conversational turn pauses, multi-host casting (Charon/Aoede), and two-pass linear EBU R128 loudnorm mastering (-19.0 LUFS, -1.5 dBTP). Verified on benchmark paper (22 turns, 275.4s audio).
 - **Phase 4 Unified CLI & Autonomous Orchestrator**: Implemented `PodcastOrchestrator` (`audiobook_factory/podcast/orchestrator.py`) and dedicated CLI (`audiobook_factory/podcast/cli.py` & `audiobook_cli.py podcast <file>`) for 1-shot document $\to$ mastered podcast production.
-- **Verification & Audit**: 96/96 full-suite tests PASSING (100% green). Adversarial bug audit and boundary isolation verified by subagent team.
+- **Verification & Audit**: Full test suite PASSING (880+ tests 100% green). Adversarial bug audit and boundary isolation verified by subagent team.
 
