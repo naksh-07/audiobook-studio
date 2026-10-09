@@ -69,6 +69,24 @@ A boat emerged from the reeds.
         self.assertIn(explicit_halant, cleaned)
 
 
+    def test_scifi_coordinate_bracket_retention(self):
+        """
+        Verify that Sci-Fi/military identifiers and coordinates (Sector [4], Unit [12])
+        are preserved while standard footnote references ([1], [42]) are stripped cleanly.
+        """
+        raw = "Squad Alpha moved to Sector [4] after securing Unit [12].[1] The general ordered Level [3] lockdown[42]."
+        cleaned = clean_book_text(raw)
+        self.assertIn("Sector [4]", cleaned)
+        self.assertIn("Unit [12].", cleaned)
+        self.assertIn("Level [3]", cleaned)
+        self.assertNotIn("[1]", cleaned)
+        self.assertNotIn("[42]", cleaned)
+        self.assertEqual(
+            cleaned,
+            "Squad Alpha moved to Sector [4] after securing Unit [12]. The general ordered Level [3] lockdown."
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
 

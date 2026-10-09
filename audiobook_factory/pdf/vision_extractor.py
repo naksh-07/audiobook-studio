@@ -41,18 +41,19 @@ class GeminiVisionPDFExtractor(PDFEscalationEngine):
 
         try:
             import pypdf
-            reader = pypdf.PdfReader(str(pdf_path))
-            if page_num > len(reader.pages):
-                return None
+            with open(pdf_path, "rb") as f:
+                reader = pypdf.PdfReader(f)
+                if page_num > len(reader.pages):
+                    return None
 
-            writer = pypdf.PdfWriter()
-            writer.add_page(reader.pages[page_num - 1])
+                writer = pypdf.PdfWriter()
+                writer.add_page(reader.pages[page_num - 1])
 
-            import io
-            buf = io.BytesIO()
-            writer.write(buf)
-            buf.seek(0)
-            page_bytes = buf.read()
+                import io
+                buf = io.BytesIO()
+                writer.write(buf)
+                buf.seek(0)
+                page_bytes = buf.read()
         except Exception:
             return None
 

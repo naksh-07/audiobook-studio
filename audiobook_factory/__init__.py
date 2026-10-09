@@ -39,124 +39,149 @@ for _sub in ("real_audio", "sound_design"):
     if _sub_path.is_dir() and str(_sub_path) not in __path__:
         __path__.append(str(_sub_path))
 
-from .extractor import (
-    process_book_file,
-    extract_chapters,
-    extract_epub,
-    clean_book_text,
-    split_large_chapter_on_semantic_boundary,
-)
-from .book_model import (
-    CanonicalBook,
-    CanonicalChapter,
-    CanonicalBlock,
-    SourceProvenance,
-    ExtractionQualityReport,
-    ExtractionGateAuditError,
-)
-from .translator import (
-    translate_book_project,
-    normalize_translated_lexicon,
-)
-from .script_builder import (
-    generate_project_scripts,
-    build_dramatized_script_llm,
-    build_narrator_script,
-)
-from .tts_dispatcher import TTSDispatcher, UnregisteredSpeakerError, probe_key_health
-from .soundscape import (
-    detect_chapter_mood,
-    resolve_ambient_score,
-    generate_chapter_soundscape_plan,
-    render_chapter_soundscape,
-    generate_project_soundscapes,
-    apply_dynamic_sidechain_ducking,
-    render_multitrack_chapter_audio,
-    get_sound_bank,
-    attenuate_foley_whisper_collisions,
-)
-from .mastering import concatenate_and_master_chapter
-from .packager import package_m4b_audiobook
-from .sound_bank import SoundBank
-from .logger import logger
-from .state import ProjectStateLedger
-from .orchestrator import PipelineOrchestrator
-from .contracts import (
-    ProjectConfig,
-    CharacterProfile,
-    CharacterRoster,
-    SceneSource,
-    MusicCue,
-    FoleyCue,
-    AmbienceScene,
-    MasteringConfig,
-    CreativeManifest,
-    ManifestValidationError,
-    BookPackagingSpecs,
-    BookChapterMarker,
-    BookTableOfContents,
-    BookVoiceRoster,
-    GlobalLoreBible,
-    BookMasterManifest,
-    MasteringSettings,
-)
-from .cinema_audio_engine import (
-    render_discrete_stems,
-    CinemaAudioManifest,
-    StemMetadata,
-    StemLedger,
-)
-from .mastering_contracts import (
-    MasteringProfile,
-    MasteringAnalysisFacts,
-    MasteringQCResult,
-    MasteringRequest,
-    MasteringResult,
-    MasteringLedger,
-    MasteringIssueSeverity,
-    MasteringIssue,
-    MasteringActionPlan,
-    DialogueProtectionReport,
-    BookMasterProfile,
-    DimensionDeviation,
-    ChapterConsistencyAudit,
-    BookConsistencyReport,
-)
-from .mastering_analyzer import MasteringAnalyzer
-from .mastering_qc import MasteringQCAgent
-from .mastering_engine import MasteringEngineV2
-from .mastering_judge import MasteringJudge
-from .dialogue_protection import DialogueProtectionAgent
-from .book_master_profile import BookMasterProfileBuilder
-from .chapter_consistency import ChapterConsistencyAuditor, BookConsistencyReportBuilder
-from .golden_mastering_suite import GoldenMasteringSuite
-from .perceptual_critic import PerceptualCritic
-from .reference_mastering import ReferenceMasteringAuditor, CANONICAL_REFERENCE_PROFILES
-from .scene_aware_engine import SceneAwareDecisionEngine
-from .mastering_certification import MasteringCertifier
-from .gate_auditor import (
-    AuditResult,
-    GateAuditError,
-    audit_chapter_gates,
-    audit_gate0_translation,
-    audit_gate1_roster,
-    audit_gate2_script,
-    audit_gate3_5_acoustic_feasibility,
-    audit_gate5_master,
-    audit_gate5_2_spectral_masking,
-    audit_gate5_3_stereo_phase,
-    audit_gate6a_voice_continuity,
-    audit_gate6b_loudness_continuity,
-    audit_gate6c_toc_integrity,
-    audit_gate6c_toc_monotonicity,
-    audit_gate6d_packaging_specs,
-    audit_book_master,
-)
-from .dialogue_editing import (
-    DialogueEditor,
-    DialogueEditPlan,
-    DialogueEditorialConfig,
-    DialogueQCReport,
-)
+import importlib
+from typing import Any, Dict, Tuple
 
-__version__ = "4.0.0b1"
+__version__ = "5.2.0"
+
+# Mapping of symbol names to (submodule_relative_path, symbol_name)
+_LAZY_IMPORTS: Dict[str, Tuple[str, str]] = {
+    # Extraction / Pillar 1
+    "process_book_file": (".extractor", "process_book_file"),
+    "extract_chapters": (".extractor", "extract_chapters"),
+    "extract_epub": (".extractor", "extract_epub"),
+    "clean_book_text": (".extractor", "clean_book_text"),
+    "split_large_chapter_on_semantic_boundary": (".extractor", "split_large_chapter_on_semantic_boundary"),
+    "CanonicalBook": (".book_model", "CanonicalBook"),
+    "CanonicalChapter": (".book_model", "CanonicalChapter"),
+    "CanonicalBlock": (".book_model", "CanonicalBlock"),
+    "SourceProvenance": (".book_model", "SourceProvenance"),
+    "ExtractionQualityReport": (".book_model", "ExtractionQualityReport"),
+    "ExtractionGateAuditError": (".book_model", "ExtractionGateAuditError"),
+    
+    # Translation
+    "translate_book_project": (".translator", "translate_book_project"),
+    "normalize_translated_lexicon": (".translator", "normalize_translated_lexicon"),
+    
+    # Dramaturgy / Screenplay
+    "generate_project_scripts": (".script_builder", "generate_project_scripts"),
+    "build_dramatized_script_llm": (".script_builder", "build_dramatized_script_llm"),
+    "build_narrator_script": (".script_builder", "build_narrator_script"),
+    
+    # TTS
+    "TTSDispatcher": (".tts_dispatcher", "TTSDispatcher"),
+    "UnregisteredSpeakerError": (".tts_dispatcher", "UnregisteredSpeakerError"),
+    "probe_key_health": (".tts_dispatcher", "probe_key_health"),
+    
+    # Soundscape (Legacy)
+    "detect_chapter_mood": (".soundscape", "detect_chapter_mood"),
+    "resolve_ambient_score": (".soundscape", "resolve_ambient_score"),
+    "generate_chapter_soundscape_plan": (".soundscape", "generate_chapter_soundscape_plan"),
+    "render_chapter_soundscape": (".soundscape", "render_chapter_soundscape"),
+    "generate_project_soundscapes": (".soundscape", "generate_project_soundscapes"),
+    "apply_dynamic_sidechain_ducking": (".soundscape", "apply_dynamic_sidechain_ducking"),
+    "render_multitrack_chapter_audio": (".soundscape", "render_multitrack_chapter_audio"),
+    "get_sound_bank": (".soundscape", "get_sound_bank"),
+    "attenuate_foley_whisper_collisions": (".soundscape", "attenuate_foley_whisper_collisions"),
+    
+    # Mastering & Packager
+    "concatenate_and_master_chapter": (".mastering", "concatenate_and_master_chapter"),
+    "package_m4b_audiobook": (".packager", "package_m4b_audiobook"),
+    "SoundBank": (".sound_bank", "SoundBank"),
+    "logger": (".logger", "logger"),
+    "ProjectStateLedger": (".state", "ProjectStateLedger"),
+    "PipelineOrchestrator": (".orchestrator", "PipelineOrchestrator"),
+    
+    # Contracts
+    "ProjectConfig": (".contracts", "ProjectConfig"),
+    "CharacterProfile": (".contracts", "CharacterProfile"),
+    "CharacterRoster": (".contracts", "CharacterRoster"),
+    "SceneSource": (".contracts", "SceneSource"),
+    "MusicCue": (".contracts", "MusicCue"),
+    "FoleyCue": (".contracts", "FoleyCue"),
+    "AmbienceScene": (".contracts", "AmbienceScene"),
+    "MasteringConfig": (".contracts", "MasteringConfig"),
+    "CreativeManifest": (".contracts", "CreativeManifest"),
+    "ManifestValidationError": (".contracts", "ManifestValidationError"),
+    "BookPackagingSpecs": (".contracts", "BookPackagingSpecs"),
+    "BookChapterMarker": (".contracts", "BookChapterMarker"),
+    "BookTableOfContents": (".contracts", "BookTableOfContents"),
+    "BookVoiceRoster": (".contracts", "BookVoiceRoster"),
+    "GlobalLoreBible": (".contracts", "GlobalLoreBible"),
+    "BookMasterManifest": (".contracts", "BookMasterManifest"),
+    "MasteringSettings": (".contracts", "MasteringSettings"),
+    
+    # Cinema Audio Engine
+    "render_discrete_stems": (".cinema_audio_engine", "render_discrete_stems"),
+    "CinemaAudioManifest": (".cinema_audio_engine", "CinemaAudioManifest"),
+    "StemMetadata": (".cinema_audio_engine", "StemMetadata"),
+    "StemLedger": (".cinema_audio_engine", "StemLedger"),
+    
+    # Mastering Contracts & Systems
+    "MasteringProfile": (".mastering_contracts", "MasteringProfile"),
+    "MasteringAnalysisFacts": (".mastering_contracts", "MasteringAnalysisFacts"),
+    "MasteringQCResult": (".mastering_contracts", "MasteringQCResult"),
+    "MasteringRequest": (".mastering_contracts", "MasteringRequest"),
+    "MasteringResult": (".mastering_contracts", "MasteringResult"),
+    "MasteringLedger": (".mastering_contracts", "MasteringLedger"),
+    "MasteringIssueSeverity": (".mastering_contracts", "MasteringIssueSeverity"),
+    "MasteringIssue": (".mastering_contracts", "MasteringIssue"),
+    "MasteringActionPlan": (".mastering_contracts", "MasteringActionPlan"),
+    "DialogueProtectionReport": (".mastering_contracts", "DialogueProtectionReport"),
+    "BookMasterProfile": (".mastering_contracts", "BookMasterProfile"),
+    "DimensionDeviation": (".mastering_contracts", "DimensionDeviation"),
+    "ChapterConsistencyAudit": (".mastering_contracts", "ChapterConsistencyAudit"),
+    "BookConsistencyReport": (".mastering_contracts", "BookConsistencyReport"),
+    "MasteringAnalyzer": (".mastering_analyzer", "MasteringAnalyzer"),
+    "MasteringQCAgent": (".mastering_qc", "MasteringQCAgent"),
+    "MasteringEngineV2": (".mastering_engine", "MasteringEngineV2"),
+    "MasteringJudge": (".mastering_judge", "MasteringJudge"),
+    "DialogueProtectionAgent": (".dialogue_protection", "DialogueProtectionAgent"),
+    "BookMasterProfileBuilder": (".book_master_profile", "BookMasterProfileBuilder"),
+    "ChapterConsistencyAuditor": (".chapter_consistency", "ChapterConsistencyAuditor"),
+    "BookConsistencyReportBuilder": (".chapter_consistency", "BookConsistencyReportBuilder"),
+    "GoldenMasteringSuite": (".golden_mastering_suite", "GoldenMasteringSuite"),
+    "PerceptualCritic": (".perceptual_critic", "PerceptualCritic"),
+    "ReferenceMasteringAuditor": (".reference_mastering", "ReferenceMasteringAuditor"),
+    "CANONICAL_REFERENCE_PROFILES": (".reference_mastering", "CANONICAL_REFERENCE_PROFILES"),
+    "SceneAwareDecisionEngine": (".scene_aware_engine", "SceneAwareDecisionEngine"),
+    "MasteringCertifier": (".mastering_certification", "MasteringCertifier"),
+    
+    # Gates
+    "AuditResult": (".gate_auditor", "AuditResult"),
+    "GateAuditError": (".gate_auditor", "GateAuditError"),
+    "audit_chapter_gates": (".gate_auditor", "audit_chapter_gates"),
+    "audit_gate0_translation": (".gate_auditor", "audit_gate0_translation"),
+    "audit_gate1_roster": (".gate_auditor", "audit_gate1_roster"),
+    "audit_gate2_script": (".gate_auditor", "audit_gate2_script"),
+    "audit_gate3_5_acoustic_feasibility": (".gate_auditor", "audit_gate3_5_acoustic_feasibility"),
+    "audit_gate5_master": (".gate_auditor", "audit_gate5_master"),
+    "audit_gate5_2_spectral_masking": (".gate_auditor", "audit_gate5_2_spectral_masking"),
+    "audit_gate5_3_stereo_phase": (".gate_auditor", "audit_gate5_3_stereo_phase"),
+    "audit_gate6a_voice_continuity": (".gate_auditor", "audit_gate6a_voice_continuity"),
+    "audit_gate6b_loudness_continuity": (".gate_auditor", "audit_gate6b_loudness_continuity"),
+    "audit_gate6c_toc_integrity": (".gate_auditor", "audit_gate6c_toc_integrity"),
+    "audit_gate6c_toc_monotonicity": (".gate_auditor", "audit_gate6c_toc_monotonicity"),
+    "audit_gate6d_packaging_specs": (".gate_auditor", "audit_gate6d_packaging_specs"),
+    "audit_book_master": (".gate_auditor", "audit_book_master"),
+    
+    # Dialogue Editing
+    "DialogueEditor": (".dialogue_editing", "DialogueEditor"),
+    "DialogueEditPlan": (".dialogue_editing", "DialogueEditPlan"),
+    "DialogueEditorialConfig": (".dialogue_editing", "DialogueEditorialConfig"),
+    "DialogueQCReport": (".dialogue_editing", "DialogueQCReport"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _LAZY_IMPORTS:
+        submod_rel, symbol = _LAZY_IMPORTS[name]
+        mod = importlib.import_module(submod_rel, package=__package__)
+        val = getattr(mod, symbol)
+        globals()[name] = val
+        return val
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(list(globals().keys()) + list(_LAZY_IMPORTS.keys()))

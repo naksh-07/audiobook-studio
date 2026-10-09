@@ -400,8 +400,19 @@ class PDFQualityAnalyzer:
                     footer_candidates.setdefault(last_line, set()).add(p_idx)
 
         # Lines repeating across >= 3 pages are designated running headers/footers
-        running_headers = {text for text, pages in header_candidates.items() if len(pages) >= 3}
-        running_footers = {text for text, pages in footer_candidates.items() if len(pages) >= 3}
+        # (Exclude scene breaks and valid chapter markers to prevent false-positive stripping)
+        running_headers = {
+            text for text, pages in header_candidates.items()
+            if len(pages) >= 3
+            and not re.match(r"^(\*|\-|\_)\s*\1\s*\1+$", text)
+            and not re.match(COMBINED_CHAPTER_REGEX, text, flags=re.IGNORECASE)
+        }
+        running_footers = {
+            text for text, pages in footer_candidates.items()
+            if len(pages) >= 3
+            and not re.match(r"^(\*|\-|\_)\s*\1\s*\1+$", text)
+            and not re.match(COMBINED_CHAPTER_REGEX, text, flags=re.IGNORECASE)
+        }
 
         # Step 2: Per-page quality analysis
         for p_idx, page in enumerate(raw_pages, 1):
@@ -427,8 +438,11 @@ class PDFQualityAnalyzer:
             warnings: List[str] = []
             is_suspicious = False
 
-            # Signal 1: Blank or abnormally low text density on interior page
-            if 0 < word_count < 15 and char_count < 80:
+            # Signal 1: Zero text or abnormally low text density (scanned image or missing font encoding)
+            if word_count == 0:
+                warnings.append("Zero extractable text on page (likely scanned image, image-only page, or missing font encoding).")
+                is_suspicious = True
+            elif word_count < 15 and char_count < 80:
                 warnings.append(f"Low text density ({word_count} words on page).")
                 is_suspicious = True
 
