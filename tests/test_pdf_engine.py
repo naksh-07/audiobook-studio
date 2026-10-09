@@ -425,6 +425,46 @@ ET
         self.assertEqual(cross_block.provenance.page_number, 1)
         self.assertEqual(cross_block.provenance.page_end, 2)
 
+    def test_scanned_zero_word_pdf_escalation(self):
+        """
+        Verify that 0-word pages (scanned image pages or font-encoding failures)
+        are flagged as suspicious (status='LOW') and trigger vision escalation healing.
+        """
+        pages = [
+            "Chapter 1: The Scanned Archive\n\nThis is page one with clear digital text containing detailed historical narrative and sufficient sentences.",
+            "",  # 0 words: scanned image page
+            "This is page three following the scanned image page with continued storytelling and standard paragraphs.",
+        ]
+        audits, cleaned = PDFQualityAnalyzer.audit_pages(pages)
+        self.assertEqual(len(audits), 3)
+        self.assertFalse(audits[0].is_suspicious)
+        self.assertTrue(audits[1].is_suspicious)
+        self.assertEqual(audits[1].status, "LOW")
+        self.assertEqual(audits[1].word_count, 0)
+        self.assertTrue(any("Zero extractable text" in w for w in audits[1].warnings))
+        self.assertFalse(audits[2].is_suspicious)
+
+        # Mock escalation engine healing the 0-word page
+        mock_escalator = MagicMock(spec=PDFEscalationEngine)
+        mock_escalator.escalate_page.return_value = "Transcribed text from scanned image page with detailed historical accounts."
+
+        for audit in audits:
+            if audit.is_suspicious:
+                healed = mock_escalator.escalate_page(Path("scanned.pdf"), audit.page_number)
+                accepted, reason = PDFQualityAnalyzer.should_accept_escalation(
+                    cleaned[audit.page_number - 1], healed, local_audit=audit
+                )
+                if accepted and healed:
+                    cleaned[audit.page_number - 1] = healed
+                    audit.is_suspicious = False
+                    audit.status = "HIGH"
+                    audit.word_count = len(healed.split())
+
+        mock_escalator.escalate_page.assert_called_once_with(Path("scanned.pdf"), 2)
+        self.assertFalse(audits[1].is_suspicious)
+        self.assertEqual(audits[1].status, "HIGH")
+        self.assertIn("Transcribed text from scanned image", cleaned[1])
+
 
 if __name__ == "__main__":
     unittest.main()

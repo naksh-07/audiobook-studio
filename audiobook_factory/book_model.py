@@ -343,6 +343,33 @@ class CanonicalBook(BaseModel):
 
         return book_path
 
+    @classmethod
+    def load_canonical(cls, canonical_dir: Path) -> "CanonicalBook":
+        """
+        Loads and validates a canonical book model and its quality report from disk.
+        Allows downstream pipeline rooms to reload the canonical AST without re-extracting source files.
+        """
+        canonical_dir = Path(canonical_dir).resolve()
+        book_file = canonical_dir / "book.json"
+        report_file = canonical_dir / "quality_report.json"
+
+        if not book_file.exists():
+            raise FileNotFoundError(f"Canonical book.json not found in: {canonical_dir}")
+
+        with open(book_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        book = cls.model_validate(data)
+
+        if report_file.exists():
+            try:
+                with open(report_file, "r", encoding="utf-8") as f:
+                    rep_data = json.load(f)
+                book.quality_report = ExtractionQualityReport.model_validate(rep_data)
+            except Exception:
+                pass
+
+        return book
+
     def project_legacy_extracted(self, extracted_dir: Path) -> List[Path]:
         """
         Projects canonical chapters into backward-compatible chapter_XXX.md files.

@@ -49,10 +49,11 @@ class ForensicPDFEngine:
         raw_pages: List[str] = []
         try:
             import pypdf
-            reader = pypdf.PdfReader(str(self.file_path))
-            for page in reader.pages:
-                text = PDFLayoutReconstructor.extract_page_reading_order(page)
-                raw_pages.append(text)
+            with open(self.file_path, "rb") as f:
+                reader = pypdf.PdfReader(f)
+                for page in reader.pages:
+                    text = PDFLayoutReconstructor.extract_page_reading_order(page)
+                    raw_pages.append(text)
         except Exception:
             raw_pages = []
 
