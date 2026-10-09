@@ -27,8 +27,8 @@
   - Loudness Range: **5.8 LU** (EBU R128 dynamic compliance).
 
 ## Extraction Subsystem: Standalone Architecture Migration (v5.3)
-- **Status**: Phase 1 COMPLETED (100% Green, 40/40 Tests).
+- **Status**: Phase 2 COMPLETED (100% Green, 45/45 Tests).
 - **Branch**: `feature/standalone-extraction`.
-- **Phase 1 Highlights**: Hardened logic snapshot from `0cd84ed` (EPUB 3 nav landmarks, Roman numeral fixes, normalizer HTML/Unicode hygiene, Windows file handle safety, `load_canonical()` AST rehydration); translation scope quarantined.
-- **Next Phase**: Phase 2 (Modular package scaffolding under `audiobook_factory/extraction/`).
+- **Phase 2 Highlights**: Re-structured into standalone package `audiobook_factory/extraction/` with dedicated `contracts.py`, `engine.py`, `normalizer.py`, `segmenter.py`, `quality_gate.py`, and `parsers/` (`epub.py`, `text.py`, `pdf/`).
+- **Next Phase**: Phase 3 (Standalone CLI & Backward Compatibility Facades).
 
