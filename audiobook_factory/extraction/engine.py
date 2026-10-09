@@ -65,6 +65,7 @@ class ExtractionEngine:
         output_base_dir: Path,
         force_gate: bool = False,
         book_id: Optional[str] = None,
+        quiet: bool = False,
     ) -> CanonicalBook:
         """
         Ingests a book document, verifies Gate 0.1, writes canonical representations,
@@ -91,7 +92,8 @@ class ExtractionEngine:
         file_sha256 = compute_sha256(input_file)
         ext = input_file.suffix.lower()
 
-        print(f"[*] Ingesting book: '{input_file.name}' (Format: {ext.upper()}, Size: {file_size_bytes / (1024*1024):.2f} MB)...")
+        if not quiet:
+            print(f"[*] Ingesting book: '{input_file.name}' (Format: {ext.upper()}, Size: {file_size_bytes / (1024*1024):.2f} MB)...")
 
         # 1. Preserve Raw Source
         raw_copy_path = raw_dir / f"source_original{ext}"
@@ -194,8 +196,8 @@ class ExtractionEngine:
             total_chapters = legacy_metadata["total_chapters"]
             est_hours = legacy_metadata["estimated_total_hours"]
             gate = canonical_book.quality_report.gate_status
-
-            print(f"[+] Ingestion complete: {total_chapters} chapters ({total_words} words, ~{est_hours} hrs) [Gate: {gate}] -> {project_dir}")
+            if not quiet:
+                print(f"[+] Ingestion complete: {total_chapters} chapters ({total_words} words, ~{est_hours} hrs) [Gate: {gate}] -> {project_dir}")
             return canonical_book
 
         except Exception as parse_err:
