@@ -51,7 +51,7 @@ class EPUBStructuralHTMLParser(HTMLParser):
         self.current_pieces: List[str] = []
         self.current_anchor: Optional[str] = None
         self.ignore_depth = 0
-        self.ignore_tags = {"script", "style", "head", "title", "meta", "link"}
+        self.ignore_tags = {"script", "style", "head", "title", "meta", "link", "aside"}
         self.block_index = 0
 
     def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]):

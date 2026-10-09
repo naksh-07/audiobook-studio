@@ -213,6 +213,52 @@ class TestExtractionPackage(unittest.TestCase):
         self.assertEqual(err_data["status"], "EXTRACTION_FAILED")
         self.assertEqual(err_data["book_id"], "corrupt")
 
+    def test_06_book_id_path_traversal_sanitization(self):
+        """Verifies that malicious or path-traversing book_id inputs are sanitized and stay inside output dir."""
+        txt_path = self.base_path / "traversal_test.txt"
+        words = ["word"] * 60
+        txt_path.write_text("Chapter 1: Security\n\n" + " ".join(words), encoding="utf-8")
+
+        out_dir = self.base_path / "projects"
+        # Passing malicious traversal sequence in book_id
+        canonical = ExtractionEngine.extract(txt_path, out_dir, book_id="../../escaped_slug")
+        self.assertEqual(canonical.book_id, "escaped_slug")
+        # Ensure project was created strictly inside out_dir
+        expected_dir = (out_dir / "escaped_slug").resolve()
+        self.assertTrue(expected_dir.exists())
+        self.assertTrue(expected_dir.is_relative_to(out_dir.resolve()))
+
+    def test_07_indic_abbreviation_sentence_split_protection(self):
+        """Verifies that Devanagari honorific abbreviations do not cause premature sentence fragmentation."""
+        from audiobook_factory.extraction.segmenter import _recursive_split_segments
+        # Build text that exceeds threshold and has an Indic abbreviation right around split point
+        filler = "यह एक वाक्य है जो परीक्षण के लिए बनाया गया है। " * 30
+        text = filler + "डॉ. कुमार ने कहा कि सब ठीक है। " + filler
+        segments = _recursive_split_segments(text, max_words=50)
+        # Verify that 'डॉ.' is never broken away from 'कुमार'
+        full_reconstructed = " ".join(s[0] for s in segments)
+        self.assertIn("डॉ. कुमार", full_reconstructed)
+
+    def test_08_epub_aside_tag_ignored(self):
+        """Verifies that non-narrative <aside> elements in EPUBs are ignored by EPUBStructuralHTMLParser."""
+        from audiobook_factory.extraction.parsers.epub import EPUBStructuralHTMLParser
+        parser = EPUBStructuralHTMLParser(source_file="test.html", spine_item="item_01", base_reading_order=0)
+        sample_html = (
+            "<div>"
+            "<h1>Chapter 1</h1>"
+            "<p>Main literary narrative sentence.</p>"
+            "<aside><p>This is a footnote or sidebar note that should be ignored.</p></aside>"
+            "<p>Another literary narrative sentence.</p>"
+            "</div>"
+        )
+        parser.feed(sample_html)
+        blocks = parser.finalize()
+        texts = [b.raw_text for b in blocks]
+        self.assertTrue(any("Main literary narrative sentence." in t for t in texts))
+        self.assertTrue(any("Another literary narrative sentence." in t for t in texts))
+        self.assertFalse(any("This is a footnote or sidebar note" in t for t in texts))
+
 
 if __name__ == "__main__":
     unittest.main()
+

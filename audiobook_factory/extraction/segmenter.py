@@ -308,8 +308,8 @@ def _recursive_split_segments(
             punct_pos = match.start(1)
             if punct == ".":
                 pre_slice = content[:punct_pos + 1]
-                # Skip if period belongs to an honorific or common abbreviation
-                if re.search(r"\b(?:Mr|Mrs|Ms|Dr|Prof|Capt|Lt|Col|Gen|Sgt|St|Jr|Sr|Rev|Hon|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec|vs|etc|no|e\.g|i\.e)\.$", pre_slice, re.IGNORECASE):
+                # Skip if period belongs to an honorific or common abbreviation (English or Indic)
+                if re.search(r"(?:\b(?:Mr|Mrs|Ms|Dr|Prof|Capt|Lt|Col|Gen|Sgt|St|Jr|Sr|Rev|Hon|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec|vs|etc|no|e\.g|i\.e)|(?:डॉ|प्रो|पं|श्री|श्रीमती|इं|ले|कै))\.$", pre_slice, re.IGNORECASE):
                     continue
             pos = match.end()
             dist = abs(pos - mid_char)

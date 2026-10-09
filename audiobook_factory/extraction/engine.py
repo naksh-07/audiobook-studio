@@ -78,7 +78,10 @@ class ExtractionEngine:
             raise FileNotFoundError(f"Input file not found: {input_file}")
 
         output_base_dir = Path(output_base_dir).resolve()
-        book_slug = book_id or re.sub(r"[^\w\-]", "_", input_file.stem.lower()).strip("_")
+        raw_slug = (book_id or input_file.stem).lower()
+        book_slug = re.sub(r"[^\w\-]", "_", raw_slug).strip("_")
+        if not book_slug:
+            book_slug = "book"
         project_dir = output_base_dir / book_slug
         raw_dir = project_dir / "raw"
         canonical_dir = project_dir / "canonical"
@@ -175,6 +178,9 @@ class ExtractionEngine:
 
             else:
                 raise ValueError(f"Unsupported file format: {ext}")
+
+            if canonical_book:
+                canonical_book.book_id = book_slug
 
             canonical_book.quality_report.duration_sec = round(time.time() - t_start, 2)
 
