@@ -26,5 +26,9 @@
   - True Peak: **-4.0 dBFS** (Hard ceiling: $\le$ -1.5 dBTP).
   - Loudness Range: **5.8 LU** (EBU R128 dynamic compliance).
 
-## Antigravity Studio Plugin & UI Extension
-- **Live Extension**: Registered at `~/.gemini/config/plugins/audiobook-studio/` (`@audiobook-director`, `audiobook-studio` skill, Stitch-grade sidecar panel).
+## Extraction Subsystem: Standalone Architecture Migration (v5.3)
+- **Status**: Phase 1 COMPLETED (100% Green, 40/40 Tests).
+- **Branch**: `feature/standalone-extraction`.
+- **Phase 1 Highlights**: Hardened logic snapshot from `0cd84ed` (EPUB 3 nav landmarks, Roman numeral fixes, normalizer HTML/Unicode hygiene, Windows file handle safety, `load_canonical()` AST rehydration); translation scope quarantined.
+- **Next Phase**: Phase 2 (Modular package scaffolding under `audiobook_factory/extraction/`).
+
