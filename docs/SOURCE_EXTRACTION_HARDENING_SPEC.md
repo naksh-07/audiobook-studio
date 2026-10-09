@@ -374,6 +374,7 @@ The test suite enforces the following 50 unit, integration, and regression test 
 | `TEST-PKG-08` | `test_extraction_package.py`<br/>`test_08_epub_aside_tag_ignored` | Non-narrative `<aside>` sidebar in EPUB | Ignored by parser; narrative body text preserved. | **PASSED** |
 | `TEST-PKG-09` | `test_extraction_package.py`<br/>`test_09_markdown_table_and_equation_block_classification` | Markdown research paper with table and `$$E=mc^2$$` | Emits `table` and `equation` blocks with row/col and LaTeX metadata. | **PASSED** |
 | `TEST-PKG-10` | `test_extraction_package.py`<br/>`test_10_math_symbols_not_flagged_as_ocr_noise` | Page dense with $\int, \sum, \nabla, \alpha, \beta$ | Whitelisted by `PDFQualityAnalyzer`; 0 false-positive symbol noise halts. | **PASSED** |
+| `TEST-PKG-11` | `test_extraction_package.py`<br/>`test_11_scientific_whitepaper_end_to_end_extraction` | Full extraction on `sample_research_paper.md` | Emits `abstract`, `table`, `equation`, `callout` blocks with Gate 0.1 PASS. | **PASSED** |
 
 ---
 
@@ -383,4 +384,4 @@ The test suite enforces the following 50 unit, integration, and regression test 
 - **Universal Novel-Agnostic Guarantee**: Certified **100% Generic** (Zero hardcoded novel titles, franchise lore, or character names; all pronunciations, names, and entities are dynamically discovered from source text).
 - **Security Audit**: Certified **100% Secure** (Zip-Slip traversal immune, XML External Entity [XXE] & Billion Laughs immune via safe parsing, path traversal sanitized, vision prompt insulated).
 - **Runtime & Windows Safety**: Certified **100% Safe** (Windows file descriptor lifecycle via strict context managers, $<10$ MB peak memory on 500-page volumes, `extraction_error.json` crash boundary).
-- **Total Test Suite**: **63 / 63 PASSED (0 failures, 0 regressions)** across all supported formats (.epub, .pdf, .txt, .md).
+- **Total Test Suite**: **64 / 64 PASSED (0 failures, 0 regressions)** across all supported formats (.epub, .pdf, .txt, .md).

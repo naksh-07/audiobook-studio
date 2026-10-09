@@ -315,6 +315,37 @@ class TestExtractionPackage(unittest.TestCase):
         symbol_noise_warnings = [w for w in audits[0].warnings if "symbol/noise ratio" in w.lower()]
         self.assertEqual(len(symbol_noise_warnings), 0)
 
+    def test_11_scientific_whitepaper_end_to_end_extraction(self):
+        """Verifies full end-to-end extraction on a complex scientific whitepaper with tables, LaTeX, and Gate 0.1 PASS."""
+        benchmark_file = Path("benchmarks/sample_research_paper.md")
+        if not benchmark_file.exists():
+            self.skipTest("Benchmark sample_research_paper.md not found.")
+
+        out_dir = self.base_path / "projects"
+        canonical_book = ExtractionEngine.extract(benchmark_file, out_dir, force_gate=False)
+
+        self.assertIsInstance(canonical_book, CanonicalBook)
+        self.assertEqual(canonical_book.quality_report.gate_status, "PASS")
+        self.assertGreater(len(canonical_book.chapters), 1)
+
+        # Gather all block types
+        all_blocks = [b for ch in canonical_book.chapters for b in ch.blocks]
+        block_types = {b.type for b in all_blocks}
+
+        self.assertIn("abstract", block_types)
+        self.assertIn("table", block_types)
+        self.assertIn("equation", block_types)
+        self.assertIn("callout", block_types)
+
+        # Check equation metadata
+        eq_block = next(b for b in all_blocks if b.type == "equation")
+        self.assertIn("\\mathcal{L}_{\\text{total}}", eq_block.semantic_metadata.get("latex", ""))
+
+        # Check table metadata
+        tbl_block = next(b for b in all_blocks if b.type == "table")
+        self.assertEqual(tbl_block.semantic_metadata.get("format"), "markdown")
+        self.assertGreaterEqual(tbl_block.semantic_metadata.get("table_rows", 0), 4)
+
 
 if __name__ == "__main__":
     unittest.main()

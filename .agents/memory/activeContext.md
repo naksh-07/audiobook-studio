@@ -30,6 +30,6 @@
 - **Status**: 100% IMPLEMENTED, VERIFIED & DOCUMENTED (`main`).
 - **Pillar 1 Standalone**: Package `audiobook_factory/extraction/` with contracts, engine, parsers (epub, text, pdf), normalizer, segmenter, and quality gate.
 - **Scientific & Podcast Ready (v5.4)**: Added structured Markdown tables, LaTeX equations ($E=mc^2$), abstracts, and callouts (`BlockType: table, equation, abstract, callout`). Whitelisted Greek/math symbols in `PDFQualityAnalyzer` (0 false OCR halts). Upgraded `GeminiVisionPDFExtractor` multimodal technical prompt.
-- **Zero-Bloat SOTA**: 3-Tier hybrid architecture bypassing 15GB–20GB PyTorch/CUDA model footprint.
-- **Verification**: 63/63 tests passing green across all extraction and legacy facade suites (0 regressions).
+- **Phase 1 Benchmark Validated**: Ingested `benchmarks/sample_research_paper.md` with 100% AST typing (`table`, `equation`, `abstract`, `callout`), full LaTeX metadata, and Gate 0.1 PASS.
+- **Verification**: 64/64 tests passing green across all extraction and legacy facade suites (0 regressions).
 
