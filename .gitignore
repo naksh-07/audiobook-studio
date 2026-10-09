@@ -35,8 +35,10 @@ var/
 wheels/
 *.egg-info/
 .installed.cfg
-*.egg
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
 
 # Audio & Media Output Artifacts
 *.wav
