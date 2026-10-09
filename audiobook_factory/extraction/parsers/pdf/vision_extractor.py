@@ -64,8 +64,11 @@ class GeminiVisionPDFExtractor(PDFEscalationEngine):
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
 
         prompt = (
-            "Extract all prose text from this book page in clean Markdown reading order. "
-            "Strip running headers and footers. Do not summarize."
+            "Extract all text from this document page in strict, clean Markdown reading order.\n"
+            "- Tables: Transcribe all tables into clean, structured Markdown table syntax with headers (| Col 1 | Col 2 |).\n"
+            "- Mathematics: Transcribe all mathematical formulas, variables, and expressions into standard LaTeX syntax ($...$ for inline math, $$...$$ for display equations).\n"
+            "- Structure: Preserve section headers (#, ##, ###), bullet lists, and figure/table captions.\n"
+            "- Cleanliness: Strip running headers and page numbers. Do not summarize or omit text."
         )
         from audiobook_factory.safety import get_universal_safety_settings
         payload = {

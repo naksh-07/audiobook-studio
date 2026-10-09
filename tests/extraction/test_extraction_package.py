@@ -258,6 +258,63 @@ class TestExtractionPackage(unittest.TestCase):
         self.assertTrue(any("Another literary narrative sentence." in t for t in texts))
         self.assertFalse(any("This is a footnote or sidebar note" in t for t in texts))
 
+    def test_09_markdown_table_and_equation_block_classification(self):
+        """Verifies MarkdownParser accurately tags tables, equations, abstracts, and callouts with semantic metadata."""
+        md_text = (
+            "# Section 1: Deep Learning Findings\n\n"
+            "> **Abstract**: This whitepaper evaluates attention mechanism latency.\n\n"
+            "Here is the benchmark summary table:\n\n"
+            "| Model | Accuracy | Latency (ms) |\n"
+            "| :--- | :--- | :--- |\n"
+            "| Flash 2.0 | 94.5% | 120 |\n"
+            "| Pro 1.5 | 96.2% | 340 |\n\n"
+            "The loss function is defined as:\n\n"
+            "$$\\mathcal{L}_{\\text{total}} = \\lambda \\sum_{i=1}^N (y_i - \\hat{y}_i)^2$$\n\n"
+            "> [!NOTE]\n"
+            "> Lower latency enables real-time podcast audio synthesis.\n"
+        )
+        md_file = self.base_path / "research_paper.md"
+        md_file.write_text(md_text, encoding="utf-8")
+
+        parser = MarkdownParser(md_file)
+        book = parser.parse()
+
+        self.assertEqual(len(book.chapters), 1)
+        blocks = book.chapters[0].blocks
+        block_types = [b.type for b in blocks]
+
+        self.assertIn("abstract", block_types)
+        self.assertIn("table", block_types)
+        self.assertIn("equation", block_types)
+        self.assertIn("callout", block_types)
+
+        # Inspect table block
+        table_blocks = [b for b in blocks if b.type == "table"]
+        self.assertEqual(len(table_blocks), 1)
+        self.assertEqual(table_blocks[0].semantic_metadata.get("format"), "markdown")
+        self.assertIn("Flash 2.0", table_blocks[0].raw_text)
+
+        # Inspect equation block
+        eq_blocks = [b for b in blocks if b.type == "equation"]
+        self.assertEqual(len(eq_blocks), 1)
+        self.assertEqual(eq_blocks[0].semantic_metadata.get("display_mode"), "block")
+        self.assertEqual(eq_blocks[0].semantic_metadata.get("format"), "latex")
+
+    def test_10_math_symbols_not_flagged_as_ocr_noise(self):
+        """Verifies PDFQualityAnalyzer does not misidentify standard math/Greek symbols as OCR noise."""
+        from audiobook_factory.extraction.parsers.pdf.quality_analyzer import PDFQualityAnalyzer
+
+        math_dense_page = (
+            "We define the gradient as \\nabla f(x) and the integral \\int_{0}^{\\infty} e^{-x^2} dx. "
+            "For all \\alpha, \\beta \\in \\mathbb{R}, the condition \\sum_{i=1}^n x_i \\le \\theta holds. "
+            "The loss function converges monotonically as t \\to \\infty."
+        )
+        audits, cleaned = PDFQualityAnalyzer.audit_pages([math_dense_page])
+        self.assertEqual(len(audits), 1)
+        # Should not flag as symbol noise
+        symbol_noise_warnings = [w for w in audits[0].warnings if "symbol/noise ratio" in w.lower()]
+        self.assertEqual(len(symbol_noise_warnings), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -616,26 +616,89 @@ for chapter in book_ast.chapters:
 
 ---
 
-## 13. Summary Matrix of Architectural Upgrades (Pillar 1 v5.3)
+## 14. Research Papers, Scientific Whitepapers, Complex Tables & LaTeX Math Formulas (Pillar 1 v5.4)
 
-| Capability | Legacy Pipeline (v3.x) | Forensic Ingestion Engine (Pillar 1 v5.3 Hardened) |
-|---|---|---|
-| **Data Representation** | Ephemeral, flat string chunks | Strongly typed Pydantic v2 AST ([`CanonicalBook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/book_model.py)) with sacred raw text, clean normalized text, and `load_canonical()` rehydration |
-| **PDF Multi-Column Layout** | Left-to-right interleaving across columns; severed sentences | Geometric XY-cut decomposition ([`PDFLayoutReconstructor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/pdf/layout_reconstructor.py)), gutter detection, spanning banner cuts, and column wrap healing |
-| **Scanned PDF Escalation** | 0-word scanned pages silently passed as empty | 0-word pages flagged as `is_suspicious=True`, triggering selective visual OCR escalation via `GeminiVisionPDFExtractor` |
-| **Source Provenance** | None (lost upon extraction) | Character-accurate `_PDFPageSpanRecord` indexing, tracking `page_number`, `page_end`, `line_start`, `line_end`, `char_offset`, `reading_order`, `extraction_method` |
-| **Source Preservation** | None (ephemeral) | Sacred `raw/` archive with SHA-256 verification manifest; unmutated `raw_text` vs sanitized `normalized_text` (purging `\x00`, `\x07`, `\u00ad`) |
-| **EPUB Parsing** | Double zip read, naive regex split, broken tags | Single-pass OPF/spine, HTML5 `<nav epub:type="toc">` landmarks, node-level anchor isolation, and resilient entity resolution (`_safe_xml_fromstring`) |
-| **Heading Disambiguation** | Standalone 'I' created false chapters; lost quoted subtitles | Isolated 'I' guard, dialogue quote immunity, 2-line title lookahead assembly, and meso-tier Priority 4 abbreviation protection |
-| **Semantic Role Alignment** | Passive sentences inverted actors ($A \leftrightarrow B$) | Passive-voice semantic extraction (`source_semantic_map.py`) ensuring agents map to Actors and patients map to Recipients |
-| **Entity Discovery** | 4k/8k character truncation missed late-introduced cast | 100% full chapter entity scanning (`entity_discovery.py`) harvesting up to 100,000 characters into `BookBible` |
-| **Coordinate Normalization** | Bracketed coords (`Sector [4]`) stripped as footnotes | Citation footnotes stripped while coordinates (`Sector [4]`, `Unit [12]`) and Indic ZWJ/ZWNJ characters are 100% preserved |
-| **Resource Safety** | Open file handle locks on Windows (Error 32) | Context managers (`with open(...)`) across PDF and EPUB readers with `extraction_error.json` crash isolation |
-| **Quality Verification** | None (corrupted text passed downstream) | Independent fail-closed **Gate 0.1** ([`ExtractionQualityAuditor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/quality_gate.py)) auditing word floors, empty chapters, suspicious pages, and chunk telemetry |
-| **Downstream Compatibility** | `extracted/chapter_XXX.md` | 100% backward-compatible projection via `project_legacy_extracted()` and `metadata.json` |
+To support deep-dive tech podcasts and academic paper audio production, Pillar 1 v5.4 incorporates native structural parsing for **scientific research papers (arXiv), financial balance sheets, complex Markdown tables, and LaTeX mathematical equations ($E=mc^2$)** without adding 15GB–20GB of heavyweight local PyTorch/CUDA models (`UniMERNet`, `TableFormer`, `Surya`).
+
+### 1. 3-Tier Zero-Bloat Hybrid Architecture
+
+```mermaid
+flowchart TD
+    subgraph Input["Input Document"]
+        P["Research Paper / Report / Whitepaper (PDF / EPUB / TXT / MD)"]
+    end
+
+    subgraph Tier1["Tier 1: Fast Local CPU Ingestion (Zero-Bloat)"]
+        D1["PDFQualityAnalyzer & Text Parser:"]
+        D1 -->|Table Heuristics: Numeric columns, grid pipes, 'Table X:'| T1["Structured Table Extraction"]
+        D1 -->|Math Whitelist: ∑, ∫, ∇, α, β, subscripts, 'Equation X:'| M1["Math Noise Whitelist (No False Halts)"]
+        D1 -->|Standard Literary Narrative| N1["Fast CPU Coordinate Extraction (XY-Cut)"]
+    end
+
+    subgraph Tier2["Tier 2: Multimodal Vision SOTA Escalation"]
+        T1 & M1 --> G1["GeminiVisionPDFExtractor (Technical Mode)"]
+        G1 --> R1["Structured Markdown Tables (| Col 1 | Col 2 |)"]
+        G1 --> R2["Standard LaTeX ($E=mc^2$, $$\\mathcal{L}_{\\text{loss}}$$)"]
+        G1 --> R3["Abstracts, Callouts & Section Headings"]
+    end
+
+    subgraph Tier3["Tier 3: Canonical AST Contracts"]
+        A1["audiobook_factory.extraction.contracts"]
+        A1 --> B1["BlockType: 'table' (rows, cols, markdown format)"]
+        A1 --> B2["BlockType: 'equation' (latex, display_mode)"]
+        A1 --> B3["BlockType: 'abstract' & 'callout'"]
+    end
+
+    subgraph Tier4["Tier 4: Podcast Verbalization (Downstream)"]
+        P1["Downstream Podcast Script Builder (NotebookLM-Style)"]
+        P1 --> V1["Tables $\\to$ Auditory Insights ('Table 2 indicates a 40% latency reduction...')"]
+        P1 --> V2["Equations $\\to$ Spoken Math ('Energy equals mass times c squared...')"]
+    end
+
+    Input --> Tier1
+    N1 --> Tier3
+    Tier2 --> Tier3
+    Tier3 --> Tier4
+```
+
+### 2. Expanded BlockType Hierarchy & Semantic Metadata
+
+The `CanonicalBlock` schema supports rich non-narrative elements with structured metadata:
+
+```python
+BlockType = Literal[
+    "paragraph",
+    "heading",
+    "scene_break",
+    "dialogue",
+    "verse",
+    "quote",
+    "raw",
+    "table",       # Structured Markdown/HTML tables (| Col 1 | Col 2 |)
+    "equation",    # Inline or display LaTeX expressions ($E=mc^2$, $$\mathcal{L}$$)
+    "abstract",    # Paper abstract or executive summary
+    "callout",     # Research takeaways, tips, or warning sidebars
+]
+```
+
+When a table or equation block is detected:
+- **Table Blocks (`type="table"`):** `semantic_metadata` stores `{"format": "markdown", "table_rows": N, "table_cols": M}`.
+- **Equation Blocks (`type="equation"`):** `semantic_metadata` stores `{"format": "latex", "latex": "...", "display_mode": "block" | "inline"}`.
+- **Abstract Blocks (`type="abstract"`):** Captures paper executive summaries with high structural priority.
+- **Callout Blocks (`type="callout"`):** Captures GitHub-style alerts (`> [!NOTE]`) and research sidebars.
+
+### 3. Math Symbol Tolerance in Gate 0.1 (`PDFQualityAnalyzer`)
+
+Standard OCR quality gates flag dense mathematical equations (such as $\int_{0}^{\infty} e^{-x^2} dx$ or $\nabla f(x) \le \theta$) as corrupted OCR symbol noise. `PDFQualityAnalyzer` whitelists Greek characters (`\u0370-\u03FF`), mathematical operators (`\u2200-\u22FF`, `\u2A00-\u2AFF`), arrows (`\u2190-\u21FF`), superscripts/subscripts (`\u2070-\u209F`), and LaTeX delimiter tokens (`$`, `\`, `{`, `}`, `_`, `^`, `*`, `+`, `=`, `<`, `>`, `|`, `%`, `~`), eliminating false-positive halts on technical papers.
+
+### 4. Downstream Podcast Verbalization Bridge
+
+In deep-dive tech podcasts, hosts verbalize structured data rather than reading raw syntax:
+- **Tables:** Summarized into auditory insights (e.g. *"Looking at Table 1, Flash 2.0 achieves 94.5% accuracy with only 120 milliseconds latency..."*).
+- **Equations:** Spoken mathematically (e.g. *"The total loss is defined as lambda times the sum over all samples of the squared residual error..."*).
 
 ---
 
-## 14. Invariants & Remediation Specification (v5.3)
+## 15. Invariants & Remediation Specification (v5.4)
 
-For the complete forensic audit, edge-case risk matrices, and step-by-step P0/P1/P2 remediation blueprint, consult the companion [Source Extraction Hardening Specification (v5.3)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/SOURCE_EXTRACTION_HARDENING_SPEC.md).
+For the complete forensic audit, edge-case risk matrices, and step-by-step P0/P1/P2 remediation blueprint, consult the companion [Source Extraction Hardening Specification (v5.4)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/SOURCE_EXTRACTION_HARDENING_SPEC.md).

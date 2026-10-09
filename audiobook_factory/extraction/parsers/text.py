@@ -134,7 +134,28 @@ class PlainTextParser:
                     l_start = matching_lines[0] if matching_lines else 1
                     l_end = matching_lines[-1] if matching_lines else l_start
 
-                    b_type = "scene_break" if re.match(r"^(\*|\-|\_)\s*\1\s*\1+$", para_clean) else "paragraph"
+                    # Rich block classification for literature, technical papers, and podcasts
+                    meta: Dict[str, Any] = {}
+                    if re.match(r"^(\*|\-|\_)\s*\1\s*\1+$", para_clean):
+                        b_type = "scene_break"
+                    elif re.search(r"^\|.+\|\s*\n\s*\|[-:\s|]+\|", para_clean):
+                        b_type = "table"
+                        table_lines = [ln.strip() for ln in para_clean.splitlines() if ln.strip().startswith("|")]
+                        meta["table_rows"] = len(table_lines)
+                        meta["table_cols"] = len([c for c in table_lines[0].split("|") if c.strip()]) if table_lines else 0
+                        meta["format"] = "markdown"
+                    elif (para_clean.startswith("$$") and para_clean.endswith("$$")) or re.match(r"^\\begin\{equation\*?\}.+\\end\{equation\*?\}", para_clean, re.DOTALL):
+                        b_type = "equation"
+                        meta["latex"] = para_clean.strip("$").strip()
+                        meta["display_mode"] = "block"
+                        meta["format"] = "latex"
+                    elif re.match(r"^(?:>\s*)?(?:#{1,6}\s*Abstract\b|\*\*Abstract\*\*)", para_clean, re.IGNORECASE):
+                        b_type = "abstract"
+                    elif re.match(r"^>\s*\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]|^>\s+", para_clean):
+                        b_type = "callout"
+                    else:
+                        b_type = "paragraph"
+
                     prov = SourceProvenance(
                         source_file=str(self.file_path),
                         source_type=self.source_type,
@@ -144,7 +165,6 @@ class PlainTextParser:
                         char_offset=block_doc_start,
                         extraction_method="text_parser",
                     )
-                    meta: Dict[str, Any] = {}
                     if norm_warnings:
                         meta["normalization_warnings"] = norm_warnings
 

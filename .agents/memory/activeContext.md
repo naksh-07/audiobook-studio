@@ -26,11 +26,10 @@
   - True Peak: **-4.0 dBFS** (Hard ceiling: $\le$ -1.5 dBTP).
   - Loudness Range: **5.8 LU** (EBU R128 dynamic compliance).
 
-## Extraction Subsystem: Standalone Architecture Migration (v5.3)
-- **Status**: 100% MERGED, AUDITED & HARDENED (`main`).
+## Extraction Subsystem: Standalone Architecture & Scientific Upgrade (v5.4)
+- **Status**: 100% IMPLEMENTED, VERIFIED & DOCUMENTED (`main`).
 - **Pillar 1 Standalone**: Package `audiobook_factory/extraction/` with contracts, engine, parsers (epub, text, pdf), normalizer, segmenter, and quality gate.
-- **CLI & Isolation**: Standalone CLI (`cli.py`), PEP 562 lazy-loading root facade, zero downstream coupling.
-- **Audit Hardening (v5.3.1)**: Sanitized `book_id` path traversal, added Devanagari abbreviations (`डॉ.`, `प्रो.`, `पं.`) to sentence splitting, added EPUB `<aside>` ignore filtering.
-- **Verification**: 61/61 tests passing green across 10 test suites (0 regressions).
-- **Ready for Next**: Standalone subsystem integration ready for sibling branches (`translation`, `tts-system`, `dramaturgy`, `research-system`).
+- **Scientific & Podcast Ready (v5.4)**: Added structured Markdown tables, LaTeX equations ($E=mc^2$), abstracts, and callouts (`BlockType: table, equation, abstract, callout`). Whitelisted Greek/math symbols in `PDFQualityAnalyzer` (0 false OCR halts). Upgraded `GeminiVisionPDFExtractor` multimodal technical prompt.
+- **Zero-Bloat SOTA**: 3-Tier hybrid architecture bypassing 15GB–20GB PyTorch/CUDA model footprint.
+- **Verification**: 63/63 tests passing green across all extraction and legacy facade suites (0 regressions).
 

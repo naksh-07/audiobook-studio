@@ -24,6 +24,10 @@ BlockType = Literal[
     "poetry",
     "list",
     "note",
+    "table",
+    "equation",
+    "abstract",
+    "callout",
     "unknown",
 ]
 

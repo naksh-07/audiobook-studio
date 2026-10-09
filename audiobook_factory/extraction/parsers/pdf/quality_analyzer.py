@@ -57,7 +57,7 @@ class PDFQualityAnalyzer:
 
         symbols = len(
             re.findall(
-                r"[^a-zA-Z0-9\s\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F\.,'\"‘’“”\?\!\-\—\–\:\;\(\)\[\]…\/]",
+                r"[^a-zA-Z0-9\s\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F\u0370-\u03FF\u2200-\u22FF\u2A00-\u2AFF\u2190-\u21FF\u2070-\u209F\.,'\"‘’“”\?\!\-\—\–\:\;\(\)\[\]…\/\$\\\{\}\_\^\*\+\=\<\>\|\%~]",
                 cleaned,
             )
         )
@@ -450,7 +450,7 @@ class PDFQualityAnalyzer:
             if char_count > 50:
                 symbols = len(
                     re.findall(
-                        r"[^a-zA-Z0-9\s\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F\.,'\"‘’“”\?\!\-\—\–\:\;\(\)\[\]…\/]",
+                        r"[^a-zA-Z0-9\s\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F\u0370-\u03FF\u2200-\u22FF\u2A00-\u2AFF\u2190-\u21FF\u2070-\u209F\.,'\"‘’“”\?\!\-\—\–\:\;\(\)\[\]…\/\$\\\{\}\_\^\*\+\=\<\>\|\%~]",
                         cleaned_text,
                     )
                 )

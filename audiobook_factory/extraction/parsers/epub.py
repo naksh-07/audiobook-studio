@@ -67,7 +67,7 @@ class EPUBStructuralHTMLParser(HTMLParser):
         if anchor:
             self.current_anchor = anchor
 
-        if tag in ("h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote", "hr"):
+        if tag in ("h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote", "hr", "table", "math"):
             self._flush_current_block()
             self.current_tag = tag
             self.current_attrs = attr_dict
@@ -90,7 +90,7 @@ class EPUBStructuralHTMLParser(HTMLParser):
         if self.ignore_depth > 0:
             return
 
-        if tag in ("h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote"):
+        if tag in ("h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote", "table", "math"):
             self._flush_current_block()
             self.current_tag = None
             self.current_attrs = {}
@@ -120,10 +120,16 @@ class EPUBStructuralHTMLParser(HTMLParser):
             level = int(tag[1])
         elif tag == "blockquote":
             block_type = "quote"
+        elif tag == "table":
+            block_type = "table"
+        elif tag in ("math", "equation"):
+            block_type = "equation"
         else:
             # Check for scene break typography (e.g. * * *, ---, ###)
             if re.match(r"^(\*|\-|\_)\s*\1\s*\1+$", raw_stripped):
                 block_type = "scene_break"
+            elif re.match(r"^#{1,6}\s*Abstract\b|^\*\*Abstract\*\*", raw_stripped, re.IGNORECASE):
+                block_type = "abstract"
             else:
                 block_type = "paragraph"
 
