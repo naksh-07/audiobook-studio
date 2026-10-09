@@ -702,3 +702,58 @@ In deep-dive tech podcasts, hosts verbalize structured data rather than reading 
 ## 15. Invariants & Remediation Specification (v5.4)
 
 For the complete forensic audit, edge-case risk matrices, and step-by-step P0/P1/P2 remediation blueprint, consult the companion [Source Extraction Hardening Specification (v5.4)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/SOURCE_EXTRACTION_HARDENING_SPEC.md).
+
+---
+
+## 16. Technical Whitepaper & Research Podcast Production Subsystem (Pillar 1 v5.5)
+
+To convert scientific research papers, financial whitepapers, and technical reports into studio-grade NotebookLM-style dual-host podcasts, the [`audiobook_factory.podcast`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/) package provides a complete 3-room production pipeline:
+
+### 1. Architectural Pipeline
+1. **Pillar 1 Ingestion (`ExtractionEngine`)**: Extracts documents into `CanonicalBook` AST with typed blocks (`table`, `equation`, `abstract`, `callout`).
+2. **Room 3 Verbalization (`PodcastScriptBuilder`)**:
+   - `MathVerbalizer`: Translates display and inline LaTeX equations ($E=mc^2, \mathcal{L}$) into spoken mathematical prose.
+   - `TableVerbalizer`: Parses Markdown tables into conversational auditory insights and comparative benchmarks.
+   - `AbstractCalloutVerbalizer`: Turns paper abstracts into podcast episode hooks and callouts into key takeaway transitions.
+   - Allocates alternating turns between Host A (*Dr. Vance* - Lead Explainer) and Host B (*Maya* - Inquisitive Co-host).
+3. **Room 4 Synthesis & Editorial (`PodcastAudioProducer`)**:
+   - Concurrent TTS synthesis with multi-host voice casting (Host A `Charon` @ temp 0.32, Host B `Aoede` @ temp 0.38).
+   - 12ms/18ms Hann micro-fades eliminating digital click/pop boundary artifacts.
+   - Inter-turn conversational pause latencies (`pause_after_ms` 150ms–350ms).
+4. **Room 5 Broadcast Mastering (`master_podcast_audio`)**:
+   - Two-pass measured linear EBU R128 loudnorm mastering (**-19.0 LUFS**, **-1.5 dBTP** True Peak).
+   - Packaging with complete production manifests and duration telemetry.
+
+### 2. CLI Commands
+```bash
+# 1-Shot End-to-End Podcast Production from Paper
+python audiobook_cli.py podcast papers/quantum_breakthrough.pdf
+
+# Offline / Mock Mode (Zero Quota / Fast Local Testing)
+python audiobook_cli.py podcast benchmarks/sample_research_paper.md --mock
+
+# Dedicated Podcast Sub-Module CLI
+python -m audiobook_factory.podcast.cli produce papers/attention_is_all_you_need.pdf
+python -m audiobook_factory.podcast.cli script papers/attention_is_all_you_need.pdf
+python -m audiobook_factory.podcast.cli render audiobooks/projects/attention_podcast/podcast_script.json
+python -m audiobook_factory.podcast.cli inspect audiobooks/projects/attention_podcast/podcast_script.json
+```
+
+### 3. Programmatic Python API
+```python
+from audiobook_factory.podcast import process_document_to_podcast
+
+result = process_document_to_podcast(
+    source_file="benchmarks/sample_research_paper.md",
+    output_dir="audiobooks/projects/sample_paper_podcast",
+    style="conversational_podcast",
+    host_a_name="Dr. Vance",
+    host_a_voice="Charon",
+    host_b_name="Maya",
+    host_b_voice="Aoede",
+    mock_mode=False,
+)
+
+print(f"Status: {result.status} | Duration: {result.duration_sec:.1f}s | Mastered Audio: {result.mastered_audio_path}")
+```
+

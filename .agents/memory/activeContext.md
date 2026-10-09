@@ -33,5 +33,6 @@
 - **Phase 1 Benchmark Validated**: Ingested `benchmarks/sample_research_paper.md` with 100% AST typing (`table`, `equation`, `abstract`, `callout`), full LaTeX metadata, and Gate 0.1 PASS.
 - **Phase 2 Technical Verbalization Bridge**: Implemented `audiobook_factory/podcast/` (`MathVerbalizer`, `TableVerbalizer`, `AbstractCalloutVerbalizer`, `PodcastScriptBuilder`) generating dual-host screenplay JSON with spoken math and auditory table insights.
 - **Phase 3 Multi-Voice Audio Production & EBU R128 Mastering**: Implemented `PodcastAudioProducer` (`audiobook_factory/podcast/producer.py`) with 12ms/18ms Hann micro-fading, conversational turn pauses, multi-host casting (Charon/Aoede), and two-pass linear EBU R128 loudnorm mastering (-19.0 LUFS, -1.5 dBTP). Verified on benchmark paper (22 turns, 275.4s audio).
-- **Verification**: 37/37 targeted podcast and extraction tests PASSING (100% green).
+- **Phase 4 Unified CLI & Autonomous Orchestrator**: Implemented `PodcastOrchestrator` (`audiobook_factory/podcast/orchestrator.py`) and dedicated CLI (`audiobook_factory/podcast/cli.py` & `audiobook_cli.py podcast <file>`) for 1-shot document $\to$ mastered podcast production.
+- **Verification**: 44/44 targeted podcast and extraction tests PASSING (100% green).
 

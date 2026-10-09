@@ -139,11 +139,42 @@ def main():
     p_audit.add_argument("book", help="Project book slug")
     p_audit.add_argument("--chapter", type=int, required=True, help="Chapter number to audit")
 
+    # podcast
+    p_podcast = subparsers.add_parser("podcast", help="Generate dual-host podcast audio from research paper or whitepaper (.pdf, .md, .txt)")
+    p_podcast.add_argument("file", help="Input research paper/document path")
+    p_podcast.add_argument("--output-dir", default=None, help="Target project output directory")
+    p_podcast.add_argument("--style", choices=["conversational_podcast", "formal_lecture", "narrative_audiobook"], default="conversational_podcast", help="Verbalization style")
+    p_podcast.add_argument("--host-a-name", default="Dr. Vance", help="Lead explainer host name")
+    p_podcast.add_argument("--host-a-voice", default="Charon", help="Lead explainer host voice")
+    p_podcast.add_argument("--host-b-name", default="Maya", help="Inquisitive co-host name")
+    p_podcast.add_argument("--host-b-voice", default="Aoede", help="Inquisitive co-host voice")
+    p_podcast.add_argument("--mock", action="store_true", help="Run in mock/offline mode")
+    p_podcast.add_argument("--script-only", action="store_true", help="Generate podcast_script.json only")
+    p_podcast.add_argument("--force-gate", action="store_true", help="Force bypass of extraction quality gate review")
+
     args = parser.parse_args()
 
     if not args.subcommand:
         parser.print_help()
         sys.exit(1)
+
+    def _handle_podcast(a):
+        from audiobook_factory.podcast.orchestrator import process_document_to_podcast
+        res = process_document_to_podcast(
+            source_file=a.file,
+            output_dir=a.output_dir,
+            style=a.style,
+            host_a_name=a.host_a_name,
+            host_a_voice=a.host_a_voice,
+            host_b_name=a.host_b_name,
+            host_b_voice=a.host_b_voice,
+            script_only=a.script_only,
+            mock_mode=a.mock,
+            force_gate=a.force_gate,
+        )
+        if res.status != "SUCCESS":
+            print(f"\n[!] Podcast production failed: {res.error_message}", file=sys.stderr)
+            sys.exit(1)
 
     cmds = {
         "extract": cmd_extract,
@@ -156,6 +187,7 @@ def main():
         "auto": cmd_auto,
         "audit": cmd_audit,
         "audit-book": cmd_audit_book,
+        "podcast": _handle_podcast,
     }
     try:
         cmds[args.subcommand](args)

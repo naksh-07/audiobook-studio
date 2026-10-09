@@ -111,6 +111,8 @@ class PodcastProductionResult(BaseModel):
     total_segments: int = 0
     total_words: int = 0
     duration_sec: float = 0.0
+    canonical_book_path: Optional[str] = None
+    script_path: Optional[str] = None
     dialogue_raw_path: Optional[str] = None
     mastered_audio_path: Optional[str] = None
     integrated_lufs: float = -19.0

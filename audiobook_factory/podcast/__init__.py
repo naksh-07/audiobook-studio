@@ -28,6 +28,10 @@ from audiobook_factory.podcast.producer import (
     PodcastAudioProducer,
     produce_podcast_audio,
 )
+from audiobook_factory.podcast.orchestrator import (
+    PodcastOrchestrator,
+    process_document_to_podcast,
+)
 
 __all__ = [
     "PodcastScript",
@@ -44,4 +48,6 @@ __all__ = [
     "HannMicroFadeProcessor",
     "PodcastAudioProducer",
     "produce_podcast_audio",
+    "PodcastOrchestrator",
+    "process_document_to_podcast",
 ]
