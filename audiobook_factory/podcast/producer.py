@@ -255,13 +255,13 @@ class PodcastAudioProducer:
                 raw_bytes = wf.readframes(wf.getnframes())
 
             if sampwidth == 2:
-                dtype = np.int16
+                samples = np.frombuffer(raw_bytes, dtype=np.int16).astype(np.float32)
             elif sampwidth == 4:
-                dtype = np.int32
+                # 32-bit integer PCM scaled to 16-bit float range [-32768, 32767]
+                samples = np.frombuffer(raw_bytes, dtype=np.int32).astype(np.float32)
+                samples = samples * (32767.0 / 2147483648.0)
             else:
-                dtype = np.int16
-
-            samples = np.frombuffer(raw_bytes, dtype=dtype).astype(np.float32)
+                samples = np.frombuffer(raw_bytes, dtype=np.int16).astype(np.float32)
             if n_channels > 1:
                 samples = samples.reshape(-1, n_channels)[:, 0]  # Downmix to mono
 
@@ -358,8 +358,21 @@ class PodcastAudioProducer:
             logger.warning(f"  [MASTERING WARNING] Pass 1 measurement encountered error: {e}")
 
         # Pass 2: Linear mastering chain
+        def _parse_safe_float(val: Any) -> Optional[float]:
+            try:
+                f = float(val)
+                return f if not (math.isnan(f) or math.isinf(f)) else None
+            except (ValueError, TypeError):
+                return None
+
+        has_valid_pass1 = (
+            pass1_stats is not None
+            and all(_parse_safe_float(pass1_stats.get(k)) is not None for k in ["input_i", "input_tp", "input_lra", "input_thresh", "target_offset"])
+            and (_parse_safe_float(pass1_stats.get("input_i")) or -70.0) > -69.0
+        )
+
         filter_parts = ["highpass=f=45"]
-        if pass1_stats and pass1_stats.get("input_i") not in ("-inf", "inf") and float(pass1_stats.get("input_i", 0.0)) > -69.0:
+        if has_valid_pass1 and pass1_stats:
             filter_parts.append(
                 f"loudnorm=I={target_lufs}:TP={true_peak:.1f}:LRA={loudness_range:.1f}:"
                 f"measured_I={pass1_stats['input_i']}:"
@@ -405,12 +418,16 @@ class PodcastAudioProducer:
 
         # Compute metrics
         final_duration = get_audio_duration(output_audio)
+        m_i = _parse_safe_float(pass1_stats.get("input_i")) if pass1_stats else None
+        m_tp = _parse_safe_float(pass1_stats.get("input_tp")) if pass1_stats else None
+        m_lra = _parse_safe_float(pass1_stats.get("input_lra")) if pass1_stats else None
+
         metrics = {
             "target_lufs": target_lufs,
             "target_true_peak": true_peak,
-            "measured_input_i": float(pass1_stats["input_i"]) if pass1_stats else -19.0,
-            "measured_input_tp": float(pass1_stats["input_tp"]) if pass1_stats else -1.5,
-            "measured_input_lra": float(pass1_stats["input_lra"]) if pass1_stats else loudness_range,
+            "measured_input_i": m_i if m_i is not None else -19.0,
+            "measured_input_tp": m_tp if m_tp is not None else -1.5,
+            "measured_input_lra": m_lra if m_lra is not None else loudness_range,
             "duration_sec": final_duration,
             "mastering_standard": "EBU_R128_AUDIBLE_COMPLIANT",
         }

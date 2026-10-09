@@ -119,12 +119,16 @@ class MathVerbalizer:
         )
         text = re.sub(r"\\int\b", "the integral of", text)
 
-        # 4. Fractions: \frac{num}{den}
-        text = re.sub(
-            r"\\frac\{([^{}]+)\}\{([^{}]+)\}",
-            r"\1 divided by \2",
-            text,
-        )
+        # 4. Fractions: \frac{num}{den} (iterative expansion for nested fractions up to depth 4)
+        for _ in range(4):
+            new_text = re.sub(
+                r"\\frac\{([^{}]+)\}\{([^{}]+)\}",
+                r"\1 divided by \2",
+                text,
+            )
+            if new_text == text:
+                break
+            text = new_text
 
         # 5. Hats, Tildes, Bars: \hat{y}_i, \hat{\omega}_k
         text = re.sub(
@@ -251,13 +255,14 @@ class TableVerbalizer:
         # General Table Fallback
         spoken_rows = []
         for r in rows[:4]:  # Top 4 rows for audio conciseness
-            if len(r) >= 2:
+            if len(r) >= 2 and len(headers) >= 2:
                 spoken_rows.append(f"{r[0]} with {headers[1]} of {r[1]}")
+            elif len(r) >= 1:
+                spoken_rows.append(f"{r[0]}")
 
-        return (
-            f"The table details {len(rows)} entries across {', '.join(headers[:3])}. "
-            f"Key metrics include {'; '.join(spoken_rows)}."
-        )
+        col_desc = f"across {', '.join(headers[:3])}" if headers else "of recorded values"
+        entries_desc = f"Key metrics include {'; '.join(spoken_rows)}." if spoken_rows else ""
+        return f"The table details {len(rows)} entries {col_desc}. {entries_desc}".strip()
 
 
 class AbstractCalloutVerbalizer:
