@@ -15,10 +15,13 @@
 
 ## 📖 Overview
 
-**Audiobook Studio** is an enterprise-grade, autonomous audiobook production system and a first-class **Google Antigravity Plugin**. Engineered specifically for **grounded, natural multi-voice character acting and pristine vocal narration** modeled after the benchmark standards of **Audible Studios**, it transforms raw literature (**EPUB, PDF, TXT, Markdown**) into chapterized, broadcast-compliant `.m4b` audiobooks with zero corporate fluff or tedious manual editing.
+**Audiobook Studio** is an enterprise-grade, autonomous audio production engine and a first-class **Google Antigravity Plugin**. Built for **grounded, natural multi-voice character acting and pristine vocal narration** modeled after the benchmark standards of **Audible Studios**, it provides a unique **Dual-Capability Architecture**:
+
+1. **Autonomous Literary Audiobooks (Novels & Fiction)**: Ingests raw literature (**EPUB, PDF, TXT, Markdown**), executes 4-agent Sense-for-Sense Hindustani translation, allocates multi-cast Stanislavski acting personae, and masters chapterized, broadcast-compliant `.m4b` audiobooks.
+2. **Deep-Dive Tech & Research Podcasts (Scientific Papers & Whitepapers)**: Ingests academic papers (arXiv), technical whitepapers, and reports. Converts complex Markdown tables and LaTeX mathematical expressions ($\mathcal{L}_{\text{total}}, E=mc^2$) into spoken prose and produces NotebookLM-style dual-host podcasts (*Dr. Vance* & *Maya*) mastered to **EBU R128 (-19.0 LUFS / -1.5 dBTP)**—all without requiring 15GB of PyTorch/CUDA weights.
 
 Audiobook Studio operates both as:
-1. **A Native Antigravity Plugin**: Direct with conversational directing via the `@audiobook-director` agent, interactive Webview Studio Panel sidecar, and full multi-skill workflows.
+1. **A Native Antigravity Plugin**: Direct conversational directing via the `@audiobook-director` agent, interactive Webview Studio Panel sidecar, and full multi-skill workflows.
 2. **A Standalone CLI & Python Framework**: Programmatic scripting, batch processing, and headless production pipelines.
 
 ---
@@ -181,8 +184,13 @@ Restart Antigravity or open Plugins Manager to see **Audiobook Studio** live!
 Run autonomous end-to-end production with a single command or execute granular stages step-by-step:
 
 ```bash
-# 1-Click Autonomous End-to-End Production:
+# 1-Click Autonomous Novel Production:
 audiobook-studio auto "path/to/novel.epub" --hindi --dramatized --voice Aoede --workers 3
+
+# 1-Click Autonomous Tech Paper & Whitepaper Podcast:
+audiobook-studio podcast "path/to/research_paper.pdf"
+# Or with offline mock audio (zero quota):
+python audiobook_cli.py podcast "paper.pdf" --mock
 
 # Or step-by-step modular pipeline:
 audiobook-studio extract "path/to/novel.epub"
@@ -191,6 +199,11 @@ audiobook-studio script <book_slug> --hindi --dramatized
 audiobook-studio synthesize <book_slug> --voice Aoede --workers 3
 audiobook-studio master <book_slug>
 audiobook-studio package <book_slug> --cover "cover.jpg"
+
+# Granular podcast CLI:
+python -m audiobook_factory.podcast.cli produce "paper.pdf"
+python -m audiobook_factory.podcast.cli script "paper.pdf"
+python -m audiobook_factory.podcast.cli render "podcast_script.json"
 ```
 
 ### Command Matrix
@@ -199,6 +212,7 @@ audiobook-studio package <book_slug> --cover "cover.jpg"
 |---|---|---|
 | **`auto`** | Full Book | 1-Click autonomous pipeline (Extract $\rightarrow$ Translate $\rightarrow$ Script $\rightarrow$ Synth $\rightarrow$ Master $\rightarrow$ Package). |
 | **`produce`** | Chapter / All | Produces mastered vocal chapters with EBU R128 (-19 LUFS) loudness and timeline ledger. |
+| **`podcast`** | Research Paper | Dual-host podcast synthesis from scientific papers, Markdown tables, and LaTeX math. |
 | **`extract`** | Ingestion | Ingests EPUB, PDF, TXT, or MD documents into clean Markdown chapters. |
 | **`translate`** | Translation | Translates extracted chapters into literary dramatic Hindustani via Translation Collective. |
 | **`script`** | Screenplay | Parses prose into standardized screenplay JSON with speaker attribution and acting tags. |
@@ -231,7 +245,9 @@ All quality gates are fail-closed:
 
 ## 📚 Documentation Index
 
-For exhaustive technical guides, visit the [`docs/`](docs/) directory:
+For exhaustive technical guides, visit the [`docs/`](docs/) directory and subsystem manuals:
+- [🎙️ Podcast & Technical Verbalization Subsystem](audiobook_factory/podcast/README.md)
+- [📄 Document Extraction Subsystem (Pillar 1)](audiobook_factory/extraction/README.md)
 - [🏛️ Architecture Blueprint](docs/ARCHITECTURE.md)
 - [🎛️ Audio Engineering & Mastering](docs/AUDIO_ENGINEERING.md)
 - [🎙️ Gemini Flash TTS Synthesis & Directing](docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)

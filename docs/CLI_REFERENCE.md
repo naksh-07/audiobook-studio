@@ -27,6 +27,8 @@ python audiobook_cli.py [COMMAND] [OPTIONS]
 | **[`package`](#8-m4b-container-packaging-package)** | Delivery | Packages all mastered chapters into a chapterized `.m4b` container with cover art. |
 | **[`audit`](#9-chapter-quality-audit-audit)** | QA (Chapter) | Runs Multi-Gate Independent Verification (Gates 0, 1, 2, 2.5, 2.8) on a specific chapter. |
 | **[`audit-book`](#10-full-book-macro-audit-audit-book)** | QA (Macro) | Runs Macro-Tier Gate 6 certification (Voice Continuity, Loudness, TOC Monotonicity). |
+| **[`podcast`](#11-research-paper--whitepaper-podcast-podcast)** | Scientific Paper | Generates dual-host podcast audio from research papers, LaTeX formulas, and Markdown tables. |
+| **[`podcast-cli`](#12-modular-podcast-subsystem-cli)** | Modular Engine | Dedicated CLI for granular podcast workflows (`produce`, `script`, `render`, `inspect`). |
 
 ---
 
@@ -160,6 +162,126 @@ python audiobook_cli.py audit-book <PROJECT_DIR_OR_SLUG>
 
 ---
 
+## 11. Research Paper & Whitepaper Podcast (`podcast`)
+
+Ingests any scientific research paper (arXiv), technical whitepaper, financial report, or markdown document with complex tables and LaTeX formulas, generating an engaging NotebookLM-style dual-host podcast mastered to broadcast EBU R128 (-19.0 LUFS / -1.5 dBTP).
+
+```bash
+python audiobook_cli.py podcast <FILE> [OPTIONS]
+```
+
+### Positional Arguments
+- `FILE`: Path to input research paper or technical document (`.pdf`, `.md`, `.txt`, `.epub`).
+
+### Options
+| Flag | Type | Default | Description |
+|---|:---:|:---:|---|
+| `--output-dir` | Path | `None` | Custom target project output directory. Defaults to `audiobooks/projects/<slug>_podcast/`. |
+| `--style` | Choice | `conversational_podcast` | Spoken verbalization delivery style (`conversational_podcast`, `formal_lecture`, `narrative_audiobook`). |
+| `--host-a-name` | String | `Dr. Vance` | Name of the Lead Explainer host persona. |
+| `--host-a-voice` | String | `Charon` | Gemini Flash TTS voice for Host A (`Charon`, `Fenrir`, `Puck`, `Zephyr`, `Orpheus`). |
+| `--host-b-name` | String | `Maya` | Name of the Inquisitive Co-host persona. |
+| `--host-b-voice` | String | `Aoede` | Gemini Flash TTS voice for Host B (`Aoede`, `Kore`, `Leda`). |
+| `--mock` | Flag | `False` | Run in offline/synthetic audio chunk mode (zero Gemini API quota consumed). Ideal for CI and quick testing. |
+| `--script-only` | Flag | `False` | Ingests the document and generates `podcast_script.json` without executing audio synthesis. |
+| `--force-gate` | Flag | `False` | Force bypass of Extraction Quality Gate REVIEW failure. |
+
+### Examples
+
+#### Full End-to-End Production
+```bash
+python audiobook_cli.py podcast "papers/attention_mechanism.pdf"
+```
+
+#### Custom Host Personas & Voices
+```bash
+python audiobook_cli.py podcast "papers/qwen2_vl.pdf" \
+  --host-a-name "Professor Vance" --host-a-voice Charon \
+  --host-b-name "Elena" --host-b-voice Aoede \
+  --output-dir "audiobooks/projects/qwen2_podcast"
+```
+
+#### Offline Dry-Run (Zero API Quota)
+```bash
+python audiobook_cli.py podcast "benchmarks/sample_research_paper.md" --mock
+```
+
+#### Script-Only Inspection
+```bash
+python audiobook_cli.py podcast "papers/rlhf_survey.pdf" --script-only
+```
+
+---
+
+## 12. Modular Podcast Subsystem CLI
+
+For granular control over individual stages of technical document verbalization and production, use the standalone module CLI [`audiobook_factory.podcast.cli`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/cli.py):
+
+```bash
+python -m audiobook_factory.podcast.cli <SUBCOMMAND> [OPTIONS]
+```
+
+### Subcommands
+
+#### 1. `produce`
+Executes end-to-end ingestion, mathematical/table verbalization, dual-host turn allocation, multi-voice TTS synthesis, Hann micro-fades, and two-pass linear EBU R128 vocal mastering.
+
+```bash
+python -m audiobook_factory.podcast.cli produce <FILE> [OPTIONS]
+```
+
+Options:
+- `<FILE>`: Path to input document (`.pdf`, `.md`, `.txt`, `.epub`).
+- `--output-dir <DIR>`: Output directory.
+- `--style {conversational_podcast,formal_lecture,narrative_audiobook}`: Dialogue style.
+- `--host-a-name <NAME>`: Host A display name (default: `Dr. Vance`).
+- `--host-a-voice <VOICE>`: Host A voice (default: `Charon`).
+- `--host-b-name <NAME>`: Host B display name (default: `Maya`).
+- `--host-b-voice <VOICE>`: Host B voice (default: `Aoede`).
+- `--mock`: Run with synthetic sine/harmonic vocal chunks.
+- `--force-gate`: Bypass Extraction Quality Gate REVIEW failure.
+
+#### 2. `script`
+Ingests document and generates structured `podcast_script.json` only.
+
+```bash
+python -m audiobook_factory.podcast.cli script <FILE> [OPTIONS]
+```
+
+Options:
+- `<FILE>`: Path to input document.
+- `--output-dir <DIR>`: Output directory.
+- `--style <STYLE>`: Verbalization style.
+- `--host-a-name <NAME>`: Host A display name.
+- `--host-a-voice <VOICE>`: Host A voice persona.
+- `--host-b-name <NAME>`: Host B display name.
+- `--host-b-voice <VOICE>`: Host B voice persona.
+- `--force-gate`: Bypass extraction gate review failure.
+
+#### 3. `render`
+Synthesizes and masters audio from an existing, user-edited `podcast_script.json` file.
+
+```bash
+python -m audiobook_factory.podcast.cli render <SCRIPT_FILE> [OPTIONS]
+```
+
+Options:
+- `<SCRIPT_FILE>`: Path to `podcast_script.json`.
+- `--output-dir <DIR>`: Output production directory (defaults to `<script_dir>/production`).
+- `--mock`: Synthesize mock audio chunks for rapid local verification.
+
+#### 4. `inspect`
+Inspects and prints diagnostics for a `podcast_script.json` or `_production_manifest.json`.
+
+```bash
+python -m audiobook_factory.podcast.cli inspect <PATH>
+```
+
+Output includes total spoken turns, total word count, estimated runtime, cast configuration with voices and roles, or mastered audio loudness and true peak measurements.
+
+---
+
 ## 📦 Archived Subsystems Notice
 
 The legacy subcommands (`direct`, `render`, `bgm`, `stems`, `bank`) belong to the decoupled 5-track cinematic audio engine and are archived in `archive/cinematic_audio/`. They are not part of the active Vocals-Only pipeline.
+

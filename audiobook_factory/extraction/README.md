@@ -1,122 +1,259 @@
-# Audiobook Studio: Document Extraction Subsystem (Pillar 1)
+# 📄 Audiobook Studio: Document Extraction Subsystem (Pillar 1)
 
-Standalone forensic document ingestion, geometric layout reconstruction, text normalization, chapter segmentation, and Canonical AST generation engine.
+> **Forensic document ingestion, geometric layout reconstruction, text normalization, chapter segmentation, and Canonical AST generation engine with native support for research papers, LaTeX equations, Markdown tables, and academic abstracts.**
+
+[![Subsystem](https://img.shields.io/badge/Pillar%201-Extraction%20%26%20Canonical%20AST-blue.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction)
+[![Contracts](https://img.shields.io/badge/Contracts-Pydantic%20v2%20AST-purple.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py)
+[![Quality Gate](https://img.shields.io/badge/Quality%20Gate-Gate%200.1%20Fail--Closed-red.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/quality_gate.py)
+[![Zero-Bloat](https://img.shields.io/badge/PyTorch%20Weights-0%20GB%20(Lightweight%20Hybrid)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf)
+
+---
 
 ## 1. Overview
 
-The `audiobook_factory.extraction` package converts raw literary documents, research papers, and technical whitepapers (`.epub`, `.pdf`, `.txt`, `.md`) into a canonical AST representation (`CanonicalBook`) with zero loss of raw textual fidelity, character-accurate provenance, fail-closed quality gate auditing, and native support for complex Markdown tables and LaTeX mathematical formulas.
+The [`audiobook_factory.extraction`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction) subsystem converts raw literary books, academic research papers (arXiv), and technical whitepapers (`.epub`, `.pdf`, `.txt`, `.md`) into a single source of truth: the [`CanonicalBook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py#L231) Abstract Syntax Tree (AST).
 
-## 2. Architecture
+It is engineered around four core invariants:
+1. **Sacred Raw Text Invariant**: `raw_text` preserves the exact, unmutated source text including formatting characters, while `normalized_text` provides speech-ready clean text for downstream TTS.
+2. **Forensic Provenance Tracking**: Every structural block is tagged with a [`SourceProvenance`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py#L58) record detailing source file path, line numbers, character offsets, PDF pages/columns, and EPUB spine anchors.
+3. **Zero-Bloat Lightweight Architecture**: Eliminates 15GB–20GB local PyTorch/CUDA weights (MinerU, Docling) in favor of high-performance CPU regex/XY-cut parsing combined with selective multimodal cloud vision escalation.
+4. **Native Technical Structure Support**: Full first-class classification for Markdown tables, LaTeX equations, academic abstracts, and alert callouts, bridging seamlessly into the downstream [Podcast Subsystem](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/README.md).
 
-```
+---
+
+## 2. Architecture & File Layout
+
+```text
 audiobook_factory/extraction/
 ├── __init__.py           # Clean public API exports
-├── contracts.py          # Strongly typed Pydantic v2 AST schemas
-├── engine.py             # ExtractionEngine coordinator & process_book_file
+├── contracts.py          # Strongly typed Pydantic v2 AST schemas (CanonicalBook, CanonicalBlock)
+├── engine.py             # ExtractionEngine coordinator & process_book_file adapter
 ├── normalizer.py         # TextNormalizer (Unicode spaces, HTML decoding, bracket protection)
 ├── segmenter.py          # ChapterSegmenter (regex rules, 2-line title assembler, meso-tier splitting)
 ├── quality_gate.py       # Gate 0.1 ExtractionQualityAuditor (fail-closed on REVIEW)
+├── cli.py                # Standalone extraction CLI (extract, inspect, audit)
 └── parsers/              # Dedicated format parsers
     ├── __init__.py
-    ├── epub.py           # ForensicEPUBParser (EPUB 3 nav landmarks & node-level anchor isolation)
-    ├── text.py           # PlainTextParser & MarkdownParser (line offset tracking, tables, LaTeX math)
+    ├── epub.py           # ForensicEPUBParser (EPUB 3 nav landmarks & DOM anchor isolation)
+    ├── text.py           # PlainTextParser & MarkdownParser (tables, equations, callouts)
     └── pdf/              # Forensic PDF subsystem
         ├── __init__.py
-        ├── forensic_engine.py
+        ├── forensic_engine.py       # Multi-pass PDF coordinator & text extraction
         ├── layout_reconstructor.py  # Geometric XY-cut multi-column reading order
-        ├── quality_analyzer.py      # Multi-signal quality scoring & math symbol whitelisting
-        ├── vision_extractor.py      # Gemini Multimodal Vision SOTA extractor
-        └── models.py
+        ├── quality_analyzer.py      # PDFQualityAnalyzer (math symbol whitelisting & anomaly scoring)
+        ├── vision_extractor.py      # GeminiVisionPDFExtractor (multimodal SOTA fallback)
+        └── models.py                # PDF quality audit data models
 ```
 
-## 3. Data Contracts (AST)
+---
 
-- **`CanonicalBook`**: Top-level single source of truth containing metadata, quality report, and ordered chapters. Provides `save_canonical()`, `load_canonical()`, `project_legacy_extracted()`, and `to_legacy_metadata()`.
-- **`CanonicalChapter`**: Ordered collection of `CanonicalBlock` units. Distinguishes authentic `literary_chapter` from artificial `production_chunk`.
-- **`CanonicalBlock`**: Atomic structural unit with sacred `raw_text`, speech-ready `normalized_text`, forensic `SourceProvenance`, and `semantic_metadata`.
-  - **`BlockType`**: `"paragraph" | "heading" | "scene_break" | "dialogue" | "verse" | "quote" | "raw" | "table" | "equation" | "abstract" | "callout"`
-  - **`table`**: Structured Markdown table with row/column counts and table headers (`| Col 1 | Col 2 |`).
-  - **`equation`**: Display or inline LaTeX formulas (`$$\mathcal{L} = \sum ...$$`, `$E=mc^2$`).
-  - **`abstract`**: Academic / whitepaper abstract and executive summaries.
-  - **`callout`**: Research takeaways, tips, or warning sidebars (`> [!NOTE]`).
-- **`SourceProvenance`**: Forensic coordinates tracing text back to source file, line numbers, character offsets, PDF page/columns, or EPUB spine items.
-- **`ExtractionQualityReport`**: Quantitative metrics, confidence score, warnings, suspicious pages, and Gate 0.1 status.
+## 3. Data Contracts & Typed AST Blocks
 
-## 4. 3-Tier Zero-Bloat Hybrid Extraction Architecture
+All AST components are modeled in [`audiobook_factory/extraction/contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py) using **Pydantic v2**:
 
-Rather than requiring 15GB–20GB of local PyTorch/CUDA weights (like MinerU or Docling), the extraction engine uses a lightweight, cloud-accelerated 3-Tier hybrid design:
+### 3.1 `BlockType` Hierarchy
+
+The [`BlockType`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py#L18-L32) taxonomy distinguishes standard literary prose from rich technical and academic elements:
+
+```python
+BlockType = Literal[
+    "paragraph",    # Standard body narrative prose
+    "heading",      # Chapter, section, or subsection title
+    "dialogue",     # Spoken character dialogue
+    "scene_break",  # Visual scene dividers (* * *, ---)
+    "quote",        # Epigraph or blockquote
+    "poetry",       # Verse or rhythmic stanza
+    "list",         # Bulleted or numbered item list
+    "note",         # Footnote or bibliographic reference
+    "table",        # Structured Markdown table
+    "equation",     # LaTeX display or inline equation
+    "abstract",     # Academic paper abstract or executive summary
+    "callout",      # GitHub-style alert box (> [!NOTE], etc.)
+    "unknown",      # Ambiguous unclassified block
+]
+```
+
+### 3.2 Technical AST Blocks Specification
+
+| Block Type | Source Syntax Detected | Populated `semantic_metadata` | Downstream Verbalization Behavior |
+|---|---|---|---|
+| **`table`** | Markdown tables: `\| Col 1 \| Col 2 \|` with separator row `\|:---\|:---\|` | `table_rows: int`<br/>`table_cols: int`<br/>`headers: List[str]` | Routed to [`TableVerbalizer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/verbalizer.py#L188); converts rows and columns into auditory insights and benchmark comparisons. |
+| **`equation`** | Display math `$$\mathcal{L} = ...$$` or standalone equations | `latex: str`<br/>`display: bool` | Routed to [`MathVerbalizer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/verbalizer.py#L13); converts Greek letters, vector norms, and integrals into natural spoken English math. |
+| **`abstract`** | `**Abstract**: ...` or `> Abstract: ...` blocks | `is_abstract: bool` | Routed to [`AbstractCalloutVerbalizer.verbalize_abstract()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/verbalizer.py#L269); generates an engaging podcast introduction hook. |
+| **`callout`** | GitHub-style alert boxes: `> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, etc. | `callout_type: str` (`NOTE`, `TIP`, `WARNING`) | Routed to [`AbstractCalloutVerbalizer.verbalize_callout()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/verbalizer.py#L279); creates emphasis takeaways. |
+
+### 3.3 Core Contract Models
+
+- **[`CanonicalBook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py#L231)**: Top-level document container holding `book_id`, `title`, `author`, `chapters`, `quality_report`, and `provenance_summary`. Exposes `save_canonical()` and `load_canonical()`.
+- **[`CanonicalChapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py#L96)**: Unit representing an authentic literary chapter (`is_literary_chapter=True`) or an artificial production chunk (`is_production_chunk=True`).
+- **[`CanonicalBlock`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py#L80)**: Atomic structural block storing `id`, `type`, sacred `raw_text`, `normalized_text`, `provenance`, and `semantic_metadata`.
+- **[`SourceProvenance`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py#L58)**: Forensic coordinates (`source_file`, `source_type`, `page_number`, `column_index`, `line_start`, `line_end`, `char_offset`).
+
+---
+
+## 4. 3-Tier Zero-Bloat Hybrid PDF Extraction
+
+Rather than forcing users to download 15GB–20GB of heavyweight local PyTorch models, the PDF subsystem utilizes a high-efficiency 3-Tier hybrid design:
 
 ```mermaid
 flowchart TD
-    subgraph Input["Input Document"]
-        Doc["Literary Novel / Research Paper / Whitepaper (.pdf, .epub, .txt, .md)"]
+    subgraph Ingestion["Input PDF Document"]
+        PDF["Scientific Paper / Book PDF"]
     end
 
-    subgraph Tier1["Tier 1: Fast Local CPU Ingestion & Layout"]
-        T1["XY-Cut Multi-Column Reconstruction<br/>Regex Table & LaTeX Detectors<br/>Math Symbol Whitelist (∑, ∫, ∇, α, β)"]
+    subgraph Tier1["Tier 1: Fast Local Geometry & Heuristics"]
+        Engine["ForensicPDFEngine (pypdf)"] --> XYCut["PDFLayoutReconstructor<br/>(Geometric XY-Cut Multi-Column Slicing)"]
+        XYCut --> Analyzer["PDFQualityAnalyzer<br/>• Math Symbol Whitelist (∑, ∫, ∇, α, β)<br/>• Column Layout & Noise Anomaly Audit"]
     end
 
-    subgraph Tier2["Tier 2: Multimodal Vision Escalation (SOTA)"]
-        T2["Gemini Vision SOTA Prompting<br/>• Structured Markdown Tables<br/>• Standard LaTeX ($...$, $$...$$)<br/>• Abstract & Section Extraction"]
+    subgraph Tier2["Tier 2: Selective Multimodal Vision Fallback"]
+        Analyzer -->|Anomaly Score > Threshold| Escalator["GeminiVisionPDFExtractor<br/>(Single-Page Memory PDF Extraction)"]
+        Escalator --> SOTA["Multimodal Markdown/LaTeX Transcription"]
     end
 
-    subgraph Tier3["Tier 3: Canonical AST & Verbalization"]
-        T3["CanonicalBook AST<br/>• BlockType: table, equation, abstract<br/>• Downstream Podcast Script Verbalization"]
+    subgraph Tier3["Tier 3: AST Assembly & Quality Gate"]
+        Analyzer -->|Clean Score| Assembly["CanonicalBook AST Assembler"]
+        SOTA --> Assembly
+        Assembly --> Gate["Gate 0.1 ExtractionQualityAuditor<br/>(Fail-Closed on REVIEW)"]
     end
 
-    Doc --> Tier1
-    Tier1 -->|Complex Layout / Low Density| Tier2
-    Tier1 -->|Clean Digital Prose| Tier3
+    PDF --> Engine
+    Tier1 --> Tier2
+    Tier1 --> Tier3
     Tier2 --> Tier3
 ```
 
-## 5. Usage
+---
 
-### Programmatic Ingestion
+## 5. Mathematical Symbol Whitelisting & Anomaly Detection
+
+In standard document extractors, mathematical formulas, Greek characters, and LaTeX backslashes are frequently misclassified as "OCR symbol noise" or "corrupted encoding", causing false-positive gate failures.
+
+The [`PDFQualityAnalyzer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf/quality_analyzer.py#L11) solves this via targeted **scientific symbol whitelisting**:
+
+```python
+# Whitelist in PDFQualityAnalyzer.evaluate_extraction_quality:
+symbols = len(
+    re.findall(
+        r"[^a-zA-Z0-9\s"
+        r"\u00C0-\u024F\u1E00-\u1EFF"          # Latin accented ranges
+        r"\u0900-\u097F"                      # Devanagari script (Hindi)
+        r"\u0370-\u03FF"                      # Greek and Coptic alphabet (α, β, γ, θ, ω, ...)
+        r"\u2200-\u22FF"                      # Mathematical Operators (∀, ∃, ∈, ∑, ∏, ∫, ∇, ...)
+        r"\u2A00-\u2AFF"                      # Supplemental Mathematical Operators
+        r"\u2190-\u21FF"                      # Arrows (←, →, ↔, ⇒, ...)
+        r"\u2070-\u209F"                      # Superscripts and Subscripts (⁰, ¹, ², ³, ⁿ, ᵢ, ⱼ, ...)
+        r"\.,'\"‘’“”\?\!\-\—\–\:\;\(\)\[\]…\/" # Punctuation & Brackets
+        r"\$\\\{\}\_\^\*\+\=\<\>\|\%~"        # LaTeX Syntax: $, \, {, }, _, ^, *, +, =, <, >, |, %, ~
+        r"]",
+        cleaned,
+    )
+)
+```
+
+### Heuristic Scoring Criteria
+- **Noise Ratio**: Only true non-lexical corruption characters (such as Unicode replacement `\ufffd`, random binary control codes, and broken unmapped font glyphs) increment the OCR noise counter.
+- **Gibberish Token Detection**: Evaluates corrupted alphanumeric tokens (e.g. `th3r3`, `1lI0O`) while ignoring legitimate mathematical expressions.
+- **LLM Refusal & Preamble Detection**: Detects conversational leakage (`"As an AI..."`, `"Here is the extracted text:"`) and cleanly strips preambles without corrupting literary text.
+
+---
+
+## 6. Multimodal Vision Fallback (`GeminiVisionPDFExtractor`)
+
+When a complex PDF page exhibits severe column overlap, multi-column equations, or unextractable vector fonts, [`GeminiVisionPDFExtractor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf/vision_extractor.py#L19) selectively escalates the single page:
+
+### 1. Minimal Token Memory Slice
+Rather than uploading entire books to the API, the extractor extracts solely the affected page using an in-memory `pypdf.PdfWriter` buffer (`io.BytesIO`), transmitting only the single-page bytes.
+
+### 2. SOTA Technical Transcription Prompt
+The multimodal extractor executes against Google Gemini Flash with strict structured transcription directives:
+
+```text
+Extract all text from this document page in strict, clean Markdown reading order.
+- Tables: Transcribe all tables into clean, structured Markdown table syntax with headers (| Col 1 | Col 2 |).
+- Mathematics: Transcribe all mathematical formulas, variables, and expressions into standard LaTeX syntax ($...$ for inline math, $$...$$ for display equations).
+- Structure: Preserve section headers (#, ##, ###), bullet lists, and figure/table captions.
+- Cleanliness: Strip running headers and page numbers. Do not summarize or omit text.
+```
+
+### 3. Universal Permissive Safety Settings
+Configured with universal `BLOCK_NONE` developer safety thresholds to prevent false-positive content moderation truncation during technical or historical literature processing.
+
+---
+
+## 7. Downstream Bridge into Podcast Subsystem
+
+The structured AST generated by the extraction subsystem feeds directly into the downstream [Podcast Subsystem](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/README.md):
+
+```text
+CanonicalBook AST
+   │
+   ├── CanonicalBlock (type="abstract") ──► AbstractCalloutVerbalizer.verbalize_abstract()
+   │                                              └── Spoken intro hook (Host A)
+   │
+   ├── CanonicalBlock (type="equation") ──► MathVerbalizer.verbalize_latex()
+   │                                              ├── Exact spoken math (Host A)
+   │                                              └── Intuition reaction (Host B)
+   │
+   ├── CanonicalBlock (type="table")    ──► TableVerbalizer.verbalize_table()
+   │                                              └── Comparative benchmark dialogue (Host B)
+   │
+   ├── CanonicalBlock (type="callout")  ──► AbstractCalloutVerbalizer.verbalize_callout()
+   │                                              └── Spoken takeaway transition (Host B)
+   │
+   └── CanonicalBlock (type="paragraph")──► MathVerbalizer.verbalize_inline_math()
+                                                  └── Alternating conversational turns ($...$ parsed)
+```
+
+---
+
+## 8. Usage & Code Examples
+
+### 8.1 Ingesting a Research Paper into Canonical AST
 
 ```python
 from pathlib import Path
-from audiobook_factory.extraction import ExtractionEngine, process_book_file
+from audiobook_factory.extraction import ExtractionEngine
 
-# Method 1: Using ExtractionEngine to get CanonicalBook AST
+# Extract paper or whitepaper into Canonical AST
 book = ExtractionEngine.extract(
-    input_file=Path("research_paper.pdf"),
-    output_base_dir=Path("projects"),
+    input_file=Path("papers/transformer_attention.pdf"),
+    output_base_dir=Path("audiobooks/projects"),
     force_gate=False,
 )
-print(f"Extracted {len(book.chapters)} chapters/sections, {book.quality_report.total_words} words.")
 
-# Inspect structured blocks (tables & equations)
-for block in book.chapters[0].blocks:
-    if block.type == "table":
-        print(f"Table ({block.semantic_metadata.get('table_rows')} rows): {block.raw_text[:60]}...")
-    elif block.type == "equation":
-        print(f"LaTeX Equation: {block.semantic_metadata.get('latex')}")
+print(f"Title: {book.title}")
+print(f"Word count: {book.quality_report.total_words}")
+print(f"Gate 0.1 Status: {book.quality_report.gate_status}")
 
-# Method 2: Backward-compatible metadata dictionary
-metadata = process_book_file(
-    input_file=Path("novel.epub"),
-    output_base_dir=Path("projects"),
-)
+# Iterate over structured blocks
+for chapter in book.chapters:
+    print(f"\n--- {chapter.title} ---")
+    for block in chapter.blocks:
+        if block.type == "table":
+            print(f"[TABLE] {block.semantic_metadata.get('table_rows')} rows: {block.raw_text[:40]}...")
+        elif block.type == "equation":
+            print(f"[EQUATION] LaTeX: {block.semantic_metadata.get('latex')}")
+        elif block.type == "abstract":
+            print(f"[ABSTRACT] {block.normalized_text[:80]}...")
 ```
 
-### Direct Parser Access
+### 8.2 Command-Line Extraction
 
-```python
-from pathlib import Path
-from audiobook_factory.extraction.parsers.epub import ForensicEPUBParser
-from audiobook_factory.extraction.parsers.text import PlainTextParser, MarkdownParser
-from audiobook_factory.extraction.parsers.pdf import ForensicPDFEngine
+```bash
+# Ingest PDF paper and output canonical book.json
+audiobook-studio extract "papers/attention.pdf"
 
-# EPUB parsing
-epub_parser = ForensicEPUBParser(Path("book.epub"))
-book, legacy_items = epub_parser.parse()
-
-# Markdown research paper parsing
-md_parser = MarkdownParser(Path("whitepaper.md"))
-book = md_parser.parse()
+# Bypass gate failure if processing low-word count sample
+audiobook-studio extract "test_paper.pdf" --force-gate
 ```
 
-## 6. Quality Gates (Gate 0.1)
+---
 
-Extraction enforces Gate 0.1 fail-closed protection via `ExtractionQualityAuditor`. Documents with $<50$ words, 0 chapters, or $>25\%$ layout/OCR anomalies trigger an `ExtractionGateAuditError` unless bypassed with `force_gate=True`. Mathematical and Greek symbols are whitelisted to eliminate false-positive symbol noise halts on technical papers.
+## 9. Quality Gate 0.1 (`ExtractionQualityAuditor`)
+
+All extractions are validated against **Gate 0.1** in [`quality_gate.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/quality_gate.py):
+- **Word Count Threshold**: Fails if total extracted word count $< 50$ words.
+- **Chapter Monotonicity**: Fails if 0 chapters or sections are identified.
+- **Anomaly Ceiling**: Fails if layout anomaly ratio $> 25\%$ across pages.
+- **Fail-Closed Protection**: Raises `ExtractionGateAuditError` on status `REVIEW` to halt broken text from consuming downstream TTS compute, unless explicitly overridden with `--force-gate`.
