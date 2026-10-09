@@ -27,6 +27,7 @@ python audiobook_cli.py [COMMAND] [OPTIONS]
 | **[`package`](#8-m4b-container-packaging-package)** | Delivery | Packages all mastered chapters into a chapterized `.m4b` container with cover art. |
 | **[`audit`](#9-chapter-quality-audit-audit)** | QA (Chapter) | Runs Multi-Gate Independent Verification (Gates 0, 1, 2, 2.5, 2.8) on a specific chapter. |
 | **[`audit-book`](#10-full-book-macro-audit-audit-book)** | QA (Macro) | Runs Macro-Tier Gate 6 certification (Voice Continuity, Loudness, TOC Monotonicity). |
+| **[`keys`](#11-key-inventory--fleet-monitor-keys)** | Control Plane | Inspects key fleet status, active leases, audit logs, and resets quotas. |
 
 ---
 
@@ -156,6 +157,95 @@ Executes Macro-Tier Gate 6 certification across the entire novel project.
 
 ```bash
 python audiobook_cli.py audit-book <PROJECT_DIR_OR_SLUG>
+```
+
+---
+
+## 11. Key Inventory & Fleet Monitor (`keys`)
+
+Inspects and manages the ACID SQLite API key inventory, active multi-user concurrency leases, tamper-evident audit logs, and provider quota states.
+
+```bash
+python audiobook_cli.py keys [ACTION] [OPTIONS]
+```
+
+### Positional Action Arguments
+- `ACTION`: Optional action choice: `status`, `audit`, or `reset` (default: `status`).
+
+### Options
+| Flag | Type | Default | Description |
+|---|:---:|:---:|---|
+| `--provider` | String | `gemini` | Target provider filter (`gemini`, `cerebras`, `groq`, `openai`, `openrouter`). |
+| `--limit` | Integer | `25` | Number of recent audit log events to display (used with `audit`). |
+
+---
+
+### Subcommands & Usage
+
+#### A. Fleet Telemetry & Quota Status (`keys status`)
+Displays live inventory health, daily quota consumption breakdown, active leases, and circuit breaker status.
+
+```bash
+python audiobook_cli.py keys status --provider gemini
+```
+
+**Output Telemetry Structure:**
+```text
+======================================================================
+  AUDIOBOOK FACTORY - KEY INVENTORY & FLEET STATUS (GEMINI)
+======================================================================
+  Date (Quota Period)   : 2026-10-09
+  Total Registered Keys : 124
+  Active Healthy Keys   : 118
+  Exhausted Today       : 4
+  Temporary Backoff     : 2
+  In-Flight Leases      : 1
+----------------------------------------------------------------------
+
+  ACTIVE LEASES (IN-FLIGHT CONCURRENCY):
+  LEASE ID             ALIAS        USER           WORKLOAD   EXPIRES
+  ------------------------------------------------------------------
+  e8f20b31-4c12-...    key_a8f2     naksh-07       tts        2026-10-09T00:32:15
+
+  KEY INVENTORY DETAILS:
+  ALIAS          STATUS           CALLS TODAY    LAST USED
+  ------------------------------------------------------------------
+  key_a8f2       ACTIVE           14 ok / 0 fail 2026-10-09T00:31:15
+  key_b4c9       EXHAUSTED_TODAY  10 ok / 1 fail 2026-10-09T00:28:40
+  key_c1d7       TEMP_BACKOFF     5 ok / 1 fail  2026-10-09T00:30:02
+======================================================================
+```
+
+#### B. Audit Log Inspection (`keys audit`)
+Inspects recent tamper-evident lease acquisition, release, and revocation events. Plaintext keys are never logged; only deterministic aliases (`key_XXXX`) and calling PIDs are exposed.
+
+```bash
+python audiobook_cli.py keys audit --limit 50
+```
+
+**Output Log Structure:**
+```text
+======================================================================
+  AUDIOBOOK FACTORY - KEY LEASE AUDIT LOG (LAST 25 EVENTS)
+======================================================================
+  TIMESTAMP           EVENT    ALIAS        USER           MODEL
+  ------------------------------------------------------------------
+  2026-10-09 00:31:15 RELEASE  key_a8f2     naksh-07       gemini-3.8-flash-tts
+  2026-10-09 00:30:52 ACQUIRE  key_a8f2     naksh-07       gemini-3.8-flash-tts
+  2026-10-09 00:28:40 REVOKE   key_b4c9     naksh-07       gemini-3.8-flash-tts
+======================================================================
+```
+
+#### C. Emergency Pool Reset (`keys reset`)
+Performs an administrative reset of all keys and per-model quota ledgers in `audiobooks/keys_inventory.db` back to `ACTIVE` state. Use after midnight rollover, manual quota increase, or test runs.
+
+```bash
+python audiobook_cli.py keys reset
+```
+
+**Output:**
+```text
+[+] Success: All keys and model quota ledgers reset to ACTIVE state for today.
 ```
 
 ---

@@ -4,6 +4,13 @@
 <!-- LINE_BUDGET_HARD_CAP: 50 LINES -->
 # Active Context: Audiobook Studio Antigravity Plugin & Studio Engine (v5.2)
 
+## Current Focus: Model & Keys Manager (100% Complete, Audited & Documented)
+- **Active Branch**: `model-and-keys-manager` (branched fresh from latest `main`).
+- **Phases 1-5 (P0-P2)**: 70/70 tests PASS (0 failures, 0 errors).
+- **Hardening & Audits**: Architect, Security, and Detective adversarial audits 100% resolved.
+- **Documentation Sync**: ARCHITECTURE.md, API_REFERENCE.md, CLI_REFERENCE.md, README.md, and Obsidian report fully updated with Option C facade, 5 modules, and 7 Iron Shields.
+
+
 ## Milestone: Flagship LLM Intelligence & Resilient Directing (v5.2)
 - **Status**: 100% IMPLEMENTED & VERIFIED.
 - **Model Intelligence Floors**: Elevated `TRANSLATION`, `SCREENPLAY`, and `DRAMATURGY` to `ModelTier.TIER_1_FLAGSHIP` (`gemini-3.8-flash` / `3.7-flash`). Banished latency-first sorting for creative text; blacklisted flat models (`3.5-flash`, `lite`).

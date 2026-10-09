@@ -28,7 +28,8 @@ Audiobook Studio operates both as:
 Background music (BGM), sound effects (SFX), 5-track stem mixdowns, and external sound scraping are **permanently decoupled and archived** in `archive/cinematic_audio/`.
 
 Rather than masking spoken dialogue with noisy background beds or suffering from broken external sound downloaders, this engine channels 100% of its compute into:
-- **Google Gemini Flash TTS** with token-bucket rotating key pools.
+- **Model & Keys Manager Control Plane** ([`KeyLeaseManager`](docs/ARCHITECTURE.md#1-keyleasemanager-acid-inventory--atomic-leases), [`AntiBanGuard`](docs/ARCHITECTURE.md#2-antibanguard-the-7-iron-shields)): ACID SQLite key inventory, atomic single-request mutual exclusion, dead PID crash recovery, and The 7 Iron Shields anti-ban protection (11.0 RPM token bucket, session affinity, 18-32s anti-correlation key-switch delay, stealth SDK headers, emergency global tripwire).
+- **Google Gemini Flash TTS** with token-bucket rotating key pools and daily quota tracking (10 RPD per key on `gemini-3.8-flash-tts`).
 - **4D Acoustic Formant Modulation** (Pitch $\pm 4-12\%$, tempo, and 4D parametric EQ curves) eliminating vocal convergence.
 - **Stanislavski Directing Anchors** and temperature clamping (`0.30 - 0.52`) to prevent histrionic screeching.
 - **Broadcast EBU R128 Vocal Mastering** (-19.0 LUFS, -1.5 dBTP) with Hann micro-fades.
@@ -74,6 +75,13 @@ flowchart TD
     Room3 --> Room4
     Room4 --> Room5
 ```
+
+### 🎛️ Underlying Control Plane: Model & Keys Manager (Option C Architecture)
+All 5 production rooms interface with LLMs and speech models exclusively through [`ModelGateway`](docs/ARCHITECTURE.md#5-modelgateway-unified-production-facade), backed by:
+- **[`KeyLeaseManager`](docs/ARCHITECTURE.md#1-keyleasemanager-acid-inventory--atomic-leases)**: ACID SQLite inventory (`audiobooks/keys_inventory.db`), atomic leases, dead PID crash recovery, and "one user = one key per workload" concurrency limits.
+- **[`AntiBanGuard`](docs/ARCHITECTURE.md#2-antibanguard-the-7-iron-shields)** (The 7 Iron Shields): 11.0 RPM token bucket rate limiting, session affinity sticky binding, 18–32s random anti-correlation key-switch delay, human cadence pacing, stealth SDK headers, and emergency global tripwire.
+- **[`ModelRegistry`](docs/ARCHITECTURE.md#3-modelregistry-canonical-model-catalog)**: Canonical catalog of 50+ models, context budgets, rate limits, quality tiers (`flagship`, `balanced`, `utility`, `audio`, `local`), and modality profiles.
+- **[`RequestRouter`](docs/ARCHITECTURE.md#4-requestrouter-intelligent-router--fallback)**: Task- and capability-based matching, per-model circuit breakers (`CLOSED` / `OPEN` / `HALF_OPEN`), and automated fallback ladders.
 
 ---
 
@@ -157,11 +165,20 @@ pip install -e .
 ### 2. Configure Credentials
 Create a `.env` file in the root directory:
 ```env
-# Primary API key or comma-separated pool
+# Single primary API key:
 GEMINI_API_KEY=your_gemini_api_key_here
-# Optional multiple keys for rotating pool:
-# GEMINI_API_KEYS=key1,key2,key3
+
+# Or rotating key pool (recommended for full-length books):
+GEMINI_API_KEYS=key1,key2,key3,key4
+
+# Optional fallback and acceleration providers:
+# CEREBRAS_API_KEY=...
+# GROQ_API_KEY=...
+# OPENAI_API_KEY=...
 ```
+> [!TIP]
+> The engine automatically ingests keys from `.env` into SQLite (`audiobooks/keys_inventory.db`).
+> All production rooms lease keys dynamically with 0% double-allocations, automatic Pacific Time midnight rollover, and The 7 Iron Shields anti-ban protection.
 
 ### 3. Install into Google Antigravity
 To install as a local Antigravity plugin:
@@ -183,6 +200,9 @@ Run autonomous end-to-end production with a single command or execute granular s
 ```bash
 # 1-Click Autonomous End-to-End Production:
 audiobook-studio auto "path/to/novel.epub" --hindi --dramatized --voice Aoede --workers 3
+
+# Inspect fleet key inventory and active leases:
+audiobook-studio keys status
 
 # Or step-by-step modular pipeline:
 audiobook-studio extract "path/to/novel.epub"
@@ -207,6 +227,7 @@ audiobook-studio package <book_slug> --cover "cover.jpg"
 | **`package`** | Delivery | Packages all mastered chapters into a chapterized `.m4b` container with cover art. |
 | **`audit`** | QA (Chapter) | Runs Multi-Gate Independent Verification (Gates 0, 1, 2, 2.5, 2.8) on a specific chapter. |
 | **`audit-book`** | QA (Macro) | Runs Macro-Tier Gate 6 certification (Voice Continuity, Loudness, TOC Monotonicity). |
+| **`keys`** | Control Plane | Inspects key fleet status, active leases, audit logs, and resets quotas. |
 
 ---
 
@@ -233,6 +254,8 @@ All quality gates are fail-closed:
 
 For exhaustive technical guides, visit the [`docs/`](docs/) directory:
 - [🏛️ Architecture Blueprint](docs/ARCHITECTURE.md)
+- [📚 API Reference Manual](docs/API_REFERENCE.md)
+- [💻 CLI Reference Manual](docs/CLI_REFERENCE.md)
 - [🎛️ Audio Engineering & Mastering](docs/AUDIO_ENGINEERING.md)
 - [🎙️ Gemini Flash TTS Synthesis & Directing](docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
 - [🎭 Voice Casting Director Guide](docs/VOICE_CASTING_DIRECTOR_GUIDE.md)
@@ -240,7 +263,6 @@ For exhaustive technical guides, visit the [`docs/`](docs/) directory:
 - [🧠 Literary Translation Intelligence](docs/LITERARY_TRANSLATION_INTELLIGENCE.md)
 - [🎭 Dramatic Adaptation & Screenplay](docs/DRAMATIC_ADAPTATION_AND_SCREENPLAY.md)
 - [✂️ Dialogue Editorial Layer](docs/DIALOGUE_EDITORIAL_LAYER.md)
-- [💻 CLI Reference Manual](docs/CLI_REFERENCE.md)
 - [🛡️ Quality Gates Specifications](docs/QUALITY_GATES.md)
 
 ---

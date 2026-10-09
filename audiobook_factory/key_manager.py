@@ -639,3 +639,25 @@ def get_persistent_key_pool() -> PersistentKeyPool:
             if _pool_instance is None:
                 _pool_instance = PersistentKeyPool()
     return _pool_instance
+
+
+# Re-exports for Pillar 3.4 ACID Lease Manager
+from audiobook_factory.core.models.lease_manager import (
+    KeyLeaseManager,
+    KeyLease,
+    CallerIdentity,
+    get_key_lease_manager,
+)
+
+__all__ = [
+    "PersistentKeyPool",
+    "get_persistent_key_pool",
+    "AllKeysExhaustedTodayError",
+    "classify_gemini_error",
+    "DEFAULT_DB_PATH",
+    "KeyLeaseManager",
+    "KeyLease",
+    "CallerIdentity",
+    "get_key_lease_manager",
+]
+

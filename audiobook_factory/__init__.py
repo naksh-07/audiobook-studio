@@ -39,124 +39,127 @@ for _sub in ("real_audio", "sound_design"):
     if _sub_path.is_dir() and str(_sub_path) not in __path__:
         __path__.append(str(_sub_path))
 
-from .extractor import (
-    process_book_file,
-    extract_chapters,
-    extract_epub,
-    clean_book_text,
-    split_large_chapter_on_semantic_boundary,
-)
-from .book_model import (
-    CanonicalBook,
-    CanonicalChapter,
-    CanonicalBlock,
-    SourceProvenance,
-    ExtractionQualityReport,
-    ExtractionGateAuditError,
-)
-from .translator import (
-    translate_book_project,
-    normalize_translated_lexicon,
-)
-from .script_builder import (
-    generate_project_scripts,
-    build_dramatized_script_llm,
-    build_narrator_script,
-)
-from .tts_dispatcher import TTSDispatcher, UnregisteredSpeakerError, probe_key_health
-from .soundscape import (
-    detect_chapter_mood,
-    resolve_ambient_score,
-    generate_chapter_soundscape_plan,
-    render_chapter_soundscape,
-    generate_project_soundscapes,
-    apply_dynamic_sidechain_ducking,
-    render_multitrack_chapter_audio,
-    get_sound_bank,
-    attenuate_foley_whisper_collisions,
-)
-from .mastering import concatenate_and_master_chapter
-from .packager import package_m4b_audiobook
-from .sound_bank import SoundBank
-from .logger import logger
-from .state import ProjectStateLedger
-from .orchestrator import PipelineOrchestrator
-from .contracts import (
-    ProjectConfig,
-    CharacterProfile,
-    CharacterRoster,
-    SceneSource,
-    MusicCue,
-    FoleyCue,
-    AmbienceScene,
-    MasteringConfig,
-    CreativeManifest,
-    ManifestValidationError,
-    BookPackagingSpecs,
-    BookChapterMarker,
-    BookTableOfContents,
-    BookVoiceRoster,
-    GlobalLoreBible,
-    BookMasterManifest,
-    MasteringSettings,
-)
-from .cinema_audio_engine import (
-    render_discrete_stems,
-    CinemaAudioManifest,
-    StemMetadata,
-    StemLedger,
-)
-from .mastering_contracts import (
-    MasteringProfile,
-    MasteringAnalysisFacts,
-    MasteringQCResult,
-    MasteringRequest,
-    MasteringResult,
-    MasteringLedger,
-    MasteringIssueSeverity,
-    MasteringIssue,
-    MasteringActionPlan,
-    DialogueProtectionReport,
-    BookMasterProfile,
-    DimensionDeviation,
-    ChapterConsistencyAudit,
-    BookConsistencyReport,
-)
-from .mastering_analyzer import MasteringAnalyzer
-from .mastering_qc import MasteringQCAgent
-from .mastering_engine import MasteringEngineV2
-from .mastering_judge import MasteringJudge
-from .dialogue_protection import DialogueProtectionAgent
-from .book_master_profile import BookMasterProfileBuilder
-from .chapter_consistency import ChapterConsistencyAuditor, BookConsistencyReportBuilder
-from .golden_mastering_suite import GoldenMasteringSuite
-from .perceptual_critic import PerceptualCritic
-from .reference_mastering import ReferenceMasteringAuditor, CANONICAL_REFERENCE_PROFILES
-from .scene_aware_engine import SceneAwareDecisionEngine
-from .mastering_certification import MasteringCertifier
-from .gate_auditor import (
-    AuditResult,
-    GateAuditError,
-    audit_chapter_gates,
-    audit_gate0_translation,
-    audit_gate1_roster,
-    audit_gate2_script,
-    audit_gate3_5_acoustic_feasibility,
-    audit_gate5_master,
-    audit_gate5_2_spectral_masking,
-    audit_gate5_3_stereo_phase,
-    audit_gate6a_voice_continuity,
-    audit_gate6b_loudness_continuity,
-    audit_gate6c_toc_integrity,
-    audit_gate6c_toc_monotonicity,
-    audit_gate6d_packaging_specs,
-    audit_book_master,
-)
-from .dialogue_editing import (
-    DialogueEditor,
-    DialogueEditPlan,
-    DialogueEditorialConfig,
-    DialogueQCReport,
-)
+try:
+    from .extractor import (
+        process_book_file,
+        extract_chapters,
+        extract_epub,
+        clean_book_text,
+        split_large_chapter_on_semantic_boundary,
+    )
+    from .book_model import (
+        CanonicalBook,
+        CanonicalChapter,
+        CanonicalBlock,
+        SourceProvenance,
+        ExtractionQualityReport,
+        ExtractionGateAuditError,
+    )
+    from .translator import (
+        translate_book_project,
+        normalize_translated_lexicon,
+    )
+    from .script_builder import (
+        generate_project_scripts,
+        build_dramatized_script_llm,
+        build_narrator_script,
+    )
+    from .tts_dispatcher import TTSDispatcher, UnregisteredSpeakerError, probe_key_health
+    from .soundscape import (
+        detect_chapter_mood,
+        resolve_ambient_score,
+        generate_chapter_soundscape_plan,
+        render_chapter_soundscape,
+        generate_project_soundscapes,
+        apply_dynamic_sidechain_ducking,
+        render_multitrack_chapter_audio,
+        get_sound_bank,
+        attenuate_foley_whisper_collisions,
+    )
+    from .mastering import concatenate_and_master_chapter
+    from .packager import package_m4b_audiobook
+    from .sound_bank import SoundBank
+    from .logger import logger
+    from .state import ProjectStateLedger
+    from .orchestrator import PipelineOrchestrator
+    from .contracts import (
+        ProjectConfig,
+        CharacterProfile,
+        CharacterRoster,
+        SceneSource,
+        MusicCue,
+        FoleyCue,
+        AmbienceScene,
+        MasteringConfig,
+        CreativeManifest,
+        ManifestValidationError,
+        BookPackagingSpecs,
+        BookChapterMarker,
+        BookTableOfContents,
+        BookVoiceRoster,
+        GlobalLoreBible,
+        BookMasterManifest,
+        MasteringSettings,
+    )
+    from .cinema_audio_engine import (
+        render_discrete_stems,
+        CinemaAudioManifest,
+        StemMetadata,
+        StemLedger,
+    )
+    from .mastering_contracts import (
+        MasteringProfile,
+        MasteringAnalysisFacts,
+        MasteringQCResult,
+        MasteringRequest,
+        MasteringResult,
+        MasteringLedger,
+        MasteringIssueSeverity,
+        MasteringIssue,
+        MasteringActionPlan,
+        DialogueProtectionReport,
+        BookMasterProfile,
+        DimensionDeviation,
+        ChapterConsistencyAudit,
+        BookConsistencyReport,
+    )
+    from .mastering_analyzer import MasteringAnalyzer
+    from .mastering_qc import MasteringQCAgent
+    from .mastering_engine import MasteringEngineV2
+    from .mastering_judge import MasteringJudge
+    from .dialogue_protection import DialogueProtectionAgent
+    from .book_master_profile import BookMasterProfileBuilder
+    from .chapter_consistency import ChapterConsistencyAuditor, BookConsistencyReportBuilder
+    from .golden_mastering_suite import GoldenMasteringSuite
+    from .perceptual_critic import PerceptualCritic
+    from .reference_mastering import ReferenceMasteringAuditor, CANONICAL_REFERENCE_PROFILES
+    from .scene_aware_engine import SceneAwareDecisionEngine
+    from .mastering_certification import MasteringCertifier
+    from .gate_auditor import (
+        AuditResult,
+        GateAuditError,
+        audit_chapter_gates,
+        audit_gate0_translation,
+        audit_gate1_roster,
+        audit_gate2_script,
+        audit_gate3_5_acoustic_feasibility,
+        audit_gate5_master,
+        audit_gate5_2_spectral_masking,
+        audit_gate5_3_stereo_phase,
+        audit_gate6a_voice_continuity,
+        audit_gate6b_loudness_continuity,
+        audit_gate6c_toc_integrity,
+        audit_gate6c_toc_monotonicity,
+        audit_gate6d_packaging_specs,
+        audit_book_master,
+    )
+    from .dialogue_editing import (
+        DialogueEditor,
+        DialogueEditPlan,
+        DialogueEditorialConfig,
+        DialogueQCReport,
+    )
+except (ImportError, ModuleNotFoundError):
+    pass
 
 __version__ = "4.0.0b1"

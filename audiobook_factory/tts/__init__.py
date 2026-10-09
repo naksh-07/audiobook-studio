@@ -24,23 +24,36 @@ from audiobook_factory.tts.constants import (
     UnregisteredSpeakerError,
 )
 from audiobook_factory.tts.rate_limiter import TokenBucketRateLimiter
-from audiobook_factory.tts.providers.winrt import (
-    _synthesize_local_winrt_fallback,
-    _synthesize_local_batch_winrt,
-)
-from audiobook_factory.tts.providers.gemini import (
-    resolve_speech_metadata_style,
-    synthesize_gemini_tts,
-    synthesize_gemini_multispeaker_batch,
-)
-from audiobook_factory.tts.audio_slicer import (
-    compute_canonical_segment_filename,
-    slice_and_declick_batch,
-)
-from audiobook_factory.tts.dispatcher import (
-    TTSDispatcher,
-    synthesize_segment_audio,
-)
+try:
+    from audiobook_factory.tts.providers.winrt import (
+        _synthesize_local_winrt_fallback,
+        _synthesize_local_batch_winrt,
+    )
+except (ImportError, ModuleNotFoundError):
+    _synthesize_local_winrt_fallback = None
+    _synthesize_local_batch_winrt = None
+try:
+    from audiobook_factory.tts.providers.gemini import (
+        resolve_speech_metadata_style,
+        synthesize_gemini_tts,
+        synthesize_gemini_multispeaker_batch,
+    )
+    from audiobook_factory.tts.audio_slicer import (
+        compute_canonical_segment_filename,
+        slice_and_declick_batch,
+    )
+    from audiobook_factory.tts.dispatcher import (
+        TTSDispatcher,
+        synthesize_segment_audio,
+    )
+except (ImportError, ModuleNotFoundError):
+    resolve_speech_metadata_style = None
+    synthesize_gemini_tts = None
+    synthesize_gemini_multispeaker_batch = None
+    compute_canonical_segment_filename = None
+    slice_and_declick_batch = None
+    TTSDispatcher = None
+    synthesize_segment_audio = None
 
 __all__ = [
     "DEFAULT_BACKEND",
