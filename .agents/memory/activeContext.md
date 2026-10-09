@@ -31,5 +31,6 @@
 - **Pillar 1 Standalone**: Package `audiobook_factory/extraction/` with contracts, engine, parsers (epub, text, pdf), normalizer, segmenter, and quality gate.
 - **Scientific & Podcast Ready (v5.4)**: Added structured Markdown tables, LaTeX equations ($E=mc^2$), abstracts, and callouts (`BlockType: table, equation, abstract, callout`). Whitelisted Greek/math symbols in `PDFQualityAnalyzer` (0 false OCR halts). Upgraded `GeminiVisionPDFExtractor` multimodal technical prompt.
 - **Phase 1 Benchmark Validated**: Ingested `benchmarks/sample_research_paper.md` with 100% AST typing (`table`, `equation`, `abstract`, `callout`), full LaTeX metadata, and Gate 0.1 PASS.
-- **Verification**: 64/64 tests passing green across all extraction and legacy facade suites (0 regressions).
+- **Phase 2 Technical Verbalization Bridge**: Implemented `audiobook_factory/podcast/` (`MathVerbalizer`, `TableVerbalizer`, `AbstractCalloutVerbalizer`, `PodcastScriptBuilder`) generating dual-host screenplay JSON with natural spoken math ($E=mc^2, \mathcal{L}$) and table insight verbalization.
+- **Verification**: 71/71 tests passing green across extraction, facade, and podcast test suites (0 regressions).
 
