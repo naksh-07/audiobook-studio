@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-**Audiobook Studio (v5.4)** is designed for autonomous agentic operation within Google Antigravity, Claude Desktop, and MCP-compatible orchestration environments. The **Antigravity Audio MCP Server** ([`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/mcp/server.py)) provides a standardized, strongly-typed JSON-RPC tool suite allowing autonomous LLM agents to execute studio vocal mastering, forensic quality control, neural speech polish, and reference spectrum matching.
+**Audiobook Studio (v5.4)** is designed for autonomous agentic operation within Google Antigravity, Claude Desktop, and MCP-compatible orchestration environments. The **Antigravity Audio MCP Server** ([`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py)) provides a standardized, strongly-typed JSON-RPC tool suite allowing autonomous LLM agents to execute studio vocal mastering, forensic quality control, neural speech polish, and reference spectrum matching.
 
 ---
 
@@ -56,16 +56,16 @@ sequenceDiagram
 
 ## 🛠️ Specialized Agent Skills
 
-The repository equips Antigravity autonomous agents with two specialized production skills located in [`.agents/skills/`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/.agents/skills/):
+The repository equips Antigravity autonomous agents with two specialized production skills located in [`.agents/skills/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/.agents/skills/):
 
 ### 1. `novel-audiobook-factory`
-- **Location**: [`.agents/skills/novel-audiobook-factory/SKILL.md`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/.agents/skills/novel-audiobook-factory/SKILL.md)
+- **Location**: [`.agents/skills/novel-audiobook-factory/SKILL.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/.agents/skills/novel-audiobook-factory/SKILL.md)
 - **Scope**: Autonomous studio-grade pure vocals-only audiobook production engine.
 - **Trigger**: Activates whenever the user provides a novel manuscript (`.epub`, `.pdf`, `.txt`, `.md`) and requests an audiobook.
 - **Workflow**: Coordinates geometric document extraction, literary Hindustani translation, sliding-window screenplay attribution, speech synthesis via Google Gemini Flash TTS, 4D acoustic formants, dialogue editorial snapping, and EBU R128 mastering.
 
 ### 2. `audio-engineer-ffmpeg`
-- **Location**: [`.agents/skills/audio-engineer-ffmpeg/SKILL.md`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/.agents/skills/audio-engineer-ffmpeg/SKILL.md)
+- **Location**: [`.agents/skills/audio-engineer-ffmpeg/SKILL.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/.agents/skills/audio-engineer-ffmpeg/SKILL.md)
 - **Scope**: Studio vocal audio engineering, 4D parametric EQ formants, and FFmpeg mastering.
 - **Capabilities**:
   - Broadcast EBU R128 loudness targeting (-19.0 LUFS integrated, -1.5 dBTP ceiling).
@@ -360,7 +360,7 @@ Or configured in your MCP client settings (e.g. `claude_desktop_config.json` or 
     "antigravity-audio": {
       "command": "python",
       "args": ["-m", "audiobook_factory.mcp.server"],
-      "cwd": "C:/Users/Suraj/Documents/Antigravity/audio_master"
+      "cwd": "c:/Users/Suraj/Documents/antigravity/optimistic-kepler"
     }
   }
 }

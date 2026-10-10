@@ -1,8 +1,8 @@
-# 🏛️ Architecture: Audiobook Studio (Option C Pure Vocals-Only Engine v5.2)
+# 🏛️ Architecture: Audiobook Studio (Option C Pure Vocals-Only Engine v5.4)
 
 ## Executive Overview
 
-**Audiobook Studio (Option C Pure Vocals-Only Engine v5.2)** is an autonomous, studio-grade vocal production framework and Google Antigravity Plugin engineered specifically for **broadcast-grade spoken audio across multiple deliverables**:
+**Audiobook Studio (Option C Pure Vocals-Only Engine v5.4)** is an autonomous, studio-grade vocal production framework and Google Antigravity Plugin engineered specifically for **broadcast-grade spoken audio across multiple deliverables**:
 1. **Audible-Standard Multi-Cast Audiobooks**: Pristine verbatim prose preservation, em-dash dialogue framing, transparent measured narration (temperature 0.32), and two-pass linear EBU R128 mastering at **-19.0 LUFS** / **-1.5 dBTP**.
 2. **Conversational 2-Host Narrative Podcasts**: High-retention audio-first shows featuring calibrated host dynamics (Sameer/Priya in Hindustani, Alex/Maya in English), organic breathability ($\le 22$ words per breath, 140ms pre-roll breath pauses), 5-part retention arcs, stereo spatial staging (-0.25 Left / +0.25 Right), and **-16.0 LUFS** broadcast podcast mastering.
 
@@ -279,7 +279,7 @@ Gate 2.9 stands as the authoritative, fail-closed verification boundary position
 ### Room 4: Studio TTS Platform Core & Dialogue Stem Realization (Option C)
 *Modules: [`audiobook_factory/tts/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/), [`audiobook_factory/character_caster.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/character_caster.py), [`docs/TTS_PLATFORM_CORE_SPECIFICATION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)*
 
-Room 4 implements the **Studio TTS Platform Core (Option C: Layered Shared Core with Specialized Pipeline Facades)**, 100% certified with **1,126 passing tests (100% green)** across all architectural tiers. It permanently decouples disparate caller patterns into three specialized high-level facades backed by a shared orchestration engine:
+Room 4 implements the **Studio TTS Platform Core (Option C: Layered Shared Core with Specialized Pipeline Facades)**, 100% certified with **1,183 passing tests (100% green across 1,191 test matrix)** across all architectural tiers. It permanently decouples disparate caller patterns into three specialized high-level facades backed by a shared orchestration engine:
 
 1. **Tier 1: Specialized Client Facades**:
    - **[`GenericTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/generic_client.py)**: Ad-hoc, low-latency ($<800\text{ms}$), single-utterance synthesis for CLI interactions (`audiobook-cli tts`), UI feedback, and voice auditions (`speak()`, `speak_to_bytes()`).
@@ -318,18 +318,57 @@ Room 4 implements the **Studio TTS Platform Core (Option C: Layered Shared Core 
 
 *For complete specification details, see [`docs/TTS_PLATFORM_CORE_SPECIFICATION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md).*
 
-### Room 5: Broadcast Vocal Mastering & Multi-Format Packaging
-*Modules: [`audiobook_factory/mastering.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering.py), [`audiobook_factory/podcast/orchestrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/orchestrator.py), [`audiobook_factory/packaging.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/packaging.py)*
+### Room 5: Pro-Grade AI Vocal Mastering Workstation & Multi-Format Packaging (v5.4)
+*Subsystems: [`audiobook_factory/audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/), [`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py), [`audiobook_factory/mastering.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering.py), [`audiobook_factory/packaging.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/packaging.py), [`audiobook_factory/podcast/orchestrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/orchestrator.py)*  
+*(See exhaustive specification: [`docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md) and [`docs/AUDIO_ENGINEERING.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md))*
 
-1. **Audiobook Mastering & Packaging Track**:
-   - Target Loudness: Broadcast EBU R128 **-19.0 LUFS** ($\pm 0.5$ LU) with a **-1.5 dBTP** True Peak ceiling.
-   - Two-pass measured linear loudnorm (`-f null -` measurement pass, `linear=true` application pass). Zero dynamic compression pumping or room-tone breathing.
-   - Resampling: SOXR Kaiser Sinc 48kHz / 24-bit studio pipeline with triangular dither.
-   - Output Container: Single chapterized `.m4b` container with embedded cover art and TOC navigation.
-2. **Podcast Mastering & Packaging Track**:
-   - Target Loudness: Broadcast Podcast **-16.0 LUFS** with a **-1.0 dBTP** True Peak ceiling.
-   - Stereo Spatial Staging: Hardware pan DSP panning Host A to $-0.25$ Left and Host B to $+0.25$ Right.
-   - Output Container: High-fidelity 192kbps AAC `.m4a` / `.mp3` with embedded episode metadata and show notes.
+Room 5 constitutes the **Pro-Grade AI Vocal Mastering Workstation (Phase 6)**, elevating downstream audio engineering into an autonomous, studio-grade processing suite combining high-performance C++ JUCE DSP, forensic acoustic and script QA auditing, neural speech de-artifacting, reference spectrum matching, incremental DAG ledgering, and container delivery:
+
+1. **Pure Vocals-Only Architectural Invariant**:
+   - Background music (BGM), sound effects (SFX), multi-track stem mixdowns, and Archive.org sound bank harvesting are **permanently decoupled** and archived in [`archive/cinematic_audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/archive/cinematic_audio/).
+   - 100% of audio compute is dedicated to vocal intelligibility, multi-character acting nuance, conversational breathability, and Audible/EBU R128 compliance.
+
+2. **Immutable Contracts & Schemas** ([`contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py)):
+   - Governed by strongly-typed Pydantic v2 schemas: [`IngestionConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L15), [`SegmentAudioContract`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L26), [`ChapterMasterContract`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L68), [`DSPConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L87), [`DSPMasteringResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L107), [`AudioQAConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L121), [`SegmentQAEvaluation`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L136), [`ChapterQAReport`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L154), [`EnhancerConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L168), [`ReferenceMatcherConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L178).
+
+3. **Phase 1: C++ JUCE Vocal DSP Engine** ([`dsp.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py)):
+   - [`VocalDSPProcessor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py#L65): In-memory C++ JUCE mastering via **Spotify Pedalboard** and ITU-R BS.1770-4 loudness compliance via **Pyloudnorm**.
+   - **4-Band Parametric Vocal EQ**:
+     - `HighpassFilter(75 Hz)`: Subsonic rumble cut without sacrificing narrator baritone warmth.
+     - `PeakFilter(320 Hz, -1.5 dB, Q=1.2)`: Attenuates chest resonance and boxiness.
+     - `PeakFilter(3.2 kHz, +0.8 dB, Q=1.0)`: Lifts presence and consonant clarity in the speech intelligibility corridor.
+   - **Optical Vocal Compression**: `Compressor(threshold=-18 dB, ratio=2.5:1, attack=25ms, release=120ms)` for transparent leveling.
+   - **Lookahead True Peak Limiter**: Clamped strictly to $\le -1.5\text{ dBTP}$ with 40ms release window.
+   - **Headless VST3 Plugin Hosting**: Supports optional dynamic 64-bit VST3 plugin bundle insertion (`vst3_plugin_path`).
+   - **Deterministic FFmpeg Dual-Pass Fallback**: If Pedalboard is absent, automatically activates dual-pass linear `loudnorm` at `-19.0 LUFS` integrated target.
+
+4. **Phase 2: Forensic Audio QA Auditor** ([`qa_auditor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py)):
+   - [`AudioQAAuditor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py#L46): Forensically audits speech takes and assembled chapters:
+     - **VAD & Dead-Air Boundaries**: Flags leading dead air $> 800\text{ms}$ or trailing silence $> 1200\text{ms}$.
+     - **Text-Grounded Pacing Bounds**: Speaking rate calculated in WPM and char/sec. Flags dropouts ($> 320\text{ WPM}$ or $< 0.4\text{s}$ for $> 30\text{ chars}$) $\to$ Hard `FAIL`. Flags hallucination loops ($< 40\text{ WPM}$ on short text over $> 4.0\text{s}$) $\to$ Hard `FAIL`. Pacing variances outside $[75, 240]\text{ WPM}$ yield non-blocking `WARN`.
+     - **Speech Quality MOS Prediction**: Non-intrusive Acoustic Quality Index evaluating crest factor, DC offset, and digital clipping (target $\ge 3.5$).
+
+5. **Phase 3: Neural Vocal Polish & Reference Spectrum Matching**:
+   - **Neural Vocal Enhancer** ([`enhancer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/enhancer.py)): [`NeuralVocalEnhancer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/enhancer.py#L42) applies **DeepFilterNet3** 48kHz full-band deep filtering. Invariant: **Selective Auto-Bypass** if input $\text{SNR} \ge 45\text{ dB}$; **Energy Clamp Protection** reverting take if $|\Delta\text{RMS}| > 2.0\text{ dB}$; soft-knee spectral gate fallback at $-55\text{ dBFS}$.
+   - **Reference Spectrum Matcher** ([`reference_matcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/reference_matcher.py)): [`ReferenceSpectrumMatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/reference_matcher.py#L41) matches tonal balance of golden masters using **Matchering 2.0**. Invariant: **Hard Spectral Gain Clamp** strictly bounded to $\max \pm 3.0\text{ dB}$ to prevent frequency pumping; 1/3-octave STFT envelope fallback.
+
+6. **Phase 5: Incremental DAG Caching & Surgical Hot-Patching**:
+   - **Segment Hash Ledger** ([`ledger.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ledger.py)): [`ChapterSegmentLedger`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ledger.py#L83) indexes segment content hashes (`compute_segment_content_hash`) and timeline alignments, preventing redundant TTS and processing cycles when only a fraction of segments change.
+   - **Single-Segment Hot-Patcher** ([`hot_patcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/hot_patcher.py)): [`SingleSegmentHotPatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/hot_patcher.py#L33) splices regenerated speech chunks into existing pre-master WAV files in $<0.2\text{s}$ using 64 KB block streaming ($\le 1\text{ MB}$ RAM), rippling subsequent offsets without full chapter re-rendering.
+
+7. **Dialogue Editorial, Streaming Pre-Master & Ingestion Normalization**:
+   - **Audio Ingestion Manager** ([`ingestion.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ingestion.py)): [`AudioIngestionManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ingestion.py#L24) normalizes speech chunks to 48kHz 24-bit stereo PCM WAV, strips container watermark static, and applies a single 5.0ms raised-cosine Hann micro-taper (zero Dirac step click).
+   - **Dialogue Editorial Bridge** ([`editorial.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/editorial.py)): [`DialogueEditorialBridge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/editorial.py#L19) coordinates Ingestion $\to$ Editorial $\to$ Forensic QA $\to$ Streaming Pre-Master.
+   - **Streaming Pre-Master Composer** ([`stream_composer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/stream_composer.py)): [`ChunkStreamComposer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/stream_composer.py#L22) streams normalized speech chunks, syntactic punctuation pauses (clause: 180ms, sentence: 380ms, turn: 600ms), TPDF dither (-72 dBFS on pauses $\ge 350\text{ms}$), stereo spatial panning, and conversational overlaps directly into `premaster.wav` with constant RAM $\le 800\text{ KB}$ and zero scratch silence files on disk.
+
+8. **Chapter Delivery Encoding & Container Packaging**:
+   - **Single-Pass Chapter Delivery Encoder** ([`encoder.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/encoder.py)): [`ChapterDeliveryEncoder`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/encoder.py#L25) implements the Single Lossy Encode Pass Invariant: Mastered 48kHz 24-bit PCM WAV $\to$ 192k AAC-LC (`.m4a`), with closed-loop true peak verification asserting True Peak $\le -1.5\text{ dBTP}$.
+   - **M4B Book Packager** ([`packager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/packager.py)): [`M4BBookPackager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/packager.py#L123) packages chapter deliverables into a single `.m4b` container with embedded cover art and `FFMETADATA1` monotonic TOC markers via 100% lossless container stream copying (`-c:a copy`).
+   - **Podcast Delivery Track**: Broadcast Podcast mastering at **-16.0 LUFS** with **-1.0 dBTP** True Peak ceiling and stereo spatial staging (Host A at $-0.25$ Left, Host B at $+0.25$ Right) into AAC `.m4a` / `.mp3`.
+
+9. **Antigravity Audio MCP Server & Standalone CLI**:
+   - **Audio MCP Server** ([`server.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py)): Exposes 6 standardized stdio JSON-RPC tools (`apply_vocal_dsp`, `audit_audio_quality`, `match_reference_spectrum`, `enhance_vocal_stem`, `measure_ebu_r128_loudness`, `audit_chapter_qa`) for autonomous agent operation.
+   - **CLI Subcommands** ([`audio.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/cli/commands/audio.py)): Exposes `audiobook-cli dsp`, `qa-audit`, `enhance`, and `match-ref`.
 
 ---
 

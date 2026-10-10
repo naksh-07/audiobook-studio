@@ -1,4 +1,4 @@
-# 🎙️ Audiobook Studio (Antigravity Plugin & Option C Engine v5.2)
+# 🎙️ Audiobook Studio (Antigravity Plugin & Option C Engine v5.4)
 
 > **Autonomous Studio-Grade Multi-Voice Audiobook & 2-Host Podcast Production Engine and Google Antigravity Plugin with Gemini Flash TTS, 4D Formants, Audible Flow & Conversational Adaptation, Two-Pass EBU R128 Mastering, and the 8-Pillar Studio Production Certification Harness.**
 
@@ -13,7 +13,7 @@
 [![Audiobook Master](https://img.shields.io/badge/Audiobook%20Master-EBU%20R128%20(-19%20LUFS)-purple.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)
 [![Podcast Master](https://img.shields.io/badge/Podcast%20Master-EBU%20R128%20(-16%20LUFS)-indigo.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 [![Certification](https://img.shields.io/badge/Certification-8--Pillar%20Studio%20Harness-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/QUALITY_GATES.md)
-[![Tests](https://img.shields.io/badge/Tests-1%2C126%2F1%2C126%20Passing%20(100%25)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests)
+[![Tests](https://img.shields.io/badge/Tests-1%2C183%2F1%2C183%20Passing%20(100%25%20Green)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
 ---
@@ -288,11 +288,26 @@ audiobook-cli tts "अध्याय ५: व्यापारी ने उ�
 python audiobook_cli.py tts "Character voice test sequence." --voice Charon --out test_charon.wav
 ```
 
+### Pro-Grade AI Vocal Mastering & Forensic QA (`dsp`, `qa-audit`, `enhance`, `match-ref`)
+```bash
+# 1. C++ JUCE Vocal DSP Mastering with Spotify Pedalboard & lookahead limiter (or FFmpeg fallback)
+audiobook-cli dsp --input "premaster.wav" --output "mastered_chapter.wav" --target-lufs -19.0 --true-peak -1.5
+
+# 2. Forensic Speech QA Audit (VAD, 75-240 WPM bounds, dropouts, loops, MOS)
+audiobook-cli qa-audit --input "take_001.wav" --text "The old tavern was shrouded in darkness." --speaker "Narrator"
+
+# 3. DeepFilterNet3 Neural Vocal Polish with selective >45dB SNR auto-bypass
+audiobook-cli enhance --input "noisy_take.wav" --output "cleaned_take.wav"
+
+# 4. Matchering 2.0 Reference Spectrum Matching with strict ±3.0dB hard clamp
+audiobook-cli match-ref --target "my_chapter.wav" --reference "audible_ref.wav" --output "matched_master.wav" --max-clamp 3.0
+```
+
 ---
 
-## 🐍 Python API Quickstart: Modular TTS Platform Core
+## 🐍 Python API Quickstart: Modular TTS Platform Core & Vocal Mastering
 
-The modular TTS Platform Core provides clean facades for direct programmatic integration:
+The modular TTS Platform Core and Room 5 Mastering Workstation provide clean facades for direct programmatic integration:
 
 ```python
 from pathlib import Path
@@ -301,6 +316,13 @@ from audiobook_factory.tts import (
     LongFormTTSClient,
     MultiCastStudioClient,
     DeliveryIntent,
+)
+from audiobook_factory.audio import (
+    VocalDSPProcessor,
+    DSPConfig,
+    AudioQAAuditor,
+    NeuralVocalEnhancer,
+    ReferenceSpectrumMatcher,
 )
 
 # 1. Ad-Hoc Single Utterance (<800ms)
@@ -329,6 +351,16 @@ out_wav, total_sec, chunks = long_client.synthesize_prose(
     target_words_per_chunk=120,
 )
 print(f"[+] Prose stream complete: {total_sec:.2f}s across {len(chunks)} semantic chunks")
+
+# 4. Room 5 Pro-Grade AI Vocal DSP Mastering (C++ JUCE Pedalboard + BS.1770-4)
+dsp = VocalDSPProcessor()
+res = dsp.master_chapter("output/prose_stream.wav", "output/prose_master.wav")
+print(f"[+] Mastered via {res.backend_used}: {res.integrated_lufs} LUFS, {res.true_peak_dbtp} dBTP")
+
+# 5. Forensic Speech QA Auditing (VAD, 75-240 WPM, MOS scoring)
+auditor = AudioQAAuditor()
+eval_result = auditor.audit_segment("output/hello_hindi.wav", expected_text="नमस्ते दुनिया!", speaker="Narrator")
+print(f"[+] Take QA status: {eval_result.status} (WPM: {eval_result.estimated_wpm}, MOS: {eval_result.predicted_mos})")
 ```
 
 ---

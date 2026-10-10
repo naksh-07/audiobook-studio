@@ -1,6 +1,6 @@
 # 💻 CLI Reference: Audiobook Studio & Multi-Format Engine
 
-**Version:** 5.2 (Option C Standard v2.0 Compliant)  
+**Version:** 5.4 (Option C Standard v2.0 Compliant)  
 **Entrypoints:** `audiobook-cli` | `audiobook-studio` | `python audiobook_cli.py`  
 **Source File:** [`audiobook_cli.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_cli.py)
 
@@ -794,15 +794,18 @@ python audiobook_cli.py match-ref -t "my_chapter.wav" -r "audible_ref_master.wav
 
 ## 19. 📦 Archived Subsystems Notice
 
-The legacy subcommands (`direct`, `render`, `bgm`, `stems`, `bank`) belong to the decoupled 5-track cinematic audio engine and are archived in `archive/cinematic_audio/`. They are not part of the active Vocals-Only pipeline.
+The legacy subcommands (`direct`, `render`, `bgm`, `stems`, `bank`) belong to the decoupled 5-track cinematic audio engine and are permanently archived in [`archive/cinematic_audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/archive/cinematic_audio/). They are not part of the active Vocals-Only pipeline.
 
 ---
 
 ## 🔗 Related Documentation
 - [🏛️ Option C Architecture Blueprint](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md)
+- [🎙️ Pro-Grade AI Vocal Mastering & Production (v5.4)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
+- [🎛️ Audio Engineering & Mastering Standards](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)
+- [📚 Comprehensive API Reference Manual](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/API_REFERENCE.md)
+- [🤖 AI Agent & MCP Integration Guide](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/MCP_AGENT_INTEGRATION.md)
 - [🎙️ TTS Platform Core Architecture Specification](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)
 - [🎙️ Podcast System Architecture](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 - [🎭 Dramaturgy & Adaptation System](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/DRAMATURGY_AND_ADAPTATION_SYSTEM.md)
 - [📚 Glossary & Chapter Metadata Subsystem](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GLOSSARY_AND_METADATA_SUBSYSTEM.md)
 - [🛡️ Quality Gates & 8-Pillar Certification](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/QUALITY_GATES.md)
-- [🎛️ Audio Engineering & Mastering](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)

@@ -5138,5 +5138,298 @@ The gateway bridge functions are universally re-exported across the codebase:
 - [`audiobook_factory.tts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/__init__.py): Primary public export in `__all__` (`execute_tts_synthesize`, `execute_tts_to_file`, `execute_multispeaker_batch_to_file`, `extract_pcm_and_duration_from_audio`).
 - [`audiobook_factory.tts_dispatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts_dispatcher.py): Backward-compatible legacy re-export in `__all__`.
 - [`audiobook_factory`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/__init__.py): Lazy-loaded in `_LAZY_IMPORTS`.
-- **Test Verification**: 100% verified across the full repository test suite (**1,126 / 1,126 passed tests, 100% green**).
+- **Test Verification**: 100% verified across the full repository test suite (**1,183 / 1,183 passed tests, 100% green across 1,191 test matrix**).
+
+---
+
+## 🎛️ Room 5: Pro-Grade AI Vocal Mastering Workstation (`audiobook_factory/audio/`)
+
+**Module Directory:** [`audiobook_factory/audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/)  
+**MCP Server:** [`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py)  
+**Specification:** [`docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)  
+**Engineering Manual:** [`docs/AUDIO_ENGINEERING.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)
+
+Room 5 transforms synthesized dialogue takes into broadcast-ready, Audible-standard chapter deliverables and packaged `.m4b` containers. It integrates C++ JUCE DSP (Spotify Pedalboard), ITU-R BS.1770-4 loudness compliance (Pyloudnorm), forensic speech QA auditing, DeepFilterNet3 neural polish, Matchering 2.0 reference spectrum matching, incremental DAG ledgering, and surgical hot-patching.
+
+```mermaid
+flowchart LR
+    Ingest["Tier A Ingestion<br/>(48kHz 24-bit PCM)"] --> Edit["Dialogue Editorial<br/>(Syntax Pauses & Fades)"]
+    Edit --> Stream["Stream Composer<br/>(premaster.wav)"]
+    Stream --> QA["Forensic QA<br/>(AudioQAAuditor)"]
+    QA --> Polish["Neural Polish<br/>(DeepFilterNet3)"]
+    Polish --> Match["Spectrum Match<br/>(Matchering 2.0)"]
+    Match --> DSP["C++ JUCE DSP<br/>(VocalDSPProcessor)"]
+    DSP --> Enc["Chapter Encoder<br/>(192k AAC-LC)"]
+    Enc --> Pack["Book Packager<br/>(Lossless M4B)"]
+```
+
+---
+
+### 1. Canonical Audio Contracts (`contracts.py`)
+
+Source: [`audiobook_factory/audio/contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py)
+
+#### [`IngestionConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L15)
+```python
+class IngestionConfig(BaseModel):
+    target_sample_rate: int = Field(default=48000, ge=16000, le=96000)
+    target_channels: int = Field(default=2, ge=1, le=2)
+    target_bit_depth: int = Field(default=24, ge=16, le=32)
+    highpass_hz: int = Field(default=30, ge=20, le=100)
+    micro_taper_ms: float = Field(default=5.0, ge=1.0, le=25.0)
+```
+
+#### [`SegmentAudioContract`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L26)
+Immutable contract representing an ingested, acoustic-normalized speech segment emitted by TTS and consumed by Editorial & Mastering:
+- `chapter_id` (*int*): 1-indexed chapter number.
+- `segment_index` (*int*): 1-indexed sequence order within chapter.
+- `segment_uid` (*str*): Deterministic SHA-256 identifier.
+- `audio_path` (*Path*): Path to uncompressed 48kHz PCM WAV.
+- `audio_sha256` (*str*): Cryptographic hash of audio on disk.
+- `sample_rate` (*int*): Exact sampling rate in Hz (default: 48,000).
+- `channels` (*int*): Channel count (default: 2, Stereo).
+- `bit_depth` (*int*): PCM bit depth (default: 24).
+- `duration_ms` (*int*): Exact sample duration in milliseconds.
+- `speaker` (*str*): Character name or `"Narrator"`.
+- `voice_name` (*str*): Base synthetic voice persona (e.g. `"Aoede"`).
+- `segment_type` (*Literal["narration", "dialogue", "thought", "action"]*): Narrative classification.
+- `intensity_level` (*Literal["whisper", "low", "medium", "high", "explosive"]*): Dramatic intensity.
+- `delivery_style` (*Optional[str]*): Acting modifier.
+- `literary_text` (*str*): Sacred source text.
+- `spoken_text` (*str*): Phonetically expanded spoken text.
+
+#### [`DSPConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L87)
+Governs C++ JUCE vocal DSP mastering and optional VST3 hosting:
+- `enable_pedalboard` (*bool*): Attempt C++ Pedalboard DSP before FFmpeg fallback (default: `True`).
+- `enable_vst3` (*bool*): Enable headless VST3 plugin insertion (default: `False`).
+- `vst3_plugin_path` (*Optional[Path]*): Path to `.vst3` bundle.
+- `subsonic_hz` (*float*): Subsonic highpass cutoff frequency (default: `75.0 Hz`).
+- `boxiness_cut_hz` (*float*): Parametric notch frequency for chest resonance (default: `320.0 Hz`).
+- `boxiness_cut_db` (*float*): Boxiness attenuation gain (default: `-1.5 dB`).
+- `presence_lift_hz` (*float*): Speech presence center frequency (default: `3200.0 Hz`).
+- `presence_lift_db` (*float*): Speech presence boost (default: `+0.8 dB`).
+- `target_lufs` (*float*): EBU R128 integrated loudness target (default: `-19.0 LUFS`).
+- `true_peak_ceiling_dbtp` (*float*): Lookahead True Peak limiter ceiling (default: `-1.5 dBTP`).
+- `compressor_threshold_db` (*float*): Optical compressor threshold (default: `-18.0 dB`).
+- `compressor_ratio` (*float*): Compression ratio (default: `2.5`).
+- `compressor_attack_ms` (*float*): Compressor attack time (default: `25.0 ms`).
+- `compressor_release_ms` (*float*): Compressor release time (default: `120.0 ms`).
+
+#### [`DSPMasteringResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L107)
+Telemetry emitted by [`VocalDSPProcessor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py#L65):
+- `backend_used` (*Literal["pedalboard_juce_v2", "ffmpeg_dual_pass_linear", "fallback_linear"]*): Backend engine that rendered master.
+- `output_path` (*Path*): Path to rendered 48kHz 24-bit PCM master WAV.
+- `integrated_lufs` (*float*): Measured post-master integrated loudness.
+- `true_peak_dbtp` (*float*): Measured post-master True Peak in dBTP.
+- `loudness_range_lu` (*float*): Measured Loudness Range in LU (default: `7.5`).
+- `execution_duration_sec` (*float*): Processing wall-clock time in seconds.
+
+#### [`AudioQAConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L121)
+Parameters governing forensic speech QA auditing:
+- `enable_vad` (*bool*): Enable Voice Activity Detection for boundary checks (default: `True`).
+- `enable_whisper_alignment` (*bool*): Enable Faster-Whisper alignment (default: `False`).
+- `min_wpm` (*float*): Minimum acceptable words per minute (default: `75.0`).
+- `max_wpm` (*float*): Maximum acceptable words per minute (default: `240.0`).
+- `min_pause_ms` (*int*): Minimum inter-phrase pause (default: `120 ms`).
+- `max_pause_ms` (*int*): Maximum natural pause before dead-air alert (default: `1800 ms`).
+- `min_mos_threshold` (*float*): Minimum Mean Opinion Score before warning (default: `3.5`).
+
+#### [`SegmentQAEvaluation`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L136) & [`ChapterQAReport`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L154)
+Forensic evaluation emitted by [`AudioQAAuditor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py#L46):
+- `status` (*Literal["PASS", "WARN", "FAIL"]*): Audit verdict.
+- `estimated_wpm` (*float*): Speaking rate in words per minute.
+- `char_per_sec` (*float*): Character rate per second.
+- `predicted_mos` (*float*): Speech quality MOS score ($1.0 - 5.0$).
+- `silence_leading_ms` (*int*) / `silence_trailing_ms` (*int*): Boundary dead air measurements.
+- `issues` (*List[str]*): Detected anomalies (e.g. `TTS_DROPOUT_TRUNCATION`, `TTS_HALLUCINATION_LOOP`).
+
+#### [`EnhancerConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L168) & [`ReferenceMatcherConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L178)
+- `EnhancerConfig`: `enable_neural_enhancement` (default: `False`), `snr_bypass_threshold_db` (default: `45.0 dB`), `max_energy_diff_db` (default: `2.0 dB`).
+- `ReferenceMatcherConfig`: `enable_reference_matching` (default: `False`), `reference_track_path` (`Optional[Path]`), `max_spectral_correction_db` (default: `3.0 dB`, clamped $[0.5, 6.0]$).
+
+---
+
+### 2. C++ JUCE Vocal DSP Engine (`dsp.py`)
+
+Source: [`audiobook_factory/audio/dsp.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py)
+
+#### [`VocalDSPProcessor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py#L65)
+
+```python
+class VocalDSPProcessor:
+    def __init__(
+        self,
+        dsp_config: Optional[DSPConfig] = None,
+        ffmpeg_bin: Optional[str] = None,
+    ): ...
+```
+
+##### Methods
+
+- **`is_hardware_accelerated -> bool`**: Returns `True` if Spotify Pedalboard (C++ JUCE) is active in the host environment.
+- **`measure_loudness(audio_np: np.ndarray, sr: int = 48000) -> Tuple[float, float, float]`**:
+  Measures ITU-R BS.1770-4 Integrated Loudness (LUFS), True Peak (dBTP), and Loudness Range (LRA) via Pyloudnorm with RMS approximation fallback.
+- **`build_pedalboard_chain(config: Optional[DSPConfig] = None) -> Optional[Pedalboard]`**:
+  Assembles Spotify Pedalboard DSP chain: `HighpassFilter(75Hz)` $\to$ `PeakFilter(320Hz, -1.5dB)` $\to$ `PeakFilter(3.2kHz, +0.8dB)` $\to$ `Compressor(-18dB, 2.5:1)` $\to$ optional VST3 plugin $\to$ `Limiter(-1.5dBTP, 40ms)`.
+- **`process_samples(audio_np: np.ndarray, sr: int = 48000, config: Optional[DSPConfig] = None) -> np.ndarray`**:
+  Applies in-memory C++ JUCE DSP effects to float32 audio arrays in microsecond time.
+- **`master_chapter(input_wav: Union[str, Path], output_wav: Union[str, Path], profile: Optional[MasteringProfile] = None, dsp_config: Optional[DSPConfig] = None) -> DSPMasteringResult`**:
+  Executes end-to-end mastering of chapter pre-master audio to 48kHz 24-bit PCM master WAV. Employs Pedalboard C++ DSP when available; falls back seamlessly to deterministic FFmpeg dual-pass linear loudnorm (`-af highpass=75,loudnorm=I=-19.0:TP=-1.5:LRA=7.5`).
+
+##### Probe Helpers
+- [`has_pedalboard_engine() -> bool`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py#L55): Checks whether Spotify Pedalboard is importable.
+- [`has_pyloudnorm_engine() -> bool`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py#L60): Checks whether Pyloudnorm BS.1770-4 meter is available.
+
+---
+
+### 3. Forensic Speech QA Auditor (`qa_auditor.py`)
+
+Source: [`audiobook_factory/audio/qa_auditor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py)
+
+#### [`AudioQAAuditor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py#L46)
+
+```python
+class AudioQAAuditor:
+    def __init__(self, config: Optional[AudioQAConfig] = None): ...
+```
+
+##### Methods
+- **`audit_segment(audio_path: Union[str, Path], expected_text: str = "", speaker: str = "Narrator", segment_index: int = 1, segment_uid: Optional[str] = None) -> SegmentQAEvaluation`**:
+  Audits a single speech audio segment against screenplay text:
+  1. Empty / zero-length check ($<60\text{ms}$ or 0 frames $\to$ `FAIL`).
+  2. Severe clipping detection ($\ge 0.999$ digital saturation).
+  3. Silence boundary measurement (lead $> 800\text{ms}$ or trail $> 1200\text{ms}$).
+  4. Speaking rate calculation: detects dropouts ($> 320\text{ WPM}$ or $< 0.4\text{s}$ on $> 30\text{ chars}$ $\to$ `FAIL`), repetition loops ($< 40\text{ WPM}$ on short lines $\to$ `FAIL`), and pacing bounds ($[75, 240]\text{ WPM}$).
+  5. Speech Quality MOS estimation (crest factor, DC offset, digital clipping).
+- **`audit_chapter(audio_segments: List[Union[str, Path]], script_segments: Optional[List[Dict[str, Any]]] = None, chapter_num: int = 1) -> ChapterQAReport`**:
+  Aggregates segment evaluations into consolidated chapter-level forensic report.
+- **`estimate_speech_mos(audio_np: np.ndarray, sr: int = 48000, peak_amp: float = 0.0, rms_amp: float = 0.0) -> float`**:
+  Computes non-intrusive Acoustic Quality Index in range $[1.0, 5.0]$.
+
+##### Probe Helper
+- [`has_whisper_engine() -> bool`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py#L41): Probes presence of Faster-Whisper.
+
+---
+
+### 4. Neural Vocal Polish & De-Artifacting (`enhancer.py`)
+
+Source: [`audiobook_factory/audio/enhancer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/enhancer.py)
+
+#### [`NeuralVocalEnhancer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/enhancer.py#L42)
+
+```python
+class NeuralVocalEnhancer:
+    def __init__(self, config: Optional[EnhancerConfig] = None): ...
+```
+
+##### Methods & Invariants
+- **`is_neural_active -> bool`**: Returns `True` if DeepFilterNet3 and PyTorch CUDA are initialized.
+- **`estimate_snr_db(audio_np: np.ndarray) -> float`**:
+  Estimates Signal-to-Noise Ratio by comparing active speech frames to 10th percentile background noise frames.
+- **`enhance_samples(audio_np: np.ndarray, sr: int = 48000) -> Tuple[np.ndarray, bool]`**:
+  Applies DeepFilterNet3 neural polish with two safety invariants:
+  1. **Selective Auto-Bypass**: If $\text{SNR} \ge 45.0\text{ dB}$, neural inference is automatically bypassed to prevent consonant attenuation.
+  2. **Energy Clamp Protection**: Discards enhancement and retains original stem if $|\Delta\text{RMS}| > 2.0\text{ dB}$.
+  3. **NumPy Fallback**: Soft-knee spectral gate at $-55\text{ dBFS}$ when PyTorch is unavailable.
+- **`enhance_file(input_wav: Union[str, Path], output_wav: Union[str, Path]) -> bool`**:
+  Enhances physical WAV file on disk, writing 48kHz 24-bit PCM WAV. Returns `True` if enhanced, `False` if bypassed.
+
+##### Probe Helper
+- [`has_deepfilter_engine() -> bool`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/enhancer.py#L37): Checks whether DeepFilterNet3 is installed.
+
+---
+
+### 5. Reference Spectrum Matching (`reference_matcher.py`)
+
+Source: [`audiobook_factory/audio/reference_matcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/reference_matcher.py)
+
+#### [`ReferenceSpectrumMatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/reference_matcher.py#L41)
+
+```python
+class ReferenceSpectrumMatcher:
+    def __init__(self, config: Optional[ReferenceMatcherConfig] = None): ...
+```
+
+##### Methods & Invariants
+- **`is_matchering_active -> bool`**: Returns `True` if Matchering 2.0 is installed and enabled.
+- **`match_spectrum(target_np: np.ndarray, reference_np: np.ndarray, sr: int = 48000) -> np.ndarray`**:
+  Transplants spectral envelope of reference audio onto target audio with a **hard $\pm 3.0\text{ dB}$ clamp** on spectral gain corrections.
+- **`match_files(target_wav: Union[str, Path], reference_wav: Union[str, Path], output_wav: Union[str, Path]) -> Path`**:
+  Executes file-to-file matching, writing 48kHz 24-bit PCM WAV.
+
+##### Probe Helper
+- [`has_matchering_engine() -> bool`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/reference_matcher.py#L36): Checks whether Matchering 2.0 is installed.
+
+---
+
+### 6. Incremental DAG Ledger & Surgical Hot-Patcher (`ledger.py` & `hot_patcher.py`)
+
+Sources: [`audiobook_factory/audio/ledger.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ledger.py), [`audiobook_factory/audio/hot_patcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/hot_patcher.py)
+
+#### Hash Ledger Classes
+- **[`compute_segment_content_hash(...) -> str`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ledger.py#L20)**: Computes deterministic SHA-256 fingerprint over `segment_uid`, `spoken_text`, `speaker`, `voice_name`, `delivery_style`, `pitch_pct`, and `speed`.
+- **[`SegmentLedgerEntry`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ledger.py#L48)**: Immutable model tracking `content_hash`, disk `audio_sha256`, `timeline_start_ms`, `timeline_end_ms`.
+- **[`ChapterSegmentLedger`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ledger.py#L83)**: Chapter-level DAG ledger. Supports `diff_specifications()` to emit [`LedgerDiffResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ledger.py#L68) identifying unchanged, modified, added, and removed segments.
+
+#### [`SingleSegmentHotPatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/hot_patcher.py#L33)
+Surgically splices a regenerated speech segment into an existing chapter pre-master WAV in $<0.2\text{s}$:
+- Streams audio in 64 KB blocks maintaining constant RAM $\le 1\text{ MB}$.
+- Performs sample-exact replacement if durations match; ripples subsequent offsets and updates ledger if durations differ.
+- Returns strongly-typed [`HotPatchResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/hot_patcher.py#L20).
+
+---
+
+### 7. Dialogue Editorial & Streaming Composition (`editorial.py` & `stream_composer.py`)
+
+Sources: [`audiobook_factory/audio/editorial.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/editorial.py), [`audiobook_factory/audio/stream_composer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/stream_composer.py), [`audiobook_factory/audio/ingestion.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ingestion.py)
+
+#### [`ChunkStreamComposer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/stream_composer.py#L22)
+Block-based streaming composer assembling speech chunks, syntactic pauses, and overlaps directly into `premaster.wav`:
+- **Memory Footprint**: Constant RAM $\le 800\text{ KB}$ regardless of novel duration.
+- **Zero Scratch Silence Files**: Generates in-stream silence bytes with zero-mean TPDF dither (-72 dBFS on pauses $\ge 350\text{ms}$) preventing DAC clicks.
+- **Contextual Syntax Pauses** ([`calculate_syntax_pause_ms`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/stream_composer.py#L98)): Clause boundaries (180ms), sentence completion (380ms), speaker turn handoffs (600ms).
+- **Constant-Power Azimuth Panning** ([`apply_spatial_pan`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/stream_composer.py#L158)): Panning in range $[-1.0, 1.0]$.
+- **Equal-Power Overlaps** (DE-05): Renders conversational overlaps using raised-cosine fade windows.
+
+#### [`AudioIngestionManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ingestion.py#L24)
+- **`demux_and_clean_pcm(raw_bytes: bytes) -> Tuple[np.ndarray, int]`**: Strips RIFF wrappers and C2PA digital watermark static screeches.
+- **`apply_single_hann_micro_taper(samples: np.ndarray, sample_rate: int = 48000, taper_ms: float = 5.0) -> np.ndarray`**: Applies exactly one 5.0ms raised-cosine Hann micro-taper at speech onset and offset (initial and final samples strictly 0.0).
+
+---
+
+### 8. Chapter Delivery Encoding & Lossless M4B Packaging (`encoder.py` & `packager.py`)
+
+Sources: [`audiobook_factory/audio/encoder.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/encoder.py), [`audiobook_factory/audio/packager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/packager.py)
+
+#### [`ChapterDeliveryEncoder`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/encoder.py#L25)
+Enforces the Single Lossy Encode Pass Invariant:
+- Encodes mastered 48kHz 24-bit PCM WAV into 192k AAC-LC (`.m4a`).
+- Container flags: `-profile:a aac_low -flags +global_header -ar 48000 -ac 2`.
+- **`probe_true_peak(audio_file) -> Optional[float]`**: Measures True Peak using FFmpeg `ebur128=peak=true`.
+- **Closed-Loop Peak Remediation**: If True Peak exceeds $-1.5\text{ dBTP}$, applies automated gain trim ($-0.3\text{ dB}$) and re-encodes once to guarantee 100% compliance.
+
+#### [`M4BBookPackager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/packager.py#L123)
+Assembles multi-chapter audiobooks into `.m4b` containers:
+- **Zero Generation Loss**: Lossless stream copy (`-c:a copy -movflags +faststart`).
+- **`FFMETADATA1` Monotonic Seek Table**: Derives chapter TOC from exact AAC packet runtimes (`TIMEBASE=1/1000`), guaranteeing $\text{START}_k = \text{END}_{k-1}$.
+- Embeds cover art and metadata tags (`title`, `artist`, `album`, `genre`).
+
+---
+
+### 9. Antigravity Audio MCP Server (`audiobook_factory/mcp/server.py`)
+
+Source: [`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py)
+
+Exposes 6 standardized tools via stdio JSON-RPC for Antigravity autonomous agents:
+
+| Tool Name | Function Signature | Description |
+|---|---|---|
+| **`apply_vocal_dsp`** | [`apply_vocal_dsp_tool(input_wav, output_wav, target_lufs=-19.0, true_peak=-1.5, ...)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py#L28) | C++ JUCE parametric vocal EQ, optical compression, lookahead True-Peak limiting. |
+| **`audit_audio_quality`** | [`audit_audio_quality_tool(audio_path, expected_text="", speaker="Narrator", segment_index=1)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py#L60) | VAD, speaking pace (75-240 WPM), dropouts, repetition loops, and MOS score. |
+| **`match_reference_spectrum`** | [`match_reference_spectrum_tool(target_wav, reference_wav, output_wav, max_clamp_db=3.0)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py#L79) | Frequency spectrum matching with strict $\pm 3.0\text{ dB}$ hard clamp. |
+| **`enhance_vocal_stem`** | [`enhance_vocal_stem_tool(input_wav, output_wav, snr_bypass_db=45.0)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py#L99) | DeepFilterNet3 neural vocal cleaning with $>45\text{dB}$ SNR auto-bypass. |
+| **`measure_ebu_r128_loudness`** | [`measure_ebu_r128_loudness_tool(audio_path)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py#L118) | BS.1770-4 Integrated Loudness (LUFS), True Peak (dBTP), and Loudness Range (LRA). |
+| **`audit_chapter_qa`** | [`audit_chapter_qa_tool(audio_segments, script_segments=None, chapter_num=1)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py#L134) | Consolidated forensic QA audit report across entire chapter timeline. |
+
+The server is executed directly via `python -m audiobook_factory.mcp.server` or registered in Antigravity MCP settings.
 

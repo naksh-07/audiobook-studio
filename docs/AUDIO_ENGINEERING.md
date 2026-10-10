@@ -27,13 +27,16 @@ In legacy audiobook production, music often drowns out whispers, abrupt volume s
 
 ---
 
-## 🎛️ Pipeline Boundary: Stage 11 Cinematic Mix vs. Stage 12 Mastering
+## 🎛️ Pipeline Architecture: Pure Vocals-Only Mastering vs. Archived Multitrack Mix
 
-> **Stage 11 determines the cinematic mix. Stage 12 performs mastering.**
+> [!IMPORTANT]
+> **Pure Vocals-Only Architectural Mandate**:
+> Background music (BGM), sound effects (SFX), 5-track stem mixdowns (formerly Stage 11), and Archive.org sound scraping are **permanently decoupled and archived** in [`archive/cinematic_audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/archive/cinematic_audio/).
+> Active production is **100% focused on Audible-standard vocal excellence**, character acting nuance, dialogue clarity, and broadcast EBU R128 mastering via the **Phase 6 Pro-Grade AI Vocal Mastering Workstation**.
+>
+> *(Historical context for legacy multitrack mixes can be found in [`docs/CINEMATIC_MIX_ARCHITECTURE.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/CINEMATIC_MIX_ARCHITECTURE.md) and [`archive/cinematic_audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/archive/cinematic_audio/)).*
 
-* **Stage 11: Cinematic Mix**: Produces the **Cinematic Mix Premaster** (`CINEMATIC_MIX_PREMASTER`) by balancing narrative elements, focusing listener attention via `SceneMixIntent` and `AttentionMap`, and generating discrete DME broadcast stems (`DX`, `MX`, `FX`, `AMB`, `ME`).
-* **Stage 12: Mastering**: Performs final EBU R128 loudness normalization ($-19.0$ LUFS $\pm 0.5$ LU), true peak limiting ($-1.5$ dBTP), SOXR 48kHz sinc resampling, dithering, chapter concatenation, and multi-format audio packaging (M4B / MP3 / AAC).
-* For detailed architecture, see [Stage 11 Cinematic Mix Architecture](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/docs/CINEMATIC_MIX_ARCHITECTURE.md).
+* **Mastering Workstation (Room 5)**: Performs final EBU R128 loudness normalization ($-19.0$ LUFS $\pm 0.5$ LU), true peak limiting ($-1.5$ dBTP), SOXR 48kHz sinc resampling, dithering, chapter concatenation, and multi-format audio packaging (M4B / AAC / MP3).
 
 ---
 
@@ -451,7 +454,7 @@ The v5.4 release elevates the audio engineering pipeline into an autonomous, stu
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### A. Phase 1: C++ JUCE DSP Foundation ([`audiobook_factory/audio/dsp.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/dsp.py) / ADR-021)
+### A. Phase 1: C++ JUCE DSP Foundation ([`audiobook_factory/audio/dsp.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py) / ADR-021)
 - **`VocalDSPProcessor`**: Integrates **Spotify Pedalboard (C++ JUCE)** for microsecond in-memory audio processing:
   - **4-Band Parametric Vocal EQ**:
     - `HighpassFilter(75.0 Hz)`: Eradicates subsonic air-conditioner rumbles and desk thumps without sacrificing narrator baritone warmth.
@@ -466,7 +469,7 @@ The v5.4 release elevates the audio engineering pipeline into an autonomous, stu
   - **Deterministic FFmpeg Dual-Pass Fallback**:
     - In environments lacking `pedalboard`, the processor automatically falls back to FFmpeg linear dual-pass `loudnorm`.
 
-### B. Phase 2: AI-Assisted Acoustic & Script QA Auditor ([`audiobook_factory/audio/qa_auditor.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/qa_auditor.py) / ADR-022)
+### B. Phase 2: AI-Assisted Acoustic & Script QA Auditor ([`audiobook_factory/audio/qa_auditor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py) / ADR-022)
 - **`AudioQAAuditor`**: Forensically verifies speech takes before assembly:
   - **VAD & Dead-Air Detection**: Flags leading dead air $> 800\text{ms}$ or trailing silence $> 1200\text{ms}$.
   - **Text-Grounded Speaking Rate**:
@@ -476,7 +479,7 @@ The v5.4 release elevates the audio engineering pipeline into an autonomous, stu
   - **Speech Quality MOS (Mean Opinion Score)**:
     - Calculates non-intrusive Acoustic Quality Index evaluating crest factor, DC offset, and clipping (target $\ge 3.5$).
 
-### C. Phase 3: Neural Vocal Polish & Reference Spectrum Matching ([`audiobook_factory/audio/enhancer.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/enhancer.py), [`reference_matcher.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/audio/reference_matcher.py) / ADR-023)
+### C. Phase 3: Neural Vocal Polish & Reference Spectrum Matching ([`audiobook_factory/audio/enhancer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/enhancer.py), [`reference_matcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/reference_matcher.py) / ADR-023)
 - **`NeuralVocalEnhancer` (DeepFilterNet3)**:
   - 48kHz full-band deep filtering removing generative neural hash and room tone.
   - **Selective Auto-Bypass**: Stems with $\text{SNR} \ge 45\text{ dB}$ bypass neural inference to preserve pristine consonants.
@@ -487,12 +490,13 @@ The v5.4 release elevates the audio engineering pipeline into an autonomous, stu
   - **Hard Clamping Invariant**: EQ correction strictly clamped to $\max \pm 3.0\text{ dB}$.
   - **SciPy STFT Fallback**: 1/3-octave smoothed FFT envelope matching.
 
-### D. Phase 4: Antigravity Audio MCP Server & CLI Bridge ([`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/audiobook_factory/mcp/server.py) / ADR-024)
+### D. Phase 4: Antigravity Audio MCP Server & CLI Bridge ([`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py) / ADR-024)
 - Exposes 6 standardized tools: `apply_vocal_dsp`, `audit_audio_quality`, `match_reference_spectrum`, `enhance_vocal_stem`, `measure_ebu_r128_loudness`, and `audit_chapter_qa`.
 - Detailed operational guides:
-  - [Pure Vocals-Only Audio Mixing & Production (v5.4)](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
-  - [CLI Reference Manual](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/docs/CLI_REFERENCE.md)
-  - [AI Agent & MCP Integration Guide](file:///c:/Users/Suraj/Documents/Antigravity/audio_master/docs/MCP_AGENT_INTEGRATION.md)
+  - [Pure Vocals-Only Audio Mixing & Production (v5.4)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
+  - [CLI Reference Manual](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/CLI_REFERENCE.md)
+  - [AI Agent & MCP Integration Guide](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/MCP_AGENT_INTEGRATION.md)
+  - [Comprehensive API Reference Manual](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/API_REFERENCE.md)
 
 
 
