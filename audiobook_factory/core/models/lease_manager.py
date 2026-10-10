@@ -68,6 +68,18 @@ def is_pid_alive(pid: int) -> bool:
     """
     if pid <= 0:
         return False
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            SYNCHRONIZE = 0x00100000
+            process = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+            if process != 0:
+                kernel32.CloseHandle(process)
+                return True
+            return False
+        except Exception:
+            return False
     try:
         # On POSIX (Linux, Android, macOS), signal 0 checks for existence without killing
         os.kill(pid, 0)
@@ -78,8 +90,8 @@ def is_pid_alive(pid: int) -> bool:
         # Process exists but owned by another user
         return True
     except Exception:
-        # Fallback for Windows or unusual platforms
-        return True
+        # Fallback
+        return False
 
 
 class KeyLeaseError(RuntimeError):
