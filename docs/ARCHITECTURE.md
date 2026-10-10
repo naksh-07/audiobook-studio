@@ -66,7 +66,7 @@ flowchart TD
 
     subgraph Room4["🎙️ Room 4: Studio TTS Platform Core (Option C)"]
         Facades["Specialized Client Facades<br/>• GenericTTSClient (Single-Utterance / Audition)<br/>• LongFormTTSClient (Prose Stream & Checkpoints)<br/>• MultiCastStudioClient (Ensemble Screenplay)"]
-        Facades --> CoreEng["Shared TTS Core & Model Adapters<br/>• UniversalInputGuard & 4-Tier Semantic Chunker<br/>• Gemini Flash TTS (123+ Key Pool, BLOCK_NONE)<br/>• Qwen3-TTS (HardwareVRAMGuard)"]
+        Facades --> CoreEng["Shared TTS Core & Model Adapters<br/>• UniversalInputGuard & 4-Tier Semantic Chunker<br/>• gateway_bridge.py (ModelGateway Control Plane Bridge)<br/>• Gemini Flash TTS (123+ Key Pool, BLOCK_NONE)<br/>• Qwen3-TTS (HardwareVRAMGuard)"]
         CoreEng --> EditorialDSP["Editorial DSP & Quality Gate<br/>• TwoTierAudioQualityGate (Math + Phonetic)<br/>• FormantSculptor (Headroom EQ & Soft Tanh)<br/>• EditorialDSPEngine (12ms/18ms Hann Fades & Net Silence)<br/>• TakeBankManager (Multi-Take Auditioning)"]
     end
 
@@ -279,7 +279,7 @@ Gate 2.9 stands as the authoritative, fail-closed verification boundary position
 ### Room 4: Studio TTS Platform Core & Dialogue Stem Realization (Option C)
 *Modules: [`audiobook_factory/tts/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/), [`audiobook_factory/character_caster.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/character_caster.py), [`docs/TTS_PLATFORM_CORE_SPECIFICATION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)*
 
-Room 4 implements the **Studio TTS Platform Core (Option C: Layered Shared Core with Specialized Pipeline Facades)**, 100% certified with **882/882 passing tests** across all 5 architectural tiers. It permanently decouples disparate caller patterns into three specialized high-level facades backed by a shared orchestration engine:
+Room 4 implements the **Studio TTS Platform Core (Option C: Layered Shared Core with Specialized Pipeline Facades)**, 100% certified with **1,121/1,121 passing tests (100% green)** across all 5 architectural tiers. It permanently decouples disparate caller patterns into three specialized high-level facades backed by a shared orchestration engine:
 
 1. **Tier 1: Specialized Client Facades**:
    - **[`GenericTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/generic_client.py)**: Ad-hoc, low-latency ($<800\text{ms}$), single-utterance synthesis for CLI interactions (`audiobook-cli tts`), UI feedback, and voice auditions (`speak()`, `speak_to_bytes()`).
@@ -296,9 +296,13 @@ Room 4 implements the **Studio TTS Platform Core (Option C: Layered Shared Core 
    - **[`TTSCoreOrchestrator`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/core_orchestrator.py)**: Dispatches requests through thread pools with error recovery and validation audits.
    - **[`TokenBucketRateLimiter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/rate_limiter.py)**: Round-robin load balancing across the 120+ active SQLite key pool with anti-bot jitter ($0.35\text{s}-0.85\text{s}$) and daily quota tracking.
 
-4. **Tier 4: Pluggable Model Adapters & Dynamic Registry**:
+4. **Tier 4: Pluggable Model Adapters & Control Plane Bridge**:
+   - **TTS Control Plane Bridge** ([`gateway_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/gateway_bridge.py)): Authoritative bridge implementing [`execute_tts_synthesize()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/gateway_bridge.py#L60) and [`extract_pcm_and_duration_from_audio()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/gateway_bridge.py#L33). Routes 100% of speech synthesis traffic through [`ModelGateway.synthesize_speech()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py#L248). Rogue unmetered `urllib` requests are completely eliminated, establishing fail-closed security.
+   - **Secret Hygiene & Clean Endpoints**: Plaintext API key query parameters (`?key={key}`) are permanently removed from all endpoints in [`gemini_adapter.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini_adapter.py) and [`gemini.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py). Authentication transmits strictly via official stealth `X-goog-api-key` headers via `get_stealth_sdk_headers()`.
+   - **ACID Key Leasing & 7 Iron Shields**: Leases Concurrency=1 mutual exclusion handles from [`KeyLeaseManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py#L130) under `workload_type="tts"`, enforcing 10 RPD ceilings on `gemini-3.8-flash-tts` with fixed SQL parameter ordering for `preferred_key_alias`. Active AntiBanGuard protection enforces 11.0 RPM token-bucket rate limits, 18s–32s key-switch cooldowns, scene session affinity, and the emergency global tripwire.
+   - **5-Category `BLOCK_NONE` Framing**: Injects permanent `BLOCK_NONE` thresholds across harassment, hate speech, sexually explicit, dangerous content, and civic integrity.
    - **[`BaseTTSModelAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/base.py)**: Abstract provider contract.
-   - **[`GeminiTTSAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini_adapter.py)**: Google Cloud REST API with permanent `BLOCK_NONE` creative safety thresholds, stealth SDK headers, and direct 24kHz linear PCM unpacking.
+   - **[`GeminiTTSAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini_adapter.py)**: Delegates to `execute_tts_synthesize()`, maps `DeliveryIntent` into `speechMetadata.style`, and extracts 24kHz 16-bit linear PCM.
    - **[`QwenTTSAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/qwen_adapter.py)**: Local Wafer-Scale / CosyVoice inference guarded by `HardwareVRAMGuard` semaphore locking, with offline synthetic fallback.
    - **[`ModelAdapterRegistry`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/registry.py)**: Dynamic singleton adapter lookup (`get_adapter_registry()`).
 
@@ -453,8 +457,11 @@ All production rooms interface strictly with [`ModelGateway`](file:///c:/Users/S
    - Maintains sticky key affinity across 8–15 continuous dialogue turns, avoiding edge ban heuristics while analyzing speaker attribution.
    - Executes Gate 2.9 Pre-TTS Sanity Gate ([`LLMPreSynthesisJudge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L51-L237)) with sticky session affinity (`session_id="gate2_9_pre_tts"`), auditing dialogue attribution, gender inflections, and dramaturgy sanity before handing off to Room 4.
 5. **Room 4 (Multi-Voice TTS Performance)**:
-   - Dispatches speech generation through `gateway.synthesize_speech(text=..., voice_name=..., task="tts")`.
-   - The gateway leases keys explicitly for the `gemini-3.8-flash-tts` audio model, enforces the strict 10 RPD daily quota ceilings, and transparently rotates to fresh keys upon exhaustion.
+   - Dispatches speech generation strictly via [`execute_tts_synthesize()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/gateway_bridge.py#L60) $\rightarrow$ `gateway.synthesize_speech(text=..., voice_name=..., task="tts")`.
+   - Acquires atomic Concurrency=1 mutual exclusion leases from `KeyLeaseManager` under `workload_type="tts"`, enforcing the strict 10 RPD daily quota ceilings on `gemini-3.8-flash-tts` and transparently rotating to fresh keys upon exhaustion.
+   - Eliminates all rogue `urllib` calls and strips plaintext key query parameters (`?key={key}`) in favor of official stealth `X-goog-api-key` headers.
+   - AntiBanGuard 7 Iron Shields are fully enforced across all synthesis calls (11.0 RPM token-bucket rate limiter, 18s–32s key-switch cooldown, emergency global tripwire).
+   - Audio payload frames are unpacked and validated via [`extract_pcm_and_duration_from_audio()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/gateway_bridge.py#L33), returning rich metadata in `SpeechResult.metadata`.
 6. **Room 5 (Mastering & Verification)**:
    - Queries `gateway.get_fleet_status()` for diagnostic reporting and quota telemetry without opening direct connections to `keys_inventory.db`.
 

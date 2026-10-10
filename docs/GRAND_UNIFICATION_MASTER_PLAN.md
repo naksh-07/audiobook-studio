@@ -324,9 +324,12 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
     - [`numeral_expander.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/numeral_expander.py): `DevanagariNumeralExpander` numerals, currencies (₹, $, €), percentages, units into Hindi words.
     - [`delivery_extractor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/delivery_extractor.py): `DeliveryIntentExtractor` stage cue scrubbing (`[whispers]`, `(anger)`) into structured `DeliveryIntent`.
     - [`chunker.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/chunker.py): `SemanticProseChunker` 4-tier hierarchy (Paragraph -> Sentence -> Clause -> Word) with zero mid-word splits.
-  - **Tier 3 Pluggable Model Adapters & Dynamic Registry** ([`providers/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/)):
-    - [`base.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/base.py): `BaseTTSModelAdapter` abstract contract.
-    - [`gemini_adapter.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini_adapter.py): `GeminiTTSAdapter` (123+ key pool, `BLOCK_NONE` creative safety, `[0.30, 0.52]` temperature clamp, Narrator locked at `0.32`).
+  - **Tier 3 Pluggable Model Adapters, Control Plane Bridge & Secret Hygiene** ([`providers/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/), [`gateway_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/gateway_bridge.py)):
+    - [`gateway_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/gateway_bridge.py): `execute_tts_synthesize` authoritative control-plane bridge routing 100% of Room 4 TTS traffic to `ModelGateway.synthesize_speech()`, establishing fail-closed security and eliminating unmetered rogue `urllib` requests. `extract_pcm_and_duration_from_audio` safely extracts 16-bit linear PCM and calculates duration from RIFF WAV containers and raw PCM streams.
+    - [`base.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/base.py): `BaseTTSModelAdapter` abstract contract and `SpeechResult.metadata` dictionary supporting attempt tracking and telemetry.
+    - [`gemini_adapter.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini_adapter.py): `GeminiTTSAdapter` fully delegates to `execute_tts_synthesize()`. Plaintext API key query parameters (`?key={key}`) permanently removed; official stealth `X-goog-api-key` header enforced via `get_stealth_sdk_headers()`. Multi-speaker batch endpoint in `gemini.py` also sanitized.
+    - **Control Plane Guarantees**: `KeyLeaseManager` ACID leasing (`workload_type="tts"`, Concurrency=1 mutual exclusion), `AntiBanGuard` 7 Iron Shields active across TTS (11.0 RPM token bucket, key-switch cooldown 18s-32s, emergency tripwire, stealth headers). Fixed SQL parameter binding order in `KeyLeaseManager.acquire_lease` for `preferred_key_alias`.
+    - **5-Category `BLOCK_NONE` Framing**: Full `BLOCK_NONE` coverage across Harassment, Hate Speech, Sexually Explicit, Dangerous Content, and Civic Integrity.
     - [`qwen_adapter.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/qwen_adapter.py): `QwenTTSAdapter` (HardwareVRAMGuard local fallback).
     - [`registry.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/registry.py): `ModelAdapterRegistry` with intelligent fallback cascades.
   - **Tier 4 Quality Gates, 4D Formants & Editorial DSP** ([`dsp/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/dsp/), [`quality_gate.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/quality_gate.py), [`formant_sculptor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/formant_sculptor.py), [`take_bank_manager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/take_bank_manager.py)):
@@ -343,11 +346,15 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
 1. **Commit Chain**:
    - `f5c99fd`: *feat(tts): merge Studio TTS Platform Core (Phase 5) from origin/tts-system into main*
    - `5655c12`: *feat(cli,tts): register modular TTS symbols in lazy imports and wire tts CLI subcommand*
+   - `7d2af90`: *feat(tts): harden TTS control plane bridge with ModelGateway and eliminate rogue urllib calls*
 2. **Adversarial Hardening Highlights**:
-   - Unified DC bias normalization condition in `audio_qc_agent.py` to preserve rail-clipped audio detection while correcting minor drift.
-   - Synchronized `KeyLeaseManager` delegation with `global_key_pool` in `key_manager.py`.
-   - Verified studio temperature clamping range `[0.30, 0.52]` across `test_canonical_path_integration.py`.
-   - 61/61 dedicated tests in `tests/tts/` green (100%).
+   - Built authoritative `gateway_bridge.py` (`execute_tts_synthesize`), eliminating rogue unmetered urllib requests from Room 4 TTS workers.
+   - Stripped plaintext API key query parameters (`?key={key}`) from all REST endpoints in `gemini_adapter.py` and `gemini.py`; enforced stealth `X-goog-api-key` headers via `get_stealth_sdk_headers()`.
+   - Enforced `KeyLeaseManager` ACID leasing (`workload_type="tts"`, Concurrency=1 mutual exclusion) and fixed SQL parameter binding order for `preferred_key_alias`.
+   - Activated `AntiBanGuard` 7 Iron Shields across all TTS requests (11.0 RPM token-bucket rate limiter, 18s–32s key-switch cooldown, emergency tripwire).
+   - Added `metadata` dictionary to `SpeechResult` supporting operational attempt tracking and telemetry.
+   - Expanded `GeminiProviderAdapter` safety framing to 5-category `BLOCK_NONE` coverage (including Civic Integrity).
+   - Verified 1,121/1,121 passed tests across the repository (100% green, monotonic increase from 1,060 baseline).
 3. **Sign-Off Status**: COMPLETED, AUDITED, HARDENED, & OFFICIALLY SIGNED OFF. Ready for Phase 6 (`origin/audio-mixing-and-production`).
 
 ---
@@ -355,13 +362,13 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
 ## 6. Forward Milestones Summary
 
 | Phase | Subsystem | Status | Target Test Baseline | Key Deliverable |
-| :--- | :--- | :---: | :---: | :--- |
+| :--- | :--- | :--- | :---: | :--- |
 | **Phase 1** | Model & Keys Manager | **COMPLETED & VERIFIED** | 43/43 + 80/80 + 881 Green | Production Control Plane, 123-Key Fleet & Anti-Ban Guard |
 | **Phase 2** | Novel Researcher & Pre-Production | **COMPLETED & VERIFIED** | 30/30 + 43/43 + 37/37 Green | 2-System Pre-Production, Cast Lock & State Maintainer (`origin/research-system`) |
 | **Phase 3** | Standalone Translation (Option D) | **COMPLETED & VERIFIED** | 105/105 + 225+ Unified Green | Single-Pass Macro-Chunker, DeterministicParityGate & Gateway Bridge (`origin/translation`) |
 | **Room 1.5** | Standalone Glossary & Metadata | **COMPLETED & VERIFIED** | 8/8 + 28/28 Unified Green | Multi-Consumer Projections, Tri-Partite Taxonomy & Zero-Token Fast Path (`audiobook_factory/glossary/`) |
 | **Phase 4** | Universal Dramaturgy (Option C) | **COMPLETED & VERIFIED** | 54/54 + 56/56 + 1,025+ Green | Chapter Dramatic AST, Dual-Host Adapters, Studio Certification & Packaging (`origin/dramaturgy`) |
-| **Phase 5** | Studio TTS Platform Core | **COMPLETED & VERIFIED** | 61/61 + ~1,120+ Unified Green | 5-Tier Modular TTS Platform Core, TakeBank & Net-Silence (`origin/tts-system`) |
+| **Phase 5** | Studio TTS Platform Core & Control Plane Hardening | **COMPLETED & VERIFIED** | 1,121/1,121 Unified Green | 5-Tier Modular TTS Platform Core, ModelGateway Bridge, TakeBank & Net-Silence (`origin/tts-system`) |
 | **Phase 6** | Pro-Grade AI Vocal Mastering | **READY TO EXECUTE** | ~1,200 Tests | C++ JUCE / FFmpeg Vocal Mastering & M4B (`origin/audio-mixing-and-production`) |
 | **Phase 7** | Enterprise DAG Orchestrator & UI | Queued | ~1,250 Tests | SQLite WAL Pipeline Ledger & Studio Panel UI (`origin/Voculs`) |
 
