@@ -4,15 +4,11 @@
 <!-- LINE_BUDGET_HARD_CAP: 50 LINES -->
 # Active Context: Audiobook Studio Antigravity Plugin & Studio Engine (v6.0)
 
-## Current Focus: Grand Unification DAG - Phase 5 (Studio TTS Platform Core) Merged & Certified
+## Current Focus: Grand Unification DAG - Phase 6 (AI Vocal Mastering Workstation) Merged
 - **Master Plan**: [GRAND_UNIFICATION_MASTER_PLAN.md](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GRAND_UNIFICATION_MASTER_PLAN.md) (7-Layer Topological Merge DAG).
-- **Phases 1-4 & Room 1.5, 3.5 (COMPLETED & CERTIFIED)**:
-  - Phase 1 (ModelGateway & 123+ keys), Phase 2 (Novel Researcher), Room 1.5 (Glossary), Phase 3 (Translation Option D), Phase 4 (Universal Dramaturgy, Adapters & Gate 2.9), Room 3.5 (Voice Casting & Calibration SVCCS, Gate 2.8).
-- **Phase 5: Studio TTS Platform Core & Control Plane Hardening (COMPLETED & CERTIFIED)**:
-  - Tier 1: `GenericTTSClient`, `LongFormTTSClient`, `MultiCastStudioClient`.
-  - Tier 2: `UniversalInputGuard` (sacred/spoken boundary), `DevanagariNumeralExpander`, `DeliveryIntentExtractor`, `SemanticProseChunker` (4-tier hierarchy).
-  - Tier 3: `ModelAdapterRegistry`, `GeminiTTSAdapter` (123+ key pool, `BLOCK_NONE`), `QwenTTSAdapter` (HardwareVRAMGuard).
-  - Tier 4: `TwoTierAudioQualityGate`, `FormantSculptor` (headroom EQ biquad & soft tanh), `TakeBankManager` (candidate auditioning), `EditorialDSPEngine` (12ms/18ms Hann fades, net silence).
-  - Control Plane Hardening & Dispatcher Unification: Created `gateway_bridge.py` (`execute_tts_synthesize`, `execute_tts_to_file`, `execute_multispeaker_batch_to_file`), bridged legacy `TTSDispatcher` to `ModelGateway`, native `multiSpeakerVoiceConfig` payload formatting, eliminated rogue urllib calls, sanitized query string API keys, enforced `KeyLeaseManager` ACID leasing (`workload_type="tts"`, Concurrency=1), activated `AntiBanGuard` 7 Iron Shields (11 RPM token bucket).
-  - Verification: 1,126/1,126 passed tests across the repository (100% green, zero failures).
-- **Next Milestone**: Phase 6 Pro-Grade AI Vocal Mastering (`origin/audio-mixing-and-production`).
+- **Phases 1-5 (COMPLETED & CERTIFIED)**:
+  - Phase 1 (ModelGateway & 123+ keys), Phase 2 (Novel Researcher), Room 1.5 (Glossary), Phase 3 (Translation Option D), Phase 4 (Universal Dramaturgy & Adapters), Room 3.5 (Voice Casting & Calibration SVCCS), Phase 5 (Studio TTS Platform Core & Gateway Bridge Dispatcher Unification, 1,126 tests).
+- **Phase 6: Pro-Grade AI Vocal Mastering Workstation (MERGED & CERTIFIED)**:
+  - Room 5 Vocal Mastering Core (`audiobook_factory/audio/`): Ingestion (48kHz/24-bit, 30Hz highpass, 5ms Hann taper), `ChunkStreamComposer` (syntax pauses, stereo staging), `VocalDSPProcessor` (Pedalboard JUCE EQ/Comp/Limiter + FFmpeg dual-pass linear loudnorm fallback), `AudioQAAuditor` (VAD, 75-240 WPM, MOS, dropouts), `NeuralVocalEnhancer` (DeepFilterNet3 >45dB auto-bypass), `ReferenceSpectrumMatcher` (+-3dB clamp), `ChapterSegmentLedger` (DAG segment hashing), `SingleSegmentHotPatcher` (<0.2s line repair), `JanitorShield` (isolated scratch & deliverable protection), `ChapterDeliveryEncoder` (192k AAC single pass), `M4BBookPackager` (-map_chapters 1 monotonic TOC).
+  - MCP & CLI: `audiobook_factory/mcp/server.py` and CLI subcommands `dsp`, `qa-audit`, `enhance`, `match-ref`.
+- **Next & Final Milestone**: Phase 7 Crown Jewel Enterprise DAG Orchestrator & Studio UI Panel (`origin/Voculs`).

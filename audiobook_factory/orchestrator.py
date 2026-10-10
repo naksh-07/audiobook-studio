@@ -419,15 +419,9 @@ class PipelineOrchestrator:
         cinematic_out = mastered_dir / f"{chap_stem}_cinematic.m4a"
         logger.info(f"[*] Vocals-Only Mastering Engine: Encoding studio master for Chapter {chapter_num:02d}...")
 
-        import subprocess
-        ff = get_ffmpeg()
-        cmd_enc = [
-            ff, "-y",
-            "-i", str(vocal_wav),
-            "-c:a", "aac", "-b:a", "192k",
-            str(mastered_out),
-        ]
-        subprocess.run(cmd_enc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=300.0)
+        from audiobook_factory.audio.encoder import ChapterDeliveryEncoder
+        encoder = ChapterDeliveryEncoder()
+        encoder.encode_chapter_m4a(vocal_wav, mastered_out, target_bitrate="192k", max_true_peak_dbtp=-1.5)
         try:
             import shutil
             shutil.copy2(mastered_out, cinematic_out)

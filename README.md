@@ -40,6 +40,8 @@ Production compute is 100% focused on vocal clarity, multi-character acting nuan
 - **Google Gemini Flash TTS Key Pool**: 120+ active rotating API keys with token-bucket concurrency, daily quota tracking (10 RPD per key on `gemini-3.8-flash-tts`), and permanent `BLOCK_NONE` safety settings.
 - **4D Acoustic Formant Modulation**: Modulates pitch delta ($\pm 4-12\%$), tempo rate, and 4D parametric EQ curves (`equalizer=f=...`) via FFmpeg DSP to prevent vocal convergence across shared base TTS voices.
 - **Stanislavski Directing Restraint**: Clamped temperature (`0.30 - 0.52`) and physical vocal anchors eliminate histrionics and pitch screeching.
+- **Pro-Grade AI Vocal Mastering Workstation (Room 5)**: High-performance C++ JUCE / Pedalboard DSP with 4-band vocal parametric EQ (75Hz subsonic cut, 320Hz boxiness reduction, 3.2kHz presence lift), optical vocal compression, and True-Peak limiting ($\le -1.5\text{ dBTP}$), with seamless deterministic FFmpeg dual-pass linear loudnorm fallback.
+- **Forensic Speech QA Auditor & AI Polish**: `AudioQAAuditor` (energy VAD, speaking pace 75–240 WPM, dropouts/loops detection, MOS scoring), DeepFilterNet3 neural polish with selective $>45\text{dB}$ SNR auto-bypass, Matchering 2.0 reference spectrum matching ($\pm 3.0\text{dB}$ clamp), and `<0.2s` single-segment hot-patching.
 - **8-Pillar Studio Production Certification Harness**: Autonomous, fail-closed verification across extraction, translation, dramaturgy, attribution, performance, loudness, spatial staging, and packaging.
 
 ---
@@ -401,6 +403,7 @@ For exhaustive technical guides, visit the [`docs/`](docs/) directory and subsys
 - [💻 CLI Reference Manual](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/CLI_REFERENCE.md)
 - [🔬 Novel Researcher Architecture Specification (2-System Decomposition)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/NOVEL_RESEARCHER_ARCHITECTURE.md)
 - [🎛️ Audio Engineering & Mastering Standards](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)
+- [🎛️ Pro-Grade AI Vocal Mastering & Production (v5.4)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/VOCAL_AUDIO_MIXING_AND_PRODUCTION.md)
 - [🎙️ Gemini Flash TTS Synthesis & Directing](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
 - [🎭 Voice Casting Director Guide](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/VOICE_CASTING_DIRECTOR_GUIDE.md)
 - [🇮🇳 Complete Hindi Voice Catalog](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/HINDI_VOICE_CATALOG.md)

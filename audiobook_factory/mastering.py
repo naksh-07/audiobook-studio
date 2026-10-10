@@ -472,9 +472,9 @@ def concatenate_and_master_chapter(
 
         effective_lra = min(loudness_range, 6.0) if (has_whisper and not has_explosive) else loudness_range
 
-        limiter_limit = 0.82 if has_explosive else 0.89
-        limiter_attack = 2 if has_explosive else 5
-        target_tp = min(true_peak_db, -2.0) if has_explosive else true_peak_db
+        limiter_limit = 0.75 if has_explosive else 0.7943  # -2.0 dBFS ceiling prevents AAC inter-sample clipping
+        limiter_attack = 2 if has_explosive else 3
+        target_tp = min(true_peak_db, -2.0)
 
         pass1_stats = None
         if loudnorm:
@@ -519,10 +519,13 @@ def concatenate_and_master_chapter(
                     f"offset={pass1_stats['target_offset']}:"
                     f"linear=true"
                 )
+            elif pass1_stats and (pass1_stats.get("input_i") in ("-inf", "inf") or float(pass1_stats.get("input_i", 0.0)) <= -69.0):
+                # AP-08 Invariant: Near silence - do not apply dynamic loudnorm AGC pumping
+                filter_parts.append("volume=0.0dB")
             else:
                 filter_parts.append(f"loudnorm=I={target_lufs}:TP={target_tp:.1f}:LRA={effective_lra:.1f}")
 
-        filter_parts.append(f"alimiter=limit={limiter_limit}:attack={limiter_attack}:release=50:asc=0:level=0")
+        filter_parts.append(f"alimiter=limit={limiter_limit}:attack={limiter_attack}:release=40:asc=0:level=0")
         filter_parts.append(f"aresample=osr={target_sample_rate}:filter_type=kaiser:dither_method=triangular")
         filter_chain = ",".join(filter_parts)
 
@@ -531,7 +534,7 @@ def concatenate_and_master_chapter(
             codec = "aac"
             bitrate_args = ["-b:a", "192k"]
         elif ext == ".wav":
-            codec = "pcm_s16le"
+            codec = "pcm_s24le"
             bitrate_args = []
         else:
             codec = "libmp3lame"

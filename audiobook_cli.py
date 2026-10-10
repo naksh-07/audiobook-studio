@@ -184,11 +184,43 @@ def main():
     p_tts.add_argument("--model", default="gemini-3.8-flash", help="TTS model (default: gemini-3.8-flash)")
     p_tts.add_argument("--out", default="output.wav", help="Output WAV path (default: output.wav)")
 
+    # dsp
+    p_dsp = subparsers.add_parser("dsp", help="Apply C++ JUCE parametric vocal EQ, compression, and True-Peak limiter")
+    p_dsp.add_argument("--input", "-i", required=True, help="Input WAV audio file")
+    p_dsp.add_argument("--output", "-o", required=True, help="Output mastered WAV audio file")
+    p_dsp.add_argument("--target-lufs", type=float, default=-19.0, help="Target LUFS (default: -19.0)")
+    p_dsp.add_argument("--true-peak", type=float, default=-1.5, help="True Peak ceiling in dBTP (default: -1.5)")
+
+    # qa-audit
+    p_qa = subparsers.add_parser("qa-audit", help="Forensic speech QA audit (VAD, speaking rate bounds, dropouts, loops, MOS)")
+    p_qa.add_argument("--input", "-i", required=True, help="Input WAV audio file")
+    p_qa.add_argument("--text", "-t", default="", help="Expected spoken text")
+    p_qa.add_argument("--speaker", "-s", default="Narrator", help="Speaker name")
+
+    # enhance
+    p_enh = subparsers.add_parser("enhance", help="Apply DeepFilterNet3 neural speech de-artifacting with auto-bypass")
+    p_enh.add_argument("--input", "-i", required=True, help="Input WAV audio file")
+    p_enh.add_argument("--output", "-o", required=True, help="Output enhanced WAV file")
+
+    # match-ref
+    p_mr = subparsers.add_parser("match-ref", help="Match target frequency spectrum to reference golden master (clamped +/-3dB)")
+    p_mr.add_argument("--target", "-t", required=True, help="Target WAV audio file")
+    p_mr.add_argument("--reference", "-r", required=True, help="Golden reference WAV master")
+    p_mr.add_argument("--output", "-o", required=True, help="Output matched WAV file")
+    p_mr.add_argument("--max-clamp", type=float, default=3.0, help="Maximum spectral correction in dB (default: 3.0)")
+
     args = parser.parse_args()
 
     if not args.subcommand:
         parser.print_help()
         sys.exit(1)
+
+    from audiobook_factory.cli.commands.audio import (
+        cmd_dsp,
+        cmd_qa_audit,
+        cmd_enhance,
+        cmd_match_ref,
+    )
 
     def _handle_podcast(a):
         target_path = Path(a.target)
@@ -235,6 +267,10 @@ def main():
         "audit-book": cmd_audit_book,
         "keys": cmd_keys,
         "tts": _handle_tts,
+        "dsp": cmd_dsp,
+        "qa-audit": cmd_qa_audit,
+        "enhance": cmd_enhance,
+        "match-ref": cmd_match_ref,
     }
 
     try:

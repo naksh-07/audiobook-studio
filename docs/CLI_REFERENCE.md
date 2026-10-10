@@ -36,6 +36,10 @@ python audiobook_cli.py [COMMAND] [OPTIONS]
 | **[`master`](#11-vocal-dsp-mastering-master)** | Mastering | Master WAV | Concatenates segments with Hann micro-fades and normalizes to broadcast EBU R128. |
 | **[`keys`](#12-key-inventory--fleet-monitor-keys)** | Control Plane | Fleet Status | Inspects key fleet status, active leases (`Concurrency = 1`), audit logs, and resets quotas. |
 | **[`tts`](#13-ad-hoc-speech-synthesis-tts)** | Utterance / Audition | `output.wav` | Ad-hoc speech synthesis via modular TTS Platform Core ([`GenericTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/generic_client.py)). |
+| **[`dsp`](#15-vocal-dsp-mastering-dsp)** | Standalone Audio | Mastered WAV | Applies C++ JUCE parametric vocal EQ, optical compression, and True-Peak limiting ($\le -1.5\text{ dBTP}$). |
+| **[`qa-audit`](#16-forensic-speech-qa-audit-qa-audit)** | QA (Speech) | JSON Telemetry | Forensically audits speech segment for VAD, speaking pace (75-240 WPM), dropouts, loops, and MOS. |
+| **[`enhance`](#17-neural-vocal-polish-enhance)** | Polish / Denoise | Cleaned WAV | DeepFilterNet3 neural speech polish with $>45\text{dB}$ SNR auto-bypass. |
+| **[`match-ref`](#18-reference-spectrum-matching-match-ref)** | Spectral Match | Matched WAV | Matchering 2.0 reference spectrum matching with $\pm 3.0\text{dB}$ hard clamping. |
 | **[`podcast-cli`](#14-modular-podcast-subsystem-cli)** | Modular Engine | Subsystem | Dedicated CLI for granular podcast workflows (`produce`, `script`, `render`, `inspect`). |
 
 ---
@@ -650,7 +654,145 @@ Output includes total spoken turns, total word count, estimated runtime, cast co
 
 ---
 
-## 15. 📦 Archived Subsystems Notice
+## 15. Vocal DSP Mastering (`dsp`)
+
+Applies high-performance C++ JUCE parametric vocal EQ, optical compression, and True-Peak limiting via Spotify Pedalboard and ITU-R BS.1770-4 loudness compliance. Falls back seamlessly to deterministic FFmpeg dual-pass linear mastering if Pedalboard is unavailable.
+
+```bash
+python audiobook_cli.py dsp --input <INPUT_WAV> --output <OUTPUT_WAV> [OPTIONS]
+```
+
+### Options
+| Flag | Short | Type | Default | Description |
+|---|:---:|:---:|:---:|---|
+| `--input` | `-i` | Path | *Required* | Path to input 48kHz WAV audio file. |
+| `--output` | `-o` | Path | *Required* | Target destination for mastered 48kHz 24-bit PCM WAV. |
+| `--target-lufs` | | Float | `-19.0` | EBU R128 integrated loudness target in LUFS (-24.0 to -14.0). |
+| `--true-peak` | | Float | `-1.5` | Lookahead True Peak limiter ceiling in dBTP (-3.0 to -0.5). |
+
+### Output JSON Telemetry
+```json
+{
+  "status": "SUCCESS",
+  "backend_used": "pedalboard_juce_v2",
+  "output_path": "C:/audiobooks/masters/chapter_001_master.wav",
+  "integrated_lufs": -18.96,
+  "true_peak_dbtp": -1.50,
+  "loudness_range_lu": 7.42,
+  "execution_duration_sec": 0.38
+}
+```
+
+### Example
+```bash
+python audiobook_cli.py dsp -i "raw_chapter.wav" -o "mastered_chapter.wav" --target-lufs -19.0 --true-peak -1.5
+```
+
+---
+
+## 16. Forensic Speech QA Audit (`qa-audit`)
+
+Forensically audits a single speech audio segment or full take for Voice Activity Detection (VAD) boundaries, text-grounded speaking rate (WPM and char/sec), TTS dropouts, repetition loops, and non-intrusive Speech MOS (Mean Opinion Score).
+
+```bash
+python audiobook_cli.py qa-audit --input <INPUT_WAV> [OPTIONS]
+```
+
+### Options
+| Flag | Short | Type | Default | Description |
+|---|:---:|:---:|:---:|---|
+| `--input` | `-i` | Path | *Required* | Path to synthesized speech WAV file. |
+| `--text` | `-t` | String | `""` | Expected spoken text for script grounding and WPM calculation. |
+| `--speaker` | `-s` | String | `Narrator` | Speaker character name or Narrator tag. |
+
+### Output JSON Telemetry
+```json
+{
+  "segment_index": 1,
+  "segment_uid": "c01_s001_Aoede",
+  "speaker": "Narrator",
+  "status": "PASS",
+  "duration_ms": 3420,
+  "estimated_wpm": 142.1,
+  "char_per_sec": 14.8,
+  "predicted_mos": 4.65,
+  "silence_leading_ms": 40,
+  "silence_trailing_ms": 60,
+  "issues": [],
+  "remediation_advice": null
+}
+```
+
+### Example
+```bash
+python audiobook_cli.py qa-audit -i "c01_s001.wav" -t "The old tavern was shrouded in darkness." -s "Narrator"
+```
+
+---
+
+## 17. Neural Vocal Polish (`enhance`)
+
+Cleans synthetic TTS metallic hash, high-frequency quantization hiss, and room tone using **DeepFilterNet3** (48kHz full-band). Employs **Selective Auto-Bypass** for pristine takes ($>45\text{ dB}$ SNR) and **Energy Difference Clamping** ($|\Delta\text{RMS}| \le 2.0\text{ dB}$) to preserve delicate consonants without robotic gating.
+
+```bash
+python audiobook_cli.py enhance --input <INPUT_WAV> --output <OUTPUT_WAV>
+```
+
+### Options
+| Flag | Short | Type | Default | Description |
+|---|:---:|:---:|:---:|---|
+| `--input` | `-i` | Path | *Required* | Input WAV audio file. |
+| `--output` | `-o` | Path | *Required* | Output enhanced 48kHz 24-bit PCM WAV. |
+
+### Output JSON Telemetry
+```json
+{
+  "status": "SUCCESS",
+  "output_path": "cleaned_vocal.wav",
+  "was_enhanced": true
+}
+```
+
+### Example
+```bash
+python audiobook_cli.py enhance -i "grainy_take.wav" -o "cleaned_take.wav"
+```
+
+---
+
+## 18. Reference Spectrum Matching (`match-ref`)
+
+Transplants the frequency spectrum, tonal balance, and dynamic curve of a golden reference master (e.g. Audible bestseller master) onto target audio using **Matchering 2.0**. Enforces a **hard $\pm 3.0\text{ dB}$ clamp** on spectral correction to prevent unnatural acoustic artifacts or frequency pumping.
+
+```bash
+python audiobook_cli.py match-ref --target <TARGET_WAV> --reference <REF_WAV> --output <OUT_WAV> [OPTIONS]
+```
+
+### Options
+| Flag | Short | Type | Default | Description |
+|---|:---:|:---:|:---:|---|
+| `--target` | `-t` | Path | *Required* | Target WAV audio file to be balanced. |
+| `--reference` | `-r` | Path | *Required* | Golden reference WAV audio master. |
+| `--output` | `-o` | Path | *Required* | Output matched 48kHz 24-bit PCM WAV. |
+| `--max-clamp` | | Float | `3.0` | Maximum spectral EQ adjustment in dB ($\pm 0.5$ to $\pm 6.0$). |
+
+### Output JSON Telemetry
+```json
+{
+  "status": "SUCCESS",
+  "output_path": "matched_chapter.wav",
+  "max_clamp_db": 3.0
+}
+```
+
+### Example
+```bash
+python audiobook_cli.py match-ref -t "my_chapter.wav" -r "audible_ref_master.wav" -o "final_matched.wav" --max-clamp 2.5
+```
+
+---
+
+## 19. 📦 Archived Subsystems Notice
 
 The legacy subcommands (`direct`, `render`, `bgm`, `stems`, `bank`) belong to the decoupled 5-track cinematic audio engine and are archived in `archive/cinematic_audio/`. They are not part of the active Vocals-Only pipeline.
 

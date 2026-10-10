@@ -77,7 +77,7 @@ class TestMasteringEngineV2(unittest.TestCase):
         """Verify engine properties and default initialization."""
         self.assertIsNotNone(self.engine.analyzer)
         self.assertIsNotNone(self.engine.qc_agent)
-        self.assertEqual(self.engine.version, "2.2.0")
+        self.assertEqual(self.engine.version, "2.4.0")
         self.assertIsNotNone(self.engine.perceptual_critic)
         self.assertIsNotNone(self.engine.scene_engine)
         self.assertIsNotNone(self.engine.certifier)

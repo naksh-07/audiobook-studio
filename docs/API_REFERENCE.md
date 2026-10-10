@@ -6,7 +6,7 @@ The `audiobook_factory` package provides a strictly-typed, modular architecture 
 
 ---
 
-## 📐 Data Contracts ([`audiobook_factory.contracts`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/contracts.py))
+## 📐 Data Contracts ([`audiobook_factory.contracts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts.py))
 
 ### 1. `ProjectConfig` & `CharacterProfile`
 *Project setup, adult literary fidelity configuration, and character sociolect profiles.*
@@ -283,7 +283,7 @@ class BookMasterManifest(BaseModel):
 
 ## 🏛️ Core Engine Classes
 
-### `PipelineOrchestrator` ([`audiobook_factory.orchestrator`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/orchestrator.py))
+### `PipelineOrchestrator` ([`audiobook_factory.orchestrator`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/orchestrator.py))
 *Coordinates the complete autonomous novel production lifecycle.*
 
 ```python
@@ -331,7 +331,7 @@ class PipelineOrchestrator:
         """Produces a single cinematic chapter with stems, timeline ledger, and quality checks."""
 ```
 
-### `UniversalExtractor` ([`audiobook_factory.extractor`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/extractor.py))
+### `UniversalExtractor` ([`audiobook_factory.extractor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extractor.py))
 *Multi-format document parser with native pypdf digital parsing and Gemini multimodal fallback.*
 
 ```python
@@ -350,7 +350,7 @@ def split_large_chapter_on_semantic_boundary(
     """Splits oversized chapters along paragraph boundaries to avoid LLM context overflow."""
 ```
 
-### `LiteraryTranslator` ([`audiobook_factory.translator`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/translator.py))
+### `LiteraryTranslator` ([`audiobook_factory.translator`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translator.py))
 *Two-pass literary Hindustani translation engine with glossary synchronization and rolling narrative context.*
 
 ```python
@@ -374,7 +374,7 @@ def normalize_translated_lexicon(text: str, glossary: Dict[str, str]) -> str:
     """Applies canonical proper noun substitutions to translated text based on project glossary."""
 ```
 
-### `LinguisticSanitizer` ([`audiobook_factory.sanitizer`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/sanitizer.py))
+### `LinguisticSanitizer` ([`audiobook_factory.sanitizer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/sanitizer.py))
 *Defense-in-depth linguistic guardrail, TTS vocal tag validator, and profanity preservation engine.*
 
 ```python
@@ -406,7 +406,7 @@ def sanitize_screenplay_segment(
     """
 ```
 
-### `ScriptBuilder` ([`audiobook_factory.script_builder`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/script_builder.py))
+### `ScriptBuilder` ([`audiobook_factory.script_builder`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/script_builder.py))
 *Sliding-window dialogue parsing and character attribution engine.*
 
 ```python
@@ -426,9 +426,9 @@ def build_dramatized_script_llm(
     """Extracts speaker tags, emotions, delivery styles, and spatial pan coordinates."""
 ```
 
-### `TTSDispatcher` ([`audiobook_factory.tts_dispatcher`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/tts_dispatcher.py))
+### `TTSDispatcher` ([`audiobook_factory.tts_dispatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts_dispatcher.py))
 *Token-Bucket concurrent speech synthesizer, multimodal audio director, and zero-voice-drift orchestrator.*  
-*(See comprehensive technical manuals: [`docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md) and [`docs/VOICE_CASTING_DIRECTOR_GUIDE.md`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/docs/VOICE_CASTING_DIRECTOR_GUIDE.md))*
+*(See comprehensive technical manuals: [`docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md) and [`docs/VOICE_CASTING_DIRECTOR_GUIDE.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/VOICE_CASTING_DIRECTOR_GUIDE.md))*
 
 ```python
 class UnregisteredSpeakerError(KeyError):
@@ -505,7 +505,7 @@ def probe_key_health(api_key: str) -> bool:
     """Verifies API key validity and active quota with Google AI Studio."""
 ```
 
-### `AgentDirector` ([`audiobook_factory.agent_director`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/agent_director.py))
+### `AgentDirector` ([`audiobook_factory.agent_director`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/agent_director.py))
 *Autonomous dramaturgy and acoustic soundscape director.*
 
 ```python
@@ -542,7 +542,7 @@ class AgentDirector:
         """Resolves sound asset from sound bank using category guards (e.g. DOMETabl vs WEAPSwd)."""
 ```
 
-### `SonicBible` ([`audiobook_factory.sonic_bible`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/sonic_bible.py))
+### `SonicBible` ([`audiobook_factory.sonic_bible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/sonic_bible.py))
 *Project-level soundscape and leitmotif registry.*
 
 ```python
@@ -558,7 +558,7 @@ class SonicBible:
     def load_from_disk(cls, filepath: Path) -> SonicBible: ...
 ```
 
-### `SoundBank` ([`audiobook_factory.sound_bank`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/sound_bank.py))
+### `SoundBank` ([`audiobook_factory.sound_bank`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/sound_bank.py))
 *High-performance SQLite FTS5 audio warehouse.*
 
 ```python
@@ -581,7 +581,7 @@ class SoundBank:
         """Returns track counts, durations, and category distribution."""
 ```
 
-### `AcousticBusMatrix` ([`audiobook_factory.acoustic_bus_matrix`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/acoustic_bus_matrix.py))
+### `AcousticBusMatrix` ([`audiobook_factory.acoustic_bus_matrix`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/acoustic_bus_matrix.py))
 *Dynamic ducking profiles, UCS category resolution, and formant pocketing.*
 
 ```python
@@ -607,7 +607,7 @@ def filter_concurrency_window(
     """Applies voice limiter & priority stealing to prevent transient clumping within 200ms."""
 ```
 
-### `UniversalSoundBankIngester` ([`audiobook_factory.sound_bank_ingest`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/sound_bank_ingest.py))
+### `UniversalSoundBankIngester` ([`audiobook_factory.sound_bank_ingest`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/sound_bank_ingest.py))
 *Multi-threaded batch audio ingestion pipeline.*
 
 ```python
@@ -622,7 +622,7 @@ class UniversalSoundBankIngester:
         """Probes, extracts acoustic metadata, and indexes all audio files concurrently."""
 ```
 
-### `CinemaAudioEngine` ([`audiobook_factory.cinema_audio_engine`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/cinema_audio_engine.py))
+### `CinemaAudioEngine` ([`audiobook_factory.cinema_audio_engine`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/cinema_audio_engine.py))
 *Film-standard discrete stem renderer and packaging ledger with Music-Only 2.2kHz notch EQ.*
 
 ```python
@@ -636,7 +636,7 @@ def render_discrete_stems(
     """Renders 5 discrete DME stems (DX, MX, FX, AMB, ME) with isolated 2.2kHz notch on Music [0:a] only, and final broadcast master."""
 ```
 
-### `ManifestRenderer` ([`audiobook_factory.manifest_renderer`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/manifest_renderer.py))
+### `ManifestRenderer` ([`audiobook_factory.manifest_renderer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/manifest_renderer.py))
 *Dynamic FFmpeg `filter_complex` compiler.*
 
 ```python
@@ -652,7 +652,7 @@ def get_reverb_filter_string(preset: str = "room") -> Tuple[str, float]:
     """Generates FFmpeg aecho parameters and wet mix gain for scene presets."""
 ```
 
-### `Mastering` ([`audiobook_factory.mastering`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/mastering.py))
+### `Mastering` ([`audiobook_factory.mastering`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering.py))
 *Vocal DSP processing and EBU R128 loudness normalization.*
 
 ```python
@@ -671,7 +671,7 @@ def concatenate_and_master_chapter(
     """Concatenates speech WAVs, applies 5-stage DSP chain, and normalizes loudness."""
 ```
 
-### `Packager` ([`audiobook_factory.packager`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/packager.py))
+### `Packager` ([`audiobook_factory.packager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/packager.py))
 *M4B container packaging with AAC safety validation, faststart atom placement, and artwork embedding.*
 
 ```python
@@ -694,7 +694,7 @@ def generate_ffmetadata(
     """Generates standard FFMETADATA1 file with escaped title, artist, and chapter timestamps."""
 ```
 
-### `Foley & Magic Composite Baker` ([`scripts/bake_foley_composites.py`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/scripts/bake_foley_composites.py))
+### `Foley & Magic Composite Baker` ([`scripts/bake_foley_composites.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/scripts/bake_foley_composites.py))
 *Offline pre-rendering of multi-phase Harry Potter magic spells and tactile props, indexed into SQLite FTS5.*
 
 ```python
@@ -713,7 +713,7 @@ def bake_all_magic_and_foley_composites() -> None:
 
 ---
 
-## 🛡️ Quality Gate Auditor ([`audiobook_factory.gate_auditor`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/gate_auditor.py))
+## 🛡️ Quality Gate Auditor ([`audiobook_factory.gate_auditor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gate_auditor.py))
 
 ```python
 # Result Contract
@@ -1438,7 +1438,7 @@ class GlossaryManager:
 > Canonical novel data models ([`BookBible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py#L184) and [`BookEntity`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py#L26)) are centrally defined in [`audiobook_factory.metadata.book_bible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py).
 > The translation package re-exports them via [`audiobook_factory.translation.book_bible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/book_bible.py) for 100% backward compatibility.
 
-### 1. `BookBible` & `BookEntity` ([`audiobook_factory.translation.book_bible`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/translation/book_bible.py))
+### 1. `BookBible` & `BookEntity` ([`audiobook_factory.translation.book_bible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/book_bible.py))
 *Persistent canonical repository (`book_bible.json`) with SHA-256 versioning and one-way legacy glossary projection.*
 
 ```python
@@ -1607,8 +1607,8 @@ class TranslationEngine:
         and deterministic parity verification in a completely standalone environment."""
 ```
 
-### 5. World & Character Memory 2.0 ([`audiobook_factory.translation.memory`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/translation/memory/))
-*(See complete specification: [`docs/WORLD_AND_CHARACTER_MEMORY_2_0.md`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/docs/WORLD_AND_CHARACTER_MEMORY_2_0.md))*
+### 5. World & Character Memory 2.0 ([`audiobook_factory.translation.memory`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/memory/))
+*(See complete specification: [`docs/WORLD_AND_CHARACTER_MEMORY_2_0.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/WORLD_AND_CHARACTER_MEMORY_2_0.md))*
 
 *Event-driven narrative continuity, epistemic isolation (`MUST_NOT_KNOW`), dual-chronology validation, and performance guidance.*
 
@@ -1840,7 +1840,7 @@ class MemoryRetriever:
 
 ## 🎹 15. Sonic Intelligence Engine (Phases 1–3)
 
-### A. Phase 3 Retrieval Contracts ([`audiobook_factory.contracts`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/contracts.py))
+### A. Phase 3 Retrieval Contracts ([`audiobook_factory.contracts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts.py))
 
 ```python
 # audiobook_factory/sonic_query_planner.py
@@ -2103,7 +2103,7 @@ class DeterministicAudioAnalyzer:
 
 ---
 
-## ⚖️ Unified LLM Creative Quality & Audit Judge Protocol ([`audiobook_factory.gates.llm_judge`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/gates/llm_judge.py))
+## ⚖️ Unified LLM Creative Quality & Audit Judge Protocol ([`audiobook_factory.gates.llm_judge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/llm_judge.py))
 
 ### 1. Verdict Schemas
 
@@ -2247,7 +2247,7 @@ class LLMSoundDesignCritic(BaseLLMJudge):
 
 ## 🛡️ Pre-Mix Reality & Sound Bank Verification Engines
 
-### 1. `AudioRealityAuditor` ([`audiobook_factory.audio_reality_auditor`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/audio_reality_auditor.py))
+### 1. `AudioRealityAuditor` ([`audiobook_factory.audio_reality_auditor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio_reality_auditor.py))
 
 ```python
 class AuditedCueRecord(BaseModel):
@@ -2292,7 +2292,7 @@ class AudioRealityAuditor:
         """Audits cues, clamps durations, quenches repetition, and purges rogue Foley music."""
 ```
 
-### 2. `AudioVerificationGate` ([`audiobook_factory.sound_bank.verification_gate`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/sound_bank/verification_gate.py))
+### 2. `AudioVerificationGate` ([`audiobook_factory.sound_bank.verification_gate`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/sound_bank/verification_gate.py))
 
 ```python
 @dataclass
@@ -2323,7 +2323,7 @@ class AudioVerificationGate:
 
 ## 🌍 Universal Project Classification & Sonic Bible Generation
 
-### 1. `ProjectClassifier` ([`audiobook_factory.project_classifier`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/project_classifier.py))
+### 1. `ProjectClassifier` ([`audiobook_factory.project_classifier`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/project_classifier.py))
 
 ```python
 @dataclass
@@ -2345,7 +2345,7 @@ class ProjectClassifier:
         """Classifies era, genre, and world acoustic DNA from metadata and text."""
 ```
 
-### 2. `SonicBibleGenerator` ([`audiobook_factory.sonic_bible_generator`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/sonic_bible_generator.py))
+### 2. `SonicBibleGenerator` ([`audiobook_factory.sonic_bible_generator`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/sonic_bible_generator.py))
 
 ```python
 class SonicBibleGenerator:
@@ -2359,7 +2359,7 @@ class SonicBibleGenerator:
         """Compiles production-ready sound_bible.json registering world acoustic spaces and motifs."""
 ```
 
-### 3. `CharacterCaster` ([`audiobook_factory.character_caster`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/character_caster.py))
+### 3. `CharacterCaster` ([`audiobook_factory.character_caster`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/character_caster.py))
 
 ```python
 class CharacterCaster:
@@ -2398,7 +2398,7 @@ class CharacterCaster:
 
 ---
 
-## 🛡️ Centralized Permissive Safety Protocol ([`audiobook_factory.safety`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/safety.py))
+## 🛡️ Centralized Permissive Safety Protocol ([`audiobook_factory.safety`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/safety.py))
 
 ```python
 UNIVERSAL_BLOCK_NONE_SAFETY_SETTINGS: List[Dict[str, str]] = [
@@ -3137,7 +3137,7 @@ def audit_gate2_9_pre_tts_sanity(
 
 ---
 
-## 📊 Production Telemetry Ledger ([`audiobook_factory.telemetry`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/telemetry.py))
+## 📊 Production Telemetry Ledger ([`audiobook_factory.telemetry`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/telemetry.py))
 
 ```python
 class ProductionTelemetryLedger:
@@ -3602,7 +3602,7 @@ else:
 
 ---
 
-## 🛠️ Resilient System & Casting Utilities ([`audiobook_factory`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/))
+## 🛠️ Resilient System & Casting Utilities ([`audiobook_factory`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/))
 
 ### 1. `CharacterCaster.cast_single_speaker`
 *Dynamically registers and casts newly discovered characters mid-production with zero voice drift.*
@@ -3623,7 +3623,7 @@ def cast_single_speaker(
     """
 ```
 
-### 2. Cross-Platform Executable Resolvers ([`audiobook_factory.tts.constants`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/tts/constants.py))
+### 2. Cross-Platform Executable Resolvers ([`audiobook_factory.tts.constants`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/constants.py))
 
 ```python
 def get_ffprobe() -> str:
@@ -3633,7 +3633,7 @@ def get_ffmpeg() -> str:
     """Returns resolved path to ffmpeg executable via PATH or project fallback."""
 ```
 
-### 3. Windows Atomic File Promotion ([`audiobook_factory.tts.providers.gemini`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/tts/providers/gemini.py))
+### 3. Windows Atomic File Promotion ([`audiobook_factory.tts.providers.gemini`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py))
 
 ```python
 def _atomic_replace(src: Path, dst: Path, max_attempts: int = 8) -> None:
@@ -3641,6 +3641,369 @@ def _atomic_replace(src: Path, dst: Path, max_attempts: int = 8) -> None:
     Atomically promotes src to dst with exponential backoff retry for Windows
     file-locking defense (WinError 32) and copy2 fallback.
     """
+```
+
+---
+
+## 🎛️ Pro-Grade AI Vocal Mastering & Audio DSP Subsystem (v5.4)
+
+### 1. Strongly Typed Audio Contracts ([`audiobook_factory.audio.contracts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py))
+
+#### `DSPConfig`
+*Pydantic v2 configuration schema governing C++ JUCE DSP vocal mastering and optional VST3 hosting.*
+
+```python
+class DSPConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enable_pedalboard: bool = Field(default=True, description="Attempt C++ Pedalboard DSP before FFmpeg fallback")
+    enable_vst3: bool = Field(default=False, description="Enable headless VST3 plugin insertion")
+    vst3_plugin_path: Optional[Path] = Field(default=None, description="Path to .vst3 bundle")
+    subsonic_hz: float = Field(default=75.0, ge=20.0, le=120.0, description="Subsonic highpass filter cutoff in Hz")
+    boxiness_cut_hz: float = Field(default=320.0, ge=150.0, le=600.0, description="Parametric notch frequency for chest resonance in Hz")
+    boxiness_cut_db: float = Field(default=-1.5, ge=-6.0, le=0.0, description="Boxiness attenuation gain in dB")
+    presence_lift_hz: float = Field(default=3200.0, ge=1500.0, le=6000.0, description="Speech presence clarity center frequency in Hz")
+    presence_lift_db: float = Field(default=0.8, ge=0.0, le=4.0, description="Speech presence boost in dB")
+    target_lufs: float = Field(default=-19.0, ge=-24.0, le=-14.0, description="EBU R128 integrated loudness target in LUFS")
+    true_peak_ceiling_dbtp: float = Field(default=-1.5, ge=-3.0, le=-0.5, description="Lookahead True-Peak ceiling in dBTP")
+    compressor_threshold_db: float = Field(default=-18.0, ge=-30.0, le=-6.0, description="Optical compressor threshold in dB")
+    compressor_ratio: float = Field(default=2.5, ge=1.2, le=6.0, description="Optical compressor compression ratio")
+    compressor_attack_ms: float = Field(default=25.0, ge=5.0, le=100.0, description="Compressor attack time in ms")
+    compressor_release_ms: float = Field(default=120.0, ge=20.0, le=500.0, description="Compressor release time in ms")
+```
+
+#### `DSPMasteringResult`
+*Immutable telemetry model emitted upon completing vocal DSP mastering.*
+
+```python
+class DSPMasteringResult(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    backend_used: Literal["pedalboard_juce_v2", "ffmpeg_dual_pass_linear", "fallback_linear"] = Field(
+        ..., description="Mastering engine backend that rendered the artifact"
+    )
+    output_path: Path = Field(..., description="Rendered 48kHz 24-bit PCM master WAV")
+    integrated_lufs: float = Field(..., description="Measured post-master integrated loudness in LUFS")
+    true_peak_dbtp: float = Field(..., description="Measured post-master True Peak in dBTP")
+    loudness_range_lu: float = Field(default=7.5, description="Measured Loudness Range in LU")
+    execution_duration_sec: float = Field(default=0.0, ge=0.0, description="Processing wall-clock time in seconds")
+```
+
+#### `AudioQAConfig`
+*Pydantic v2 configuration schema governing acoustic, VAD, and script QA auditing.*
+
+```python
+class AudioQAConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enable_vad: bool = Field(default=True, description="Enable Voice Activity Detection for boundary checks")
+    enable_whisper_alignment: bool = Field(default=False, description="Enable optional Faster-Whisper script alignment")
+    whisper_model_size: str = Field(default="base", description="Whisper model tier: tiny, base, small, medium")
+    min_wpm: float = Field(default=75.0, description="Minimum acceptable words per minute")
+    max_wpm: float = Field(default=240.0, description="Maximum acceptable words per minute")
+    min_pause_ms: int = Field(default=120, description="Minimum natural inter-phrase pause in ms")
+    max_pause_ms: int = Field(default=1800, description="Maximum natural pause before dead-air alert in ms")
+    duration_tolerance_ratio: float = Field(default=0.40, description="Maximum allowable duration mismatch relative to text length")
+    min_mos_threshold: float = Field(default=3.5, description="Minimum Mean Opinion Score before warning")
+```
+
+#### `SegmentQAEvaluation`
+*Immutable forensic evaluation result for an individual speech segment.*
+
+```python
+class SegmentQAEvaluation(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    segment_index: int = Field(..., ge=1, description="1-indexed sequence order")
+    segment_uid: str = Field(..., description="Unique segment identifier")
+    speaker: str = Field(default="Narrator", description="Character or narrator name")
+    status: Literal["PASS", "WARN", "FAIL"] = Field(default="PASS", description="Audit verdict")
+    duration_ms: int = Field(..., ge=0, description="Physical audio duration in milliseconds")
+    estimated_wpm: float = Field(default=140.0, description="Estimated speaking rate in words per minute")
+    char_per_sec: float = Field(default=15.0, description="Character-to-duration speed in characters per second")
+    predicted_mos: float = Field(default=4.5, ge=1.0, le=5.0, description="Predicted Speech Quality MOS")
+    silence_leading_ms: int = Field(default=0, ge=0, description="Leading dead air in ms")
+    silence_trailing_ms: int = Field(default=0, ge=0, description="Trailing dead air in ms")
+    issues: List[str] = Field(default_factory=list, description="Detected anomalies or quality notices")
+    remediation_advice: Optional[str] = Field(default=None, description="Actionable correction recommendation")
+```
+
+#### `ChapterQAReport`
+*Consolidated forensic report covering all speech segments of a chapter.*
+
+```python
+class ChapterQAReport(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    chapter_num: int = Field(..., ge=1, description="Chapter index")
+    total_segments: int = Field(default=0, ge=0, description="Total audited speech segments")
+    passed_segments: int = Field(default=0, ge=0, description="Count of passed takes")
+    warned_segments: int = Field(default=0, ge=0, description="Count of takes with non-blocking warnings")
+    failed_segments: int = Field(default=0, ge=0, description="Count of rejected/fatal takes")
+    overall_status: Literal["PASS", "WARN", "FAIL"] = Field(default="PASS", description="Overall chapter QA status")
+    mean_mos: float = Field(default=4.5, ge=1.0, le=5.0, description="Average predicted speech MOS")
+    evaluations: List[SegmentQAEvaluation] = Field(default_factory=list, description="Individual segment evaluations")
+```
+
+#### `EnhancerConfig`
+*Pydantic v2 configuration governing DeepFilterNet3 neural speech restoration.*
+
+```python
+class EnhancerConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enable_neural_enhancement: bool = Field(default=False, description="Enable DeepFilterNet3 neural vocal cleaning")
+    snr_bypass_threshold_db: float = Field(default=45.0, description="SNR threshold above which neural filter is bypassed")
+    max_energy_diff_db: float = Field(default=2.0, description="Maximum allowable RMS energy difference before rejection")
+    model_type: str = Field(default="deepfilternet3", description="Neural enhancer model architecture")
+```
+
+#### `ReferenceMatcherConfig`
+*Pydantic v2 configuration governing Matchering 2.0 reference spectrum matching.*
+
+```python
+class ReferenceMatcherConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enable_reference_matching: bool = Field(default=False, description="Enable reference spectrum matching")
+    reference_track_path: Optional[Path] = Field(default=None, description="Path to golden reference WAV master")
+    max_spectral_correction_db: float = Field(default=3.0, ge=0.5, le=6.0, description="Hard clamp on spectral EQ adjustment in dB")
+```
+
+---
+
+### 2. C++ JUCE Vocal DSP Processor ([`audiobook_factory.audio.dsp`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py))
+
+#### `has_pedalboard_engine() -> bool`
+Returns `True` if Spotify Pedalboard (C++ JUCE) is installed and loadable in the current runtime environment.
+
+#### `has_pyloudnorm_engine() -> bool`
+Returns `True` if Pyloudnorm (ITU-R BS.1770-4) is available.
+
+#### `VocalDSPProcessor`
+*Studio-grade vocal audio mastering processor coordinating C++ JUCE DSP, BS.1770-4 loudness compliance, and deterministic FFmpeg fallback.*
+
+```python
+class VocalDSPProcessor:
+    def __init__(self, dsp_config: Optional[DSPConfig] = None, ffmpeg_bin: Optional[str] = None): ...
+
+    @property
+    def is_hardware_accelerated(self) -> bool:
+        """Returns True if Spotify Pedalboard C++ JUCE acceleration is active."""
+
+    def measure_loudness(self, audio_np: np.ndarray, sr: int = 48000) -> Tuple[float, float, float]:
+        """
+        Measures ITU-R BS.1770-4 Integrated LUFS, True Peak (dBTP), and Loudness Range (LRA).
+        Returns: (integrated_lufs, true_peak_dbtp, loudness_range_lu)
+        """
+
+    def build_pedalboard_chain(self, config: Optional[DSPConfig] = None) -> Optional[Any]:
+        """Constructs Spotify Pedalboard C++ DSP chain with EQ, optical comp, VST3, and limiter."""
+
+    def process_samples(self, audio_np: np.ndarray, sr: int = 48000, config: Optional[DSPConfig] = None) -> np.ndarray:
+        """Applies in-memory C++ JUCE DSP effects to float32 audio samples [-1.0, 1.0]."""
+
+    def master_chapter(
+        self,
+        input_wav: Union[str, Path],
+        output_wav: Union[str, Path],
+        profile: Optional[MasteringProfile] = None,
+        dsp_config: Optional[DSPConfig] = None,
+    ) -> DSPMasteringResult:
+        """
+        Executes end-to-end mastering of chapter pre-master audio to 48kHz 24-bit PCM master WAV.
+        Employs C++ JUCE Pedalboard DSP when available, otherwise falls back to FFmpeg.
+        """
+```
+
+---
+
+### 3. Forensic Audio QA Auditor ([`audiobook_factory.audio.qa_auditor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py))
+
+#### `has_whisper_engine() -> bool`
+Returns `True` if Faster-Whisper or OpenAI Whisper is installed.
+
+#### `AudioQAAuditor`
+*Forensic QA Auditor for dialogue segments and chapter master deliverables.*
+
+```python
+class AudioQAAuditor:
+    def __init__(self, config: Optional[AudioQAConfig] = None): ...
+
+    def audit_segment(
+        self,
+        audio_path: Union[str, Path],
+        expected_text: str = "",
+        speaker: str = "Narrator",
+        segment_index: int = 1,
+        segment_uid: Optional[str] = None,
+    ) -> SegmentQAEvaluation:
+        """
+        Audits a single speech audio segment against expected screenplay text.
+        Returns strongly typed SegmentQAEvaluation with PASS / WARN / FAIL verdict.
+        """
+
+    def audit_chapter(
+        self,
+        audio_segments: List[Union[str, Path]],
+        script_segments: Optional[List[Dict[str, Any]]] = None,
+        chapter_num: int = 1,
+    ) -> ChapterQAReport:
+        """
+        Executes comprehensive forensic audit across all segments of a chapter.
+        Returns consolidated ChapterQAReport.
+        """
+
+    def estimate_speech_mos(
+        self,
+        data: np.ndarray,
+        sr: int = 48000,
+        peak_amp: float = 0.5,
+        rms_amp: float = 0.1,
+    ) -> float:
+        """
+        Estimates non-intrusive Mean Opinion Score (1.0 to 5.0) based on crest factor,
+        DC offset, and clipping saturation.
+        """
+```
+
+---
+
+### 4. Neural Vocal Enhancer ([`audiobook_factory.audio.enhancer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/enhancer.py))
+
+#### `has_deepfilter_engine() -> bool`
+Returns `True` if DeepFilterNet3 and PyTorch are installed.
+
+#### `NeuralVocalEnhancer`
+*Surgical vocal enhancement processor with selective auto-bypass and energy difference clamping.*
+
+```python
+class NeuralVocalEnhancer:
+    def __init__(self, config: Optional[EnhancerConfig] = None): ...
+
+    @property
+    def is_neural_active(self) -> bool:
+        """Returns True if DeepFilterNet3 neural engine is active."""
+
+    @staticmethod
+    def estimate_snr_db(audio_np: np.ndarray) -> float:
+        """Estimates Signal-to-Noise Ratio in dB from speech energy vs quietest 10th percentile frames."""
+
+    def enhance_samples(self, audio_np: np.ndarray, sr: int = 48000) -> Tuple[np.ndarray, bool]:
+        """
+        Applies neural enhancement or spectral cleaning to float32 samples.
+        Returns: (enhanced_audio_np, was_enhanced_boolean)
+        """
+
+    def enhance_file(self, input_wav: Union[str, Path], output_wav: Union[str, Path]) -> bool:
+        """Enhances a WAV audio file on disk, writing output as 48kHz 24-bit PCM WAV."""
+```
+
+---
+
+### 5. Reference Spectrum Matcher ([`audiobook_factory.audio.reference_matcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/reference_matcher.py))
+
+#### `has_matchering_engine() -> bool`
+Returns `True` if Matchering 2.0 is installed.
+
+#### `ReferenceSpectrumMatcher`
+*Automated reference mastering and spectral envelope matcher with hard ±3.0dB clamping.*
+
+```python
+class ReferenceSpectrumMatcher:
+    def __init__(self, config: Optional[ReferenceMatcherConfig] = None): ...
+
+    @property
+    def is_matchering_active(self) -> bool:
+        """Returns True if Matchering 2.0 is active."""
+
+    def match_spectrum(
+        self,
+        target_np: np.ndarray,
+        reference_np: np.ndarray,
+        sr: int = 48000,
+    ) -> np.ndarray:
+        """Applies reference spectrum matching with +/-3dB hard clamping to float32 samples."""
+
+    def match_files(
+        self,
+        target_wav: Union[str, Path],
+        reference_wav: Union[str, Path],
+        output_wav: Union[str, Path],
+    ) -> Path:
+        """Matches target WAV to reference WAV on disk, writing output as 48kHz 24-bit PCM WAV."""
+```
+
+---
+
+### 6. Antigravity Audio MCP Server Tools ([`audiobook_factory.mcp.server`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py))
+
+#### `apply_vocal_dsp_tool`
+```python
+def apply_vocal_dsp_tool(
+    input_wav: str,
+    output_wav: str,
+    target_lufs: float = -19.0,
+    true_peak_ceiling_dbtp: float = -1.5,
+    subsonic_hz: float = 75.0,
+    boxiness_cut_db: float = -1.5,
+    presence_lift_db: float = 0.8,
+) -> Dict[str, Any]:
+    """Applies C++ JUCE parametric vocal EQ, optical compression, and lookahead True-Peak limiting."""
+```
+
+#### `audit_audio_quality_tool`
+```python
+def audit_audio_quality_tool(
+    audio_path: str,
+    expected_text: str = "",
+    speaker: str = "Narrator",
+    segment_index: int = 1,
+) -> Dict[str, Any]:
+    """Audits a single speech audio segment for dead air, WPM pacing, dropouts, loops, and MOS."""
+```
+
+#### `match_reference_spectrum_tool`
+```python
+def match_reference_spectrum_tool(
+    target_wav: str,
+    reference_wav: str,
+    output_wav: str,
+    max_clamp_db: float = 3.0,
+) -> Dict[str, Any]:
+    """Matches frequency spectrum and tonal envelope of target audio to a golden reference track."""
+```
+
+#### `enhance_vocal_stem_tool`
+```python
+def enhance_vocal_stem_tool(
+    input_wav: str,
+    output_wav: str,
+    snr_bypass_db: float = 45.0,
+) -> Dict[str, Any]:
+    """Cleans synthetic TTS hash and room noise via DeepFilterNet3 with selective auto-bypass."""
+```
+
+#### `measure_ebu_r128_loudness_tool`
+```python
+def measure_ebu_r128_loudness_tool(audio_path: str) -> Dict[str, Any]:
+    """Measures ITU-R BS.1770-4 Integrated Loudness (LUFS), True Peak (dBTP), and LRA."""
+```
+
+#### `audit_chapter_qa_tool`
+```python
+def audit_chapter_qa_tool(
+    audio_segments: List[str],
+    script_segments: Optional[List[Dict[str, Any]]] = None,
+    chapter_num: int = 1,
+) -> Dict[str, Any]:
+    """Audits an entire chapter timeline and returns aggregated forensic QA report."""
+```
+
+#### `run_stdio_server`
+```python
+def run_stdio_server() -> None:
+    """Simple JSON-RPC / Stdio server loop for Antigravity autonomous agent communication."""
 ```
 
 ---

@@ -127,9 +127,21 @@ _LAZY_IMPORTS: Dict[str, Tuple[str, str]] = {
     "concatenate_and_master_chapter": (".mastering", "concatenate_and_master_chapter"),
     "package_m4b_audiobook": (".packager", "package_m4b_audiobook"),
     "SoundBank": (".sound_bank", "SoundBank"),
-    "logger": (".logger", "logger"),
     "ProjectStateLedger": (".state", "ProjectStateLedger"),
     "PipelineOrchestrator": (".orchestrator", "PipelineOrchestrator"),
+
+    # Audio Mixing & Production Workstation (Phase 6 / Room 5)
+    "VocalDSPProcessor": (".audio", "VocalDSPProcessor"),
+    "AudioQAAuditor": (".audio", "AudioQAAuditor"),
+    "NeuralVocalEnhancer": (".audio", "NeuralVocalEnhancer"),
+    "ReferenceSpectrumMatcher": (".audio", "ReferenceSpectrumMatcher"),
+    "AudioIngestionManager": (".audio", "AudioIngestionManager"),
+    "ChunkStreamComposer": (".audio", "ChunkStreamComposer"),
+    "DialogueEditorialBridge": (".audio", "DialogueEditorialBridge"),
+    "ChapterDeliveryEncoder": (".audio", "ChapterDeliveryEncoder"),
+    "M4BBookPackager": (".audio", "M4BBookPackager"),
+    "ChapterSegmentLedger": (".audio", "ChapterSegmentLedger"),
+    "SingleSegmentHotPatcher": (".audio", "SingleSegmentHotPatcher"),
     
     # Contracts
     "ProjectConfig": (".contracts", "ProjectConfig"),

@@ -10,7 +10,10 @@ import re
 
 from audiobook_factory.logger import logger
 from audiobook_factory.soundscape import get_audio_duration
-from audiobook_factory.mastering import concatenate_and_master_chapter
+from audiobook_factory.audio.editorial import DialogueEditorialBridge
+from audiobook_factory.mastering_contracts import MasteringRequest, MasteringProfile
+from audiobook_factory.mastering_engine import MasteringEngineV2
+
 
 
 def process_and_master_dialogue_stem(
@@ -24,7 +27,7 @@ def process_and_master_dialogue_stem(
     segment_files: Optional[List[Path]] = None,
 ) -> Tuple[Path, float, Dict[int, float], List[Path]]:
     """
-    Executes the dialogue editorial layer, masters vocal bus,
+    Executes the dialogue editorial layer, masters vocal bus via MasteringEngineV2,
     and maps exact segment durations and word alignments.
     Returns: (vocal_wav, vocal_dur, seg_durations, segments)
     """
@@ -76,13 +79,54 @@ def process_and_master_dialogue_stem(
         edit_plans = None
 
     vocal_wav = mastered_dir / f"{chap_stem}_dialogue.wav"
-    concatenate_and_master_chapter(
-        edited_segments,
-        vocal_wav,
-        script_segments=script_data,
-        spatial_staging=spatial_staging,
-        edit_plans=edit_plans,
-    )
+    premaster_wav = mastered_dir / f"{chap_stem}_dialogue.premaster.wav"
+
+    try:
+        bridge = DialogueEditorialBridge()
+        bridge.prepare_premaster(
+            segments=edited_segments,
+            output_premaster_wav=premaster_wav,
+            script_segments=script_data,
+            edit_plans=edit_plans,
+            spatial_staging=spatial_staging,
+        )
+
+        master_profile = MasteringProfile(
+            target_lufs=-19.0,
+            tolerance_lu=0.5,
+            true_peak_ceiling_dbtp=-2.0,
+            limiter_ceiling_db=-2.0,
+            limiter_release_ms=40,
+            output_sample_rate=48000,
+            output_channels=2,
+        )
+        master_req = MasteringRequest(
+            chapter_id=chap_stem,
+            premaster_path=str(premaster_wav),
+            output_master_path=str(vocal_wav),
+            profile=master_profile,
+            metadata={"chapter_num": chapter_num, "spatial_staging": spatial_staging},
+        )
+        engine = MasteringEngineV2()
+        master_res = engine.master(master_req)
+
+        if master_res.status not in ("SUCCESS", "REVIEW_REQUIRED"):
+            raise RuntimeError(
+                f"MasteringEngineV2 returned status {master_res.status}: {master_res.error_message}"
+            )
+        lufs_val = master_res.analysis_after.integrated_lufs if master_res.analysis_after else -19.0
+        tp_val = master_res.analysis_after.true_peak_dbtp if master_res.analysis_after else -2.0
+        logger.info(
+            f"[+] Dialogue Stem Mastered via MasteringEngineV2 for Chapter {chapter_num:02d} "
+            f"(LUFS: {lufs_val:.2f}, TP: {tp_val} dBTP)"
+        )
+    finally:
+        if premaster_wav.exists():
+            try:
+                premaster_wav.unlink()
+            except OSError:
+                pass
+
     vocal_dur = get_audio_duration(vocal_wav)
 
     # Map exact segment durations strictly from segments passed to vocal mastering
