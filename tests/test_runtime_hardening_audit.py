@@ -105,6 +105,7 @@ def test_translation_collective_pass1_retry_success():
             text_block="This is a test paragraph that should succeed on the second attempt.",
             glossary={},
             block_title="Test Chapter",
+            use_single_pass=False,
         )
 
     assert attempts[0] == 2
@@ -123,4 +124,5 @@ def test_translation_collective_pass1_exhausted_raises():
                 text_block="This is a test paragraph that should fail completely.",
                 glossary={},
                 block_title="Test Chapter",
+                use_single_pass=False,
             )

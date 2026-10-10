@@ -434,16 +434,17 @@ class PersistentKeyPool:
     @contextlib.contextmanager
     def lease_key(self, service: str = "text", provider: str = "gemini", model: Optional[str] = None):
         """Context manager leasing a key with active in-flight concurrency tracking.
-        Delegates transparently to KeyLeaseManager control plane when available."""
-        try:
-            from audiobook_factory.core.models.lease_manager import get_key_lease_manager
-            klm = get_key_lease_manager()
-            with klm.lease_key(workload_type=service, provider=provider, model=model, allow_multi_lease=True) as lease:
-                yield lease.api_key
-                return
-        except Exception:
-            # Fallback to local table tracking
-            pass
+        Delegates transparently to KeyLeaseManager control plane when available on default DB."""
+        if self.db_path == Path(DEFAULT_DB_PATH).resolve():
+            try:
+                from audiobook_factory.core.models.lease_manager import get_key_lease_manager
+                klm = get_key_lease_manager()
+                with klm.lease_key(workload_type=service, provider=provider, model=model, allow_multi_lease=True) as lease:
+                    yield lease.api_key
+                    return
+            except Exception:
+                # Fallback to local table tracking
+                pass
 
         key = self.get_key(service=service, provider=provider, model=model)
         kh = self._hash_key(key)
@@ -459,11 +460,12 @@ class PersistentKeyPool:
 
     def record_success(self, api_key: str, model: Optional[str] = None, provider: str = "gemini", tokens_used: int = 0):
         """Records a successful synthesis or generation call."""
-        try:
-            from audiobook_factory.core.models.lease_manager import get_key_lease_manager
-            get_key_lease_manager().record_success(api_key, model=model, provider=provider, tokens_used=tokens_used)
-        except Exception:
-            pass
+        if self.db_path == Path(DEFAULT_DB_PATH).resolve():
+            try:
+                from audiobook_factory.core.models.lease_manager import get_key_lease_manager
+                get_key_lease_manager().record_success(api_key, model=model, provider=provider, tokens_used=tokens_used)
+            except Exception:
+                pass
 
         kh = self._hash_key(api_key)
         with self.lock, self._connection() as conn:
