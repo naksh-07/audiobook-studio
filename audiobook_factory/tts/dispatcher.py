@@ -57,17 +57,40 @@ from audiobook_factory.pronunciation.contracts import PronunciationStatus
 
 
 def _call_gemini_tts(*args, **kwargs):
-    """Invokes synthesize_gemini_tts, honoring any monkeypatches on the tts_dispatcher facade."""
+    """
+    Invokes speech synthesis.
+    If audiobook_factory.tts_dispatcher.synthesize_gemini_tts or local synthesize_gemini_tts
+    is monkeypatched/mocked (e.g. by unit tests), honors the mock.
+    Otherwise, strictly routes speech synthesis through the central ModelGateway control plane.
+    """
+    from audiobook_factory.tts.providers.gemini import synthesize_gemini_tts as _orig_gemini_tts
     td = sys.modules.get("audiobook_factory.tts_dispatcher")
-    fn = getattr(td, "synthesize_gemini_tts", synthesize_gemini_tts) if td else synthesize_gemini_tts
-    return fn(*args, **kwargs)
+    if td and hasattr(td, "synthesize_gemini_tts") and td.synthesize_gemini_tts is not _orig_gemini_tts:
+        return td.synthesize_gemini_tts(*args, **kwargs)
+    if synthesize_gemini_tts is not _orig_gemini_tts:
+        return synthesize_gemini_tts(*args, **kwargs)
+
+    # Route through hardened central ModelGateway control plane
+    from audiobook_factory.tts.gateway_bridge import execute_tts_to_file
+    return execute_tts_to_file(*args, **kwargs)
 
 
 def _call_gemini_multispeaker_batch(*args, **kwargs):
-    """Invokes synthesize_gemini_multispeaker_batch, honoring any monkeypatches on the tts_dispatcher facade."""
+    """
+    Invokes multi-speaker batch speech synthesis.
+    If audiobook_factory.tts_dispatcher.synthesize_gemini_multispeaker_batch is monkeypatched/mocked,
+    honors the mock. Otherwise, strictly routes through the central ModelGateway control plane.
+    """
+    from audiobook_factory.tts.providers.gemini import synthesize_gemini_multispeaker_batch as _orig_ms_batch
     td = sys.modules.get("audiobook_factory.tts_dispatcher")
-    fn = getattr(td, "synthesize_gemini_multispeaker_batch", synthesize_gemini_multispeaker_batch) if td else synthesize_gemini_multispeaker_batch
-    return fn(*args, **kwargs)
+    if td and hasattr(td, "synthesize_gemini_multispeaker_batch") and td.synthesize_gemini_multispeaker_batch is not _orig_ms_batch:
+        return td.synthesize_gemini_multispeaker_batch(*args, **kwargs)
+    if synthesize_gemini_multispeaker_batch is not _orig_ms_batch:
+        return synthesize_gemini_multispeaker_batch(*args, **kwargs)
+
+    # Route through hardened central ModelGateway control plane
+    from audiobook_factory.tts.gateway_bridge import execute_multispeaker_batch_to_file
+    return execute_multispeaker_batch_to_file(*args, **kwargs)
 
 
 def _call_key_pool():

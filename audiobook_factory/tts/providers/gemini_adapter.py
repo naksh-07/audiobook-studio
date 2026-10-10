@@ -14,21 +14,12 @@ import time
 import base64
 import struct
 import wave
-import io
-import urllib.request
-import urllib.error
 import asyncio
 from typing import Dict, Any, List, Tuple, Optional, Set
 
 from audiobook_factory.logger import logger
 from audiobook_factory.tts.contracts import CanonicalTTSRequest, SynthesizedAudioChunk, DeliveryIntent
 from audiobook_factory.tts.providers.base import BaseTTSModelAdapter
-from audiobook_factory.key_manager import (
-    get_persistent_key_pool,
-    classify_gemini_error,
-    AllKeysExhaustedTodayError,
-)
-from audiobook_factory.cadence import get_stealth_sdk_headers, get_human_cadence_controller
 from audiobook_factory.tts.gateway_bridge import (
     execute_tts_synthesize,
     extract_pcm_and_duration_from_audio,

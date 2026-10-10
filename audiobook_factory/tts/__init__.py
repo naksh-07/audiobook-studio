@@ -52,6 +52,8 @@ from audiobook_factory.tts.formant_sculptor import FormantSculptor, FormantProfi
 from audiobook_factory.tts.take_bank_manager import TakeBankManager, CandidateTake
 from audiobook_factory.tts.gateway_bridge import (
     execute_tts_synthesize,
+    execute_tts_to_file,
+    execute_multispeaker_batch_to_file,
     extract_pcm_and_duration_from_audio,
 )
 
@@ -142,6 +144,8 @@ __all__ = [
     "TakeBankManager",
     "CandidateTake",
     "execute_tts_synthesize",
+    "execute_tts_to_file",
+    "execute_multispeaker_batch_to_file",
     "extract_pcm_and_duration_from_audio",
     # Legacy / Dispatcher Invariants
     "DEFAULT_BACKEND",

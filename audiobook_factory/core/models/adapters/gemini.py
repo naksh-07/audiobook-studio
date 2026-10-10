@@ -98,7 +98,9 @@ class GeminiProviderAdapter(BaseProviderAdapter):
         # 4. Audio Modality & Voice Config (for Gemini Flash TTS)
         if is_audio:
             gen_config["responseModalities"] = ["AUDIO"]
-            if voice_name:
+            if "speech_config" in kwargs and kwargs["speech_config"]:
+                gen_config["speechConfig"] = kwargs["speech_config"]
+            elif voice_name:
                 gen_config["speechConfig"] = {
                     "voiceConfig": {
                         "prebuiltVoiceConfig": {
