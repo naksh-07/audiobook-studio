@@ -33,6 +33,8 @@ from audiobook_factory.gates.screenplay import (
 from audiobook_factory.gates.pre_synthesis import (
     audit_gate2_9_pre_tts_sanity,
     PreSynthesisGate,
+    LLMPreSynthesisJudge,
+    PreSynthesisLLMVerdict,
 )
 from audiobook_factory.gates.acoustics import (
     audit_gate3_5_acoustic_feasibility,
@@ -81,6 +83,8 @@ __all__ = [
     "audit_gate2_8_performance_fidelity",
     "audit_gate2_9_pre_tts_sanity",
     "PreSynthesisGate",
+    "LLMPreSynthesisJudge",
+    "PreSynthesisLLMVerdict",
     "audit_gate3_scenes",
     "audit_gate3_5_acoustic_feasibility",
     "audit_gate4_ledger",

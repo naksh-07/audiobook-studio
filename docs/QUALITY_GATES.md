@@ -386,26 +386,31 @@ class StudioCertificationReport(BaseModel):
 
 ### Gate 2.9: Pre-TTS Config & Attribution Sanity Gate (Fail-Closed Stage 3 -> Stage 4 Boundary)
 *(Authoritative implementation: [`audiobook_factory/gates/pre_synthesis.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py))*
-- **Function**: `audit_gate2_9_pre_tts_sanity(script_file: Union[Path, str, List[Dict[str, Any]]], project_dir: Optional[Union[Path, str]] = None, format_mode: Literal["audiobook", "podcast"] = "audiobook", strict: bool = True) -> AuditResult`
+- **Function**: `audit_gate2_9_pre_tts_sanity(script_file: Union[Path, str, List[Dict[str, Any]]], project_dir: Optional[Union[Path, str]] = None, source_file: Optional[Union[Path, str]] = None, source_text: Optional[str] = None, format_mode: Literal["audiobook", "podcast"] = "audiobook", call_llm_fn: Optional[Any] = None, skip_llm: bool = False, strict: bool = True) -> AuditResult`
 - **Modules**: [`audiobook_factory/gates/pre_synthesis.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py), [`audiobook_factory/orchestration/gates.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/orchestration/gates.py), [`audiobook_factory/podcast/orchestrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/orchestrator.py)
-- **Data Models**: [`AuditResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py), [`GateAuditError`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py)
-- **Pipeline Stage**: Executed synchronously at the exit of Stage 3 (Screenplay / Dramaturgy / Podcast Scripting) immediately before handing script batches to Room 4 TTS Dispatchers. Runs 100% locally with **Zero LLM Token Consumption**.
-- **Dual-Track Coverage**:
-  - **Audiobook Track**: Validates `scripts/chapter_XXX_screenplay.json` against `character_roster.json` and `voice_registry.json`.
-  - **Podcast Track**: Validates `scripts/chapter_XXX_podcast_script.json` against `podcast_config.json` and stereo spatial staging rules.
-- **The 6 Core Verification Pillars**:
-  1. **Speaker Whitelist & Catalog Cross-Reference**: Strictly verifies that every speaker token in the script is registered in `character_roster.json`, `voice_registry.json`, or default role sets (`Narrator`, `Narration`, `Foley`, `Host_A`, `Host_B`). Unregistered or misspelled characters strictly halt synthesis via `GateAuditError`.
-  2. **Anti-Swap Attribution & Gender Inflection Guard**: Exploits Hindi/Devanagari first-person grammatical gender discordance (`रहा हूँ` / `करूँगा` = masculine vs `रही हूँ` / `करूँगी` = feminine) cross-referenced against character gender metadata. Emits actionable warnings or defects upon detecting speaker turn inversion ($A \leftrightarrow B$).
-  3. **Anti-Swallow Dialogue Guard**: Scans `Narrator` segments for embedded dialogue quotes (`"..."` or `“...”`) accompanied by speech lead-in verbs (`said`, `कहा`, `बोला`, `replied`). Strictly aborts if direct dialogue is swallowed into narration.
-  4. **Acoustic Parameter Range Clamping**: Enforces acoustic parameter ceilings before audio synthesis:
-     - Pitch multiplier ratio clamped strictly to $[0.65, 1.35]$ (audiobook) or semitone offset $[-12.0, 12.0]$ (podcast).
-     - Speed multiplier clamped strictly to $[0.75, 1.30]$.
-     - Non-null, assigned `voice_id` verification in `voice_registry.json`.
-  5. **Podcast Stereo Spatial Staging**: In podcast format mode, enforces Host A left pan ($pan \le -0.20$), Host B right pan ($pan \ge +0.20$), and breathability punctuation across long turns ($> 45$ words).
-  6. **Text Hygiene & Fence Elimination**: Blocks empty lines, unstripped Markdown fences (````json```), and conversational LLM chatter preambles (*"Here is the script..."*).
-- **Fail-Closed Invariant**: Any critical defect raises `GateAuditError` and terminates synthesis immediately, preventing corrupted audio stem generation and saving Gemini Flash TTS API quota.
+- **Data Models**: [`AuditResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py), [`GateAuditError`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py), [`PreSynthesisLLMVerdict`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py)
+- **Pipeline Stage**: Executed synchronously at the exit of Stage 3 (Screenplay / Dramaturgy / Podcast Scripting) immediately before handing script batches to Room 4 TTS Dispatchers.
+- **Dual-Tier Hybrid Architecture**:
+  - **Tier 1 (Deterministic Fast Checks)**:
+    1. **Speaker Whitelist & Catalog Cross-Reference**: Strictly verifies that every speaker token in the script is registered in `character_roster.json`, `voice_registry.json`, or default role sets (`Narrator`, `Narration`, `Foley`, `Host_A`, `Host_B`). Unregistered or misspelled characters strictly halt synthesis via `GateAuditError`.
+    2. **Anti-Swap Attribution & Gender Inflection Guard**: Exploits Hindi/Devanagari first-person grammatical gender discordance (`रहा हूँ` / `करूँगा` = masculine vs `रही हूँ` / `करूँगी` = feminine) cross-referenced against character gender metadata. Emits actionable warnings or defects upon detecting speaker turn inversion ($A \leftrightarrow B$).
+    3. **Anti-Swallow Dialogue Guard**: Scans `Narrator` segments for embedded dialogue quotes (`"..."` or `“...”`) accompanied by speech lead-in verbs (`said`, `कहा`, `बोला`, `replied`). Strictly aborts if direct dialogue is swallowed into narration.
+    4. **Acoustic Parameter Range Clamping**: Enforces acoustic parameter ceilings before audio synthesis:
+       - Pitch multiplier ratio clamped strictly to $[0.65, 1.35]$ (audiobook) or semitone offset $[-12.0, 12.0]$ (podcast).
+       - Speed multiplier clamped strictly to $[0.75, 1.30]$.
+       - Non-null, assigned `voice_id` verification in `voice_registry.json`.
+    5. **Podcast Stereo Spatial Staging**: In podcast format mode, enforces Host A left pan ($pan \le -0.20$), Host B right pan ($pan \ge +0.20$), and breathability punctuation across long turns ($> 45$ words).
+    6. **Text Hygiene & Fence Elimination**: Blocks empty lines, unstripped Markdown fences (````json```), and conversational LLM chatter preambles (*"Here is the script..."*).
+  - **Tier 2 (Adversarial LLM Attribution & Dramaturgy Sanity Judge - `LLMPreSynthesisJudge`)**:
+    - **Engine**: Powered by Google AI Studio Gemini models utilizing our 123+ rotating API key pool via `ModelGateway.generate_text()` with AntiBanGuard 11.0 RPM pacing, session affinity, and `BLOCK_NONE` creative safety framing.
+    - **Deep Contextual Audit**: Analyzes dialogue flow against character cast bibles and source chapter narrative context (`source_file` / `source_text`).
+    - **Zero Speaker Turn Inversion**: Detects subtle context-dependent speaker swaps ($A \leftrightarrow B$) where Character A speaks Character B's lines, or where dialogue is spoken out of turn.
+    - **Narrator Dialogue Recovery**: Catches character dialogue swallowed into indirect or passive narration.
+    - **Persona & Register Alignment**: Verifies that character lines adhere to their authentic sociolect, age, status, and emotional trajectory.
+    - **Podcast Dual-Host Banter Sanity**: Ensures balanced turn-taking, distinct hosting personas, and zero host dialogue collision.
+- **Fail-Closed Invariant**: Any critical defect in Tier 1 or Tier 2 raises `GateAuditError` and terminates synthesis immediately, preventing corrupted audio stem generation and saving Gemini Flash TTS voice synthesis quota.
 - **CLI & API Integration**:
-  - API: `from audiobook_factory.gates import audit_gate2_9_pre_tts_sanity, PreSynthesisGate`
+  - API: `from audiobook_factory.gates import audit_gate2_9_pre_tts_sanity, PreSynthesisGate, LLMPreSynthesisJudge, PreSynthesisLLMVerdict`
   - Audiobook Orchestration: Integrated in `audiobook_factory.orchestration.gates.verify_pre_synthesis_gates()`.
   - Podcast Orchestration: Integrated in `audiobook_factory.podcast.orchestrator.PodcastOrchestrator.synthesize_podcast_script()`.
 

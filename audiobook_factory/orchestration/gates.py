@@ -96,6 +96,7 @@ def verify_pre_synthesis_gates(
             gate2_9_res = audit_gate2_9_pre_tts_sanity(
                 script_file=script_file,
                 project_dir=project_dir,
+                source_file=source_chap_file if source_chap_file.exists() else None,
                 format_mode="audiobook",
                 strict=True,
             )

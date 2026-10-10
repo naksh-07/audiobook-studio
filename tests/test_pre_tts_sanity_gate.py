@@ -22,6 +22,8 @@ import pytest
 from audiobook_factory.gates.pre_synthesis import (
     PreSynthesisGate,
     audit_gate2_9_pre_tts_sanity,
+    PreSynthesisLLMVerdict,
+    LLMPreSynthesisJudge,
 )
 from audiobook_factory.gates.contracts import GateAuditError, AuditResult
 from audiobook_factory.podcast.orchestrator import PodcastOrchestrator
@@ -215,3 +217,108 @@ class TestPreTTSSanityGate:
                 chapter_num=1,
                 script_file=bad_script_path,
             )
+
+    def test_10_llm_judge_detects_speaker_swap_fail_closed(self, mock_project):
+        """Tier 2 LLM Judge detects subtle speaker turn swap and aborts fail-closed."""
+        swapped_script = [
+            {"index": 1, "speaker": "Narrator", "type": "narration", "text": "They stared at each other."},
+            # Dialogue attributed to Geralt, but contextually spoken by Renfri
+            {"index": 2, "speaker": "Geralt", "type": "dialogue", "text": "मुझे मत सिखाओ कि तलवार कैसे उठाई जाती है।", "pitch_shift": 1.0, "speed_multiplier": 1.0},
+        ]
+
+        def mock_llm_swap(prompt: str, system_instruction: str):
+            return PreSynthesisLLMVerdict(
+                status="FAIL",
+                score=0.40,
+                attribution_accuracy=0.35,
+                speaker_swaps=[{
+                    "index": 2,
+                    "assigned_speaker": "Geralt",
+                    "actual_speaker": "Renfri",
+                    "reason": "Threatening line delivered to Geralt in context belongs to Renfri",
+                }],
+                reason="Critical speaker turn inversion detected.",
+            )
+
+        with pytest.raises(GateAuditError, match="LLM Attribution Judge detected Speaker Swap"):
+            audit_gate2_9_pre_tts_sanity(
+                script_file=swapped_script,
+                project_dir=mock_project,
+                call_llm_fn=mock_llm_swap,
+                strict=True,
+            )
+
+    def test_11_llm_judge_detects_swallowed_dialogue_fail_closed(self, mock_project):
+        """Tier 2 LLM Judge detects swallowed character dialogue in narration and aborts fail-closed."""
+        script_with_swallow = [
+            {"index": 1, "speaker": "Narrator", "type": "narration", "text": "Geralt looked at the innkeeper and said he would not tolerate thieves here."},
+        ]
+
+        def mock_llm_swallow(prompt: str, system_instruction: str):
+            return PreSynthesisLLMVerdict(
+                status="FAIL",
+                score=0.55,
+                attribution_accuracy=0.50,
+                swallowed_dialogue=[{
+                    "index": 1,
+                    "text_excerpt": "he would not tolerate thieves here",
+                    "intended_speaker": "Geralt",
+                }],
+                reason="Narrator segment contains swallowed spoken dialogue",
+            )
+
+        with pytest.raises(GateAuditError, match="LLM Judge detected Swallowed Dialogue"):
+            audit_gate2_9_pre_tts_sanity(
+                script_file=script_with_swallow,
+                project_dir=mock_project,
+                call_llm_fn=mock_llm_swallow,
+                strict=True,
+            )
+
+    def test_12_llm_judge_passing_records_telemetry(self, mock_project):
+        """Passing Tier 2 LLM Judge populates details['llm_audit'] telemetry."""
+        valid_script = [
+            {"index": 1, "speaker": "Narrator", "type": "narration", "text": "The wind howled."},
+            {"index": 2, "speaker": "Geralt", "type": "dialogue", "text": "मैं यहाँ सिर्फ आराम करने आया हूँ।", "pitch_shift": 1.0, "speed_multiplier": 1.0},
+        ]
+
+        def mock_llm_pass(prompt: str, system_instruction: str):
+            return PreSynthesisLLMVerdict(
+                status="PASS",
+                score=0.96,
+                attribution_accuracy=0.98,
+                speaker_swaps=[],
+                swallowed_dialogue=[],
+                persona_mismatches=[],
+                reason="All dialogue lines correctly attributed to cast.",
+            )
+
+        res = audit_gate2_9_pre_tts_sanity(
+            script_file=valid_script,
+            project_dir=mock_project,
+            call_llm_fn=mock_llm_pass,
+            strict=True,
+        )
+
+        assert res.passed is True
+        assert "llm_audit" in res.details
+        assert res.details["llm_audit"]["status"] == "PASS"
+        assert res.details["llm_audit"]["attribution_accuracy"] == 0.98
+
+    def test_13_skip_llm_flag_bypasses_tier2(self, mock_project):
+        """skip_llm=True skips Tier 2 LLM judge execution."""
+        valid_script = [
+            {"index": 1, "speaker": "Narrator", "type": "narration", "text": "Quiet night."},
+            {"index": 2, "speaker": "Geralt", "type": "dialogue", "text": "शांति है।", "pitch_shift": 1.0, "speed_multiplier": 1.0},
+        ]
+
+        res = audit_gate2_9_pre_tts_sanity(
+            script_file=valid_script,
+            project_dir=mock_project,
+            skip_llm=True,
+            strict=True,
+        )
+
+        assert res.passed is True
+        assert "llm_audit" not in res.details
+
