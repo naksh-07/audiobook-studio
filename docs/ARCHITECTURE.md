@@ -22,8 +22,13 @@ flowchart TD
         S2 --> MasterFiles[("Locked Master State<br/>book_dna.json | book_bible.json | cast_lock.json<br/>vocal_spaces.json | voice_registry.json")]
     end
 
+    subgraph Room1_5["📚 Room 1.5: Standalone Chapter Glossary & Metadata Hub"]
+        MasterFiles --> GloMgr["GlossaryManager (audiobook_factory/glossary/)<br/>• ChapterLexicalScanner (0-Token Fast-Path Sweep)<br/>• GlossaryClassifier (Tri-Partite Entity Taxonomy)<br/>• Alias Unification & Dynamic Character Locking<br/>• Persistent Artifact: chapter_XXX_glossary.json"]
+        GloMgr --> Projections["Multi-Consumer Projections<br/>• to_translation_glossary() (Flat en -> hi Map)<br/>• to_scripting_roster() (Unified Alias Schema)<br/>• to_dramaturgy_characters() (Scene Cast List)"]
+    end
+
     subgraph Room2["🧠 Room 2: Standalone Literary Translation Engine (Option D)"]
-        MasterFiles --> Collective["Decoupled Literary Translation Engine<br/>• Single-Pass Deliberative Generation (thinking_budget = 1024, temp = 0.35)<br/>• Bilingual Macro-Chunking (1,500 - 1,800w with Src + Tgt tail)<br/>• Fast Deterministic Parity Gate Matrix (0 LLM Tokens)<br/>• Tri-Partite Entity Partitioning (Zero Novel Hardcoding)<br/>• Strictly Text-to-Text: Pristine Devanagari Markdown Only"]
+        Projections --> Collective["Decoupled Literary Translation Engine<br/>• Single-Pass Deliberative Generation (thinking_budget = 1024, temp = 0.35)<br/>• Bilingual Macro-Chunking (1,500 - 1,800w with Src + Tgt tail)<br/>• Fast Deterministic Parity Gate Matrix (0 LLM Tokens)<br/>• Tri-Partite Entity Partitioning (Zero Novel Hardcoding)<br/>• Strictly Text-to-Text: Pristine Devanagari Markdown Only"]
         Collective --> DualRule["Dual-Rule Invariant ('Nothing Above Source')<br/>Classic Reverent Pathos vs Raw Unrated Realism"]
     end
 
@@ -46,7 +51,10 @@ flowchart TD
         Packager --> Deliverable["Deliverable M4B Audiobook (Chapter Markers & Cover Art)"]
     end
 
-    Room1 --> Room2
+    Room1 --> Room1_5
+    Room1_5 --> Room2
+    Room1_5 -.->|"Roster & Aliases"| Room3
+    Room1_5 -.->|"Dynamic Voice Lock"| Room4
     Room2 --> Room3
     Room3 --> Room4
     Room4 --> Room5
@@ -77,6 +85,37 @@ Room 1 operates under a strict **2-System Decoupled Architecture**:
    - **Windows 11 Atomic Replace Hardening**: `_atomic_replace()` executes a 5-attempt retry loop with exponential backoff (`0.015 * (2 ** attempt)`), eliminating `WinError 5` (Access Denied) and `WinError 32` (Sharing Violation) from Windows Defender or search indexer transient file locks.
    - **Thread-Safe Mid-Novel Casting** (`discover_and_lock_character`): Protected by `_STATE_LOCK = threading.RLock()`, enabling downstream translation and screenplay threads to dynamically register and cast minor characters without race conditions.
    - **NR-GATE-03 Pitch Clamping `[0.70, 1.30]`**: Step-stepping algorithm guarantees $\ge 4.0\%$ acoustic separation while bounding pitch between `0.70` and `1.30` with secondary speed micro-tuning ($+0.02$) to prevent robotic distortion across large ensembles.
+
+---
+
+### Room 1.5: Standalone Chapter Glossary & Metadata Hub
+*Subsystems: [`audiobook_factory/glossary/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/) (`contracts.py`, `scanner.py`, `classifier.py`, `manager.py`, `gateway_bridge.py`)*  
+*(See full architectural manual: [`docs/GLOSSARY_AND_METADATA_SUBSYSTEM.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GLOSSARY_AND_METADATA_SUBSYSTEM.md))*
+
+Room 1.5 is the decoupled, single-pass per-chapter lexical analysis, entity discovery, and metadata projection hub. Positioned between whole-novel pre-production (Room 1) and downstream consumers (Rooms 2, 3, and 4), it enforces strict cross-chapter lexical and voice consistency:
+
+1. **Zero-Import Architectural Isolation**:
+   - 100% decoupled from downstream audio (`audiobook_factory.audio`), speech synthesis (`audiobook_factory.tts`), screenplay (`audiobook_factory.screenplay`), and direct networking (`urllib.request`, `requests`, `httpx`).
+   - Continuously enforced by AST test [`tests/glossary/test_zero_import_isolation.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests/glossary/test_zero_import_isolation.py).
+2. **High-Speed Lexical Scanner & Zero-Token Fast-Path** ([`ChapterLexicalScanner`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/scanner.py)):
+   - Sweeps chapter text in under $15\text{ms}$ using regex capitalization pattern matching, mid-sentence appearance checks, and 130+ non-entity stopword filters ([`ENGLISH_NON_ENTITY_STOPWORDS`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/scanner.py#L19)).
+   - Filters candidate entities against known names and lore in [`BookBible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py). If all candidate entities are already cataloged, **zero LLM tokens are consumed** (`llm_invoked=False`).
+3. **Tri-Partite Taxonomy & Alias Unification** ([`GlossaryClassifier`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/classifier.py)):
+   - **`PROPER_NAME`**: Phonetic Devanagari transliteration (*Corwin* $\to$ *कॉरविन*).
+   - **`HERALDIC_MONIKER`**: Phonetic Devanagari transliteration (*Silver Falcon* $\to$ *सिल्वर फाल्कन*). Literal word-for-word calques (*चांदी का बाज़*) are strictly banned.
+   - **`OCCUPATIONAL_ROLE`**: Natural spoken Hindustani translation (*The Stranger* $\to$ *अजनबी*, *The Butcher* $\to$ *कसाई*).
+   - **Alias Unification**: Links emergent monikers and epithets to canonical characters, preventing downstream screenplay and TTS engines from splitting one persona across multiple voice actors.
+4. **Dynamic Voice Allocation & Canonical Lore Sync** ([`GlossaryManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/manager.py)):
+   - Discovered characters are committed to `BookBible` with forensic provenance ([`EpistemicProvenance`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py) with origin `CORPUS_EXTRACTED`).
+   - Triggers dynamic voice allocation via [`NovelStateMaintainer.discover_and_lock_character()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/state_maintainer.py), guaranteeing collision-free 4D formants in `cast_lock.json`.
+5. **Durable Chapter Artifacts & Multi-Consumer Projections** ([`ChapterGlossary`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/contracts.py)):
+   - Persists deterministic chapter snapshot artifacts to `glossary/chapter_XXX_glossary.json` with 16-character SHA-256 version fingerprints.
+   - **Room 2 Projection** ([`to_translation_glossary()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/contracts.py#L83)): Emits flat English $\to$ Hindi dictionary for `TranslationRequest.dynamic_glossary`.
+   - **Room 3 Attribution Projection** ([`to_scripting_roster()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/contracts.py#L103)): Emits structured character roster with unified aliases for `DialogueAttributionAuditor`.
+   - **Room 3 Dramaturgy Projection** ([`to_dramaturgy_characters()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/contracts.py#L126)): Emits active scene character names for scene segmentation.
+6. **Authoritative Control Plane Routing** ([`execute_glossary_llm()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/gateway_bridge.py#L26)):
+   - Routes 100% of LLM queries through `ModelGateway.generate_text()` with atomic Concurrency=1 key leases from `KeyLeaseManager`, AntiBanGuard 11.0 RPM rate limits, official stealth SDK headers (`x-goog-api-client`), and `BLOCK_NONE` creative fiction framing.
+   - Fails closed (`RuntimeError`) if ModelGateway is unavailable. Zero unmetered raw HTTP calls.
 
 ---
 
@@ -239,23 +278,28 @@ Protects large pools of free API keys (120+ keys) against edge mass-bans and bot
 
 ### Downstream Pipeline Room Integration (Zero Boundary Leakage)
 
-All 5 production rooms interface strictly with [`ModelGateway`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py), maintaining clean boundary isolation:
+All production rooms interface strictly with [`ModelGateway`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py), maintaining clean boundary isolation:
 
 1. **Room 1 (Pre-Production & Extraction)**:
    - Suspicious PDF pages route through [`GeminiVisionPDFExtractor.escalate_page()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf/vision_extractor.py#L35) $\rightarrow$ `gateway.generate_text(task="extraction", parts=parts, session_id=f"pdf_page_{page_num}")`.
    - All 6 Room 1 pre-production agents route through [`execute_preproduction_llm()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/gateway_bridge.py#L37) $\rightarrow$ `gateway.generate_text(task="directing"|"extraction")`, acquiring Concurrency=1 mutual exclusion handles from `KeyLeaseManager`.
    - Enforces AntiBanGuard 11.0 RPM token-bucket rate limiting, stealth SDK headers (`x-goog-api-client`), session affinity sticky binding, `BLOCK_NONE` creative fiction framing, and resilient `json_repair`. Rogue direct `urllib` calls are 100% eliminated.
    - Backward-compatible legacy imports re-exported via [`audiobook_factory/pdf/vision_extractor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/pdf/vision_extractor.py).
-2. **Room 2 (Translation Collective)**:
+2. **Room 1.5 (Standalone Chapter Glossary & Metadata Hub)**:
+   - All lexical classification queries route through [`execute_glossary_llm()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/gateway_bridge.py#L26) $\rightarrow$ `gateway.generate_text(task="extraction", response_json=True)`, leasing keys under Concurrency=1 mutual exclusion from `KeyLeaseManager`.
+   - Zero-token fast-path bypasses ModelGateway completely when all candidates match `BookBible`, preserving daily quota budgets.
+   - Injects `BLOCK_NONE` creative fiction framing to prevent false-positive censorship of villainous monikers, dramatic epithets, and gritty rustic dialogue terms.
+   - Fails closed if ModelGateway is unavailable; direct `urllib` or unmetered HTTP calls are completely eliminated.
+3. **Room 2 (Translation Collective)**:
    - Dispatches translation prompts through `gateway.generate_text(task="translation", min_tier=ModelTier.TIER_1_FLAGSHIP)`.
-   - The 4 translation agents (`LiteraryDraftTranslator`, `HindustaniCadenceSpecialist`, etc.) receive raw text output without managing rate-limiting delays or rotating key pools.
-3. **Room 3 (Screenplay & Anti-Swap Attribution)**:
+   - The translation engine receives pristine text output without managing rate-limiting delays or rotating key pools.
+4. **Room 3 (Screenplay & Anti-Swap Attribution)**:
    - Encloses scene chunking within `with gateway.lease_session(session_id=scene_id):`.
    - Maintains sticky key affinity across 8–15 continuous dialogue turns, avoiding edge ban heuristics while analyzing speaker attribution.
-4. **Room 4 (Multi-Voice TTS Performance)**:
+5. **Room 4 (Multi-Voice TTS Performance)**:
    - Dispatches speech generation through `gateway.synthesize_speech(text=..., voice_name=..., task="tts")`.
    - The gateway leases keys explicitly for the `gemini-3.8-flash-tts` audio model, enforces the strict 10 RPD daily quota ceilings, and transparently rotates to fresh keys upon exhaustion.
-5. **Room 5 (Mastering & Verification)**:
+6. **Room 5 (Mastering & Verification)**:
    - Queries `gateway.get_fleet_status()` for diagnostic reporting and quota telemetry without opening direct connections to `keys_inventory.db`.
 
 ---

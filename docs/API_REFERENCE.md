@@ -1168,6 +1168,265 @@ class NovelStateMaintainer:
 
 ---
 
+## 📚 Standalone Chapter Glossary & Metadata Subsystem ([`audiobook_factory.glossary`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/))
+
+*(See full architectural manual: [`docs/GLOSSARY_AND_METADATA_SUBSYSTEM.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GLOSSARY_AND_METADATA_SUBSYSTEM.md))*
+
+> [!NOTE]
+> **Room 1.5 Architectural Isolation**: The glossary package operates as an independent, single-pass per-chapter lexical analysis hub.
+> It maintains **100% zero imports** from downstream audio (`audiobook_factory.audio`), speech synthesis (`audiobook_factory.tts`), screenplay (`audiobook_factory.screenplay`), or unmetered networking (`urllib.request`, `requests`, `httpx`). All LLM operations route exclusively through `ModelGateway` via [`execute_glossary_llm()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/gateway_bridge.py#L26).
+
+### 1. Data Contracts ([`audiobook_factory.glossary.contracts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/contracts.py))
+
+#### `EntityCategory`
+```python
+EntityCategory = Literal[
+    "PROPER_NAME",        # Personal name -> Phonetic Devanagari transliteration
+    "HERALDIC_MONIKER",  # Formal title / moniker -> Phonetic Devanagari (Calques strictly banned)
+    "OCCUPATIONAL_ROLE", # Situational role / descriptor -> Spoken natural Hindustani translation
+    "LOCATION",          # Geographic location -> Devanagari translation / transliteration
+    "LORE_TERM",         # Lore / fantasy term -> Devanagari equivalent
+]
+```
+
+#### `ChapterEntity`
+```python
+class ChapterEntity(BaseModel):
+    """
+    Standardized entity record discovered in chapter text.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    canonical_id: str = Field(..., description="Unique snake_case identifier (e.g. 'lord_corwin')")
+    english_name: str = Field(..., description="Canonical English name or moniker")
+    hindi_name: str = Field(..., description="Phonetic Devanagari transliteration or evocative Hindustani translation")
+    category: EntityCategory = Field(default="PROPER_NAME", description="Tri-Partite entity classification")
+    aliases: List[str] = Field(default_factory=list, description="All situational nicknames, aliases, and titles")
+    gender: Literal["male", "female", "neutral", "unknown"] = Field(default="unknown")
+    voice_style: str = Field(default="", description="Descriptive vocal acting hint or acoustic demeanor")
+    sociolect_archetype: str = Field(default="NEUTRAL", description="Hindustani dialect/social register archetype")
+    confidence: float = Field(default=0.95, ge=0.0, le=1.0)
+    first_appearance_chapter: int = Field(default=1, ge=1)
+    is_canonical: bool = Field(default=True)
+```
+
+#### `ChapterGlossary`
+```python
+class ChapterGlossary(BaseModel):
+    """
+    Immutable, self-contained glossary snapshot for a single chapter.
+    Serves as the single source of truth for:
+    - Room 2 (Translation): dynamic_glossary (en -> hi dictionary)
+    - Room 3 (Dramaturgy): scene characters & known entity list
+    - Room 3 (Scripting): character_roster.json with unified aliases
+    - Room 4 (Voice Casting): cast_lock sync candidates
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    chapter_num: int = Field(..., ge=0, description="1-indexed chapter number (0 for front matter)")
+    chapter_id: str = Field(default="", description="Chapter identifier slug (e.g. 'chapter_004')")
+    entities: Dict[str, ChapterEntity] = Field(default_factory=dict, description="Active character and person entities")
+    locations: Dict[str, str] = Field(default_factory=dict, description="English location name -> Devanagari translation")
+    terminology: Dict[str, str] = Field(default_factory=dict, description="English fantasy/lore term -> Devanagari translation")
+    version_hash: str = Field(default="", description="Deterministic SHA-256 fingerprint of glossary content")
+    total_entities: int = Field(default=0)
+
+    def compute_hash(self) -> str:
+        """Computes a deterministic 16-char SHA-256 fingerprint of the glossary content."""
+
+    def to_translation_glossary(self) -> Dict[str, str]:
+        """Projects glossary into a clean English -> Hindi mapping for TranslationRequest.dynamic_glossary."""
+
+    def to_scripting_roster(self, use_hindi: bool = True) -> Dict[str, Any]:
+        """
+        Projects glossary into standard character_roster schema consumed by
+        DialogueAttributionAuditor and dialogue_parser. Ensures unified alias maps prevent false speaker flips.
+        """
+
+    def to_dramaturgy_characters(self) -> List[str]:
+        """Returns list of all active character names for scene segmentation."""
+
+    def save_to_file(self, path: Path | str) -> None:
+        """Atomically persists glossary to JSON on disk via temporary UUID file."""
+
+    @classmethod
+    def load_from_file(cls, path: Path | str) -> ChapterGlossary:
+        """Loads glossary from JSON file."""
+```
+
+---
+
+### 2. Chapter Lexical Scanner ([`audiobook_factory.glossary.scanner`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/scanner.py))
+
+#### `CandidateEntity`
+```python
+class CandidateEntity(BaseModel):
+    """Raw entity candidate extracted from chapter text prior to LLM classification."""
+    name: str
+    frequency: int = 1
+    sample_context: str = ""
+    suggested_category: str = "character"
+    confidence: float = 0.85
+    is_multiword: bool = False
+    has_mid_sentence: bool = False
+```
+
+#### `ChapterLexicalScanner`
+```python
+class ChapterLexicalScanner:
+    """
+    Zero-token lexical extraction engine for chapter text.
+    Sweeps text in under 15ms, filters 130+ non-entity stopwords, and cross-references
+    against BookBible to guarantee zero LLM token consumption on known vocabularies.
+    """
+
+    @classmethod
+    def scan_chapter_text(
+        cls,
+        text: str,
+        known_lexicon: Optional[Set[str]] = None,
+        book_bible: Optional[BookBible] = None,
+        min_frequency: int = 2,
+    ) -> List[CandidateEntity]:
+        """
+        Scans chapter text for uncataloged capitalized noun phrases and monikers.
+        Filters known entities from book_bible / known_lexicon.
+        Returns a sorted list of uncataloged candidate entities.
+        """
+```
+
+---
+
+### 3. Glossary Classifier & Taxonomy ([`audiobook_factory.glossary.classifier`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/classifier.py))
+
+#### `TRI_PARTITE_SYSTEM_PROMPT`
+Authoritative system instruction enforcing the 3-tier entity taxonomy:
+1. `PROPER_NAME`: Phonetic Devanagari transliteration (*Edward* $\to$ *एडवर्ड*).
+2. `HERALDIC_MONIKER`: Phonetic Devanagari transliteration (*Silver Falcon* $\to$ *सिल्वर फाल्कन*). Literal word-for-word calques (*चांदी का बाज़*) are strictly forbidden.
+3. `OCCUPATIONAL_ROLE`: Spoken natural Hindustani translation (*The Stranger* $\to$ *अजनबी*, *The Butcher* $\to$ *कसाई*).
+4. Alias Unification: Links situational roles to true names to eliminate multi-actor voice splits.
+
+#### `GlossaryClassifier`
+```python
+class GlossaryClassifier:
+    """
+    Classifies raw candidate entities and extracts Devanagari equivalents.
+    Handles resilient unwrapping across multiple JSON keys (characters, entities, candidates, data)
+    and separates discovered geographic terms from lore terminology.
+    """
+
+    @classmethod
+    def classify_candidates(
+        cls,
+        candidates: List[CandidateEntity],
+        chapter_text: str,
+        chapter_num: int = 1,
+        known_characters: Optional[List[str]] = None,
+        call_llm_fn: Optional[Callable[..., Any]] = None,
+    ) -> Tuple[List[ChapterEntity], Dict[str, str], Dict[str, str]]:
+        """
+        Classifies candidate entities using ModelGateway.
+        Returns:
+            (discovered_characters, locations_map, terminology_map)
+        """
+```
+
+---
+
+### 4. Control Plane Gateway Bridge ([`audiobook_factory.glossary.gateway_bridge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/gateway_bridge.py))
+
+#### `execute_glossary_llm`
+```python
+def execute_glossary_llm(
+    prompt: str,
+    system_instruction: Optional[str] = None,
+    task: str = "extraction",
+    model: Optional[str] = None,
+    temperature: float = 0.10,
+    max_output_tokens: Optional[int] = 8192,
+    session_id: Optional[str] = None,
+    user_id: str = "glossary_worker",
+    json_mode: bool = True,
+    **kwargs: Any,
+) -> Union[Dict[str, Any], List[Any], str]:
+    """
+    Executes a Room 1.5 Glossary LLM request strictly through ModelGateway.
+    Acquires Concurrency=1 atomic key leases via KeyLeaseManager.
+    Enforces AntiBanGuard 11.0 RPM pacing, official stealth SDK headers ('x-goog-api-client'),
+    session affinity, and BLOCK_NONE creative fiction safety framing.
+    Fails closed with RuntimeError if ModelGateway is unavailable.
+    Returns parsed JSON object/list or raw string, with automatic json_repair fallback.
+    """
+```
+
+---
+
+### 5. Unified Glossary Manager ([`audiobook_factory.glossary.manager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/manager.py))
+
+#### `GlossaryManager`
+```python
+class GlossaryManager:
+    """
+    Central Coordinator for Chapter-Level Glossary, Metadata & Entity Synchronization.
+    Coordinates zero-token lexical scanning, LLM classification, BookBible updates,
+    and NovelStateMaintainer dynamic casting in a single pass.
+    """
+
+    @classmethod
+    def scan_and_sync_chapter(
+        cls,
+        chapter_text: str,
+        project_dir: Optional[Union[Path, str]] = None,
+        chapter_num: int = 1,
+        chapter_id: Optional[str] = None,
+        book_bible: Optional[BookBible] = None,
+        call_llm_fn: Optional[Callable[..., Any]] = None,
+        min_frequency: int = 2,
+        force_classification: bool = False,
+    ) -> ChapterGlossary:
+        """
+        Executes single-pass chapter lexical analysis:
+        1. Fast zero-token regex scan against known lexicon in BookBible.
+        2. Dispatches uncataloged candidates to GlossaryClassifier via ModelGateway.
+        3. Updates BookBible, dynamic voice allocation (cast_lock.json), and persists state.
+        4. Writes durable chapter glossary artifact: glossary/chapter_XXX_glossary.json.
+        """
+
+    @classmethod
+    def get_chapter_glossary(
+        cls,
+        chapter_num: int,
+        project_dir: Union[Path, str],
+    ) -> Optional[ChapterGlossary]:
+        """Loads existing chapter glossary artifact from disk if present."""
+
+    @classmethod
+    def export_for_translation(
+        cls,
+        chapter_num: int,
+        project_dir: Union[Path, str],
+        chapter_text: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """
+        Exports a flat English -> Hindi translation glossary for
+        TranslationRequest.dynamic_glossary.
+        """
+
+    @classmethod
+    def export_for_scripting(
+        cls,
+        chapter_num: int,
+        project_dir: Union[Path, str],
+        use_hindi: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Exports structured character_roster schema consumed by
+        DialogueAttributionAuditor and dialogue_parser.
+        """
+```
+
+---
+
 ## 🧠 Literary Translation Intelligence & Memory 2.0 ([`audiobook_factory.translation`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/))
 
 *(See full architectural manual: [`docs/LITERARY_TRANSLATION_INTELLIGENCE.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/LITERARY_TRANSLATION_INTELLIGENCE.md))*
