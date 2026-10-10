@@ -8,7 +8,7 @@
 [![Control Plane](https://img.shields.io/badge/Control%20Plane-ModelGateway%20%26%20KeyLease-blueviolet.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models)
 [![Fleet Health](https://img.shields.io/badge/Active%20Fleet-123%20Keys%20(Zero--Secret)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/CLI_REFERENCE.md#12-key-inventory--fleet-monitor-keys)
 [![TTS Engine](https://img.shields.io/badge/TTS-Google%20Gemini%20Flash%20TTS-green.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
-[![Voice Casting](https://img.shields.io/badge/Voice%20Casting-4D%20Acoustic%20Formant%20Matrix-blue.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/VOICE_CASTING_DIRECTOR_GUIDE.md)
+[![Voice Casting](https://img.shields.io/badge/Voice%20Casting-Option%20C%20(2%2C089%20Voices)-blue.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_VOICE_CASTING_AND_CALIBRATION.md)
 [![Audiobook Master](https://img.shields.io/badge/Audiobook%20Master-EBU%20R128%20(-19%20LUFS)-purple.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)
 [![Podcast Master](https://img.shields.io/badge/Podcast%20Master-EBU%20R128%20(-16%20LUFS)-indigo.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 [![Certification](https://img.shields.io/badge/Certification-8--Pillar%20Studio%20Harness-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/QUALITY_GATES.md)
@@ -299,6 +299,9 @@ pytest tests/ -v
 # Run Option C dramaturgy and SPU alignment tests
 pytest tests/test_dramaturgy_spu_alignment.py tests/test_dialogue_attribution_auditor.py -v
 
+# Run Room 3.5 voice casting & Gate 2.8 distinction tests
+pytest tests/test_casting_subsystem.py tests/test_gate28_distinction.py -v
+
 # Run 8-Pillar studio certification tests
 pytest tests/test_studio_certification_suite.py -v
 ```
@@ -308,6 +311,7 @@ All quality gates are fail-closed:
 - **Gate 1 / NR-GATE-01/03**: Dramatis Personae, $\ge 4\%$ Voice Step Separation & $[0.70, 1.30]$ Pitch Bounds.
 - **Gate 2**: DialogueAttributionAuditor (0% Speaker Turn Swaps).
 - **Gate 2.5**: Stanislavski Acting Restraint & Dramatic Validation.
+- **Gate 2.8**: Auditory Distinction & Acoustic Calibration Gate (Pairwise co-speaker distance $\ge 0.65$ & phase-safe ban on asetrate/atempo).
 - **Gate 2.9**: Pre-TTS Config & Attribution Sanity Gate (Dual-Tier Hybrid: Tier 1 regex/schema/whitelist/acoustic clamping + Tier 2 Adversarial LLM Attribution Judge via 123+ Gemini key pool).
 - **Gate 5**: Dialogue Editorial Snapping & Hann Micro-fades.
 - **Gate 6**: Two-Pass Linear Loudnorm Certification (-19.0 LUFS, -1.5 dBTP).
@@ -320,6 +324,7 @@ All quality gates are fail-closed:
 
 For exhaustive technical guides, visit the [`docs/`](docs/) directory and subsystem manuals:
 - [🏛️ Option C Architecture Blueprint](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md)
+- [🎙️ Room 3.5: Studio Voice Casting & Acoustic Calibration Engine](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_VOICE_CASTING_AND_CALIBRATION.md)
 - [🎙️ 2-Host Podcast System Architecture](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 - [🎭 Dramaturgy & Multi-Format Adaptation System](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/DRAMATURGY_AND_ADAPTATION_SYSTEM.md)
 - [📚 Glossary & Chapter Metadata Subsystem](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GLOSSARY_AND_METADATA_SUBSYSTEM.md)

@@ -212,16 +212,17 @@ Room 1.5 is the decoupled, single-pass per-chapter lexical analysis, entity disc
 
 ---
 
-### Room 3.5: Studio Voice Casting & Acoustic Calibration Engine (SVCCS)
-*Modules:* [`audiobook_factory/casting/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/), [`audiobook_factory/casting/contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/contracts.py), [`audiobook_factory/casting/registry.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/registry.py), [`audiobook_factory/casting/director.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/director.py), [`audiobook_factory/casting/calibrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/calibrator.py), [`audiobook_factory/casting/adapters/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/)
+### Room 3.5: Studio Voice Casting & Acoustic Calibration Engine (SVCCS - Option C)
+*Modules:* [`audiobook_factory/casting/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/), [`audiobook_factory/casting/contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/contracts.py), [`audiobook_factory/casting/registry.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/registry.py), [`audiobook_factory/casting/director.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/director.py), [`audiobook_factory/casting/calibrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/calibrator.py), [`audiobook_factory/casting/adapters/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/)  
+*(See full architectural specification: [`docs/STUDIO_VOICE_CASTING_AND_CALIBRATION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_VOICE_CASTING_AND_CALIBRATION.md))*
 
 Room 3.5 implements **Option C: Shared Understanding & Voice Registry Core with Specialized Decoupled Subsystems**, resolving the prior schism between disparate voice catalogs and uniting 2,089 curated studio voices (including 114 native Hindi voices) under a single canonical architecture:
 
 1. **Shared Core: Canonical Voice Profile Registry & Provider Adapters**:
    - **`VoiceProfileRegistry`** ([`registry.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/registry.py)): Singleton registry indexing all available voices from curated studio catalogs. Exposes sub-millisecond querying (`query_profiles()`) filtering by language code (`hi-IN`, `en-US`), gender, dialect, perceived age, pitch tier (`low`, `medium`, `high`), and dramatic archetype.
    - **`ProviderCapabilities` & Adapters** ([`adapters/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/)):
-     - [`GeminiVoiceAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/gemini_adapter.py): Translates canonical profiles into Gemini REST payloads (`speechMetadata.style`, temperature, and FFmpeg parametric EQ filter strings).
-     - [`QwenVoiceAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/qwen_adapter.py): Generates native speed float multipliers and provisions prompt reference audio WAV stems for zero-shot neural voice cloning.
+     - [`GeminiVoiceAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/gemini.py): Translates canonical profiles into Gemini REST payloads (`speechMetadata.style`, temperature, and FFmpeg parametric EQ filter strings).
+     - [`QwenVoiceAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/qwen.py): Generates native speed float multipliers and provisions prompt reference audio WAV stems for zero-shot neural voice cloning.
 
 2. **Subsystem 1: Studio Casting Director (`StudioCastingDirector`)**:
    - **Hollywood Ensemble Prompting**: Enforces lead narrator transparency (`0.32` temperature), strict gender matching, dramatic vocal contrast across co-speakers, and regional Hindustani dialect matching (Haryanvi warriors/guards, Bhojpuri commoners/butchers, Awadhi healers/aristocracy, Bundeli foresters, Urdu courtly scholars).
@@ -235,12 +236,13 @@ Room 3.5 implements **Option C: Shared Understanding & Voice Registry Core with 
      - Speaker 1: Low-end warmth boost (+2.0 dB at 150 Hz chest resonance) and gentle presence dip (-1.5 dB at 2.8 kHz).
      - Speaker 2: Presence and clarity boost (+2.0 dB at 2.8 kHz, +1.0 dB at 8 kHz air shelf) with slight low-end reduction (-1.5 dB at 150 Hz).
    - **Phase-Safe Audio Invariant**: Strictly bans destructive digital resampling (`asetrate`) and WSOLA time-stretching (`atempo`) during playback, preserving authentic speech formants and eliminating metallic flanging.
-   - **Remediation of the Sledgehammer DSP Bug**: Fixed line 778 of `TTSDispatcher`, ensuring that `AUDIBLE_CLEAN_DSP=true` preserves surgical parametric EQ curves without wiping upstream acoustic contrast.
+   - **Remediation of the Sledgehammer DSP Bug**: Hardened `TTSDispatcher` (`tts/dispatcher.py`), ensuring that `AUDIBLE_CLEAN_DSP=true` preserves surgical parametric EQ curves without wiping upstream acoustic contrast.
 
 ---
 
 ### Room 3.5 $\rightarrow$ Room 4 Boundary: Gate 2.8 Auditory Distinction Gate
-*Module:* [`audiobook_factory/gates/gate28_distinction.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/gate28_distinction.py)
+*Module:* [`audiobook_factory/gates/gate28_distinction.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/gate28_distinction.py)  
+*(See full quality gate protocol: [`docs/QUALITY_GATES.md#gate-28-auditory-distinction--acoustic-calibration-gate`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/QUALITY_GATES.md#gate-28-auditory-distinction--acoustic-calibration-gate))*
 
 Gate 2.8 operates as an authoritative pre-synthesis gatekeeper positioned immediately prior to Gate 2.9:
 1. **Speaker Whitelist & Cast Lock Verification**: Asserts that every dialogue speaker has a non-null voice assignment in `voice_registry.json` and a permanent lock in `cast_lock.json`. Zero silent fallback to Narrator for dialogue turns.

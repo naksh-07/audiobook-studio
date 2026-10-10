@@ -3191,49 +3191,92 @@ def _atomic_replace(src: Path, dst: Path, max_attempts: int = 8) -> None:
 
 ## 🎙️ Room 3.5: Studio Voice Casting & Acoustic Calibration Engine ([`audiobook_factory.casting`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/))
 
-Room 3.5 implements Option C (Shared Understanding & Voice Registry Core with Specialized Decoupled Subsystems).
+Room 3.5 implements **Option C (Shared Understanding & Voice Registry Core with Specialized Decoupled Subsystems)**.  
+*(See complete specification: [`docs/STUDIO_VOICE_CASTING_AND_CALIBRATION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_VOICE_CASTING_AND_CALIBRATION.md))*
 
 ### 1. Data Contracts ([`audiobook_factory.casting.contracts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/contracts.py))
 
 ```python
 class ProviderCapabilities(BaseModel):
-    provider_name: str
+    provider_name: Literal["gemini_tts", "qwen3_tts", "local_winrt"] = "gemini_tts"
     supports_reference_audio: bool = False
     supports_style_prompt: bool = True
     supports_native_speed: bool = False
     native_sample_rate_hz: int = 24000
-    supported_controls: List[str] = Field(default_factory=list)
+    supported_controls: List[str] = Field(
+        default_factory=lambda: ["speechMetadata.style", "temperature", "parametric_eq"]
+    )
 
 class CanonicalVoiceProfile(BaseModel):
     voice_id: str
     display_name: str
     language_code: str = "hi-IN"
-    region_code: Optional[str] = "IN"
-    gender: str = "neutral"
-    perceived_age: Optional[int] = 30
+    region_code: str = "IN"
+    gender: Literal["male", "female", "neutral"] = "neutral"
+    perceived_age: Optional[int] = None
     dialect: str = "Standard"
-    pitch_tier: str = "medium"
+    pitch_tier: Literal["low", "medium_low", "medium", "medium_high", "high"] = "medium"
     timbre: str = ""
     role: str = ""
     persona: str = ""
     archetypes: List[str] = Field(default_factory=list)
     description: str = ""
-    default_provider: str = "gemini_tts"
-    capabilities: ProviderCapabilities
+    default_provider: Literal["gemini_tts", "qwen3_tts"] = "gemini_tts"
+    reference_audio_path: Optional[str] = None
+    capabilities: ProviderCapabilities = Field(default_factory=ProviderCapabilities)
 
 class SpectralFormantProfile(BaseModel):
-    chest_resonance_150hz_db: float = 0.0
-    nasal_presence_2800hz_db: float = 0.0
-    throat_clarity_3200hz_db: float = 0.0
-    air_shelf_8000hz_db: float = 0.0
-    target_tempo_multiplier: float = 1.0
+    chest_resonance_150hz_db: float = Field(default=0.0, ge=-4.0, le=4.0)
+    nasal_presence_2800hz_db: float = Field(default=0.0, ge=-3.0, le=4.0)
+    throat_clarity_3200hz_db: float = Field(default=0.0, ge=-3.0, le=3.0)
+    air_shelf_8000hz_db: float = Field(default=0.0, ge=-4.0, le=4.0)
+    target_tempo_multiplier: float = Field(default=1.0, ge=0.85, le=1.15)
+
+    def to_ffmpeg_filters(self) -> List[str]:
+        """Generates phase-safe FFmpeg audio filter clauses."""
 
 class SceneContrastMatrix(BaseModel):
     scene_id: str
-    speakers: List[str] = Field(default_factory=list)
+    active_speakers: List[str] = Field(default_factory=list)
     pairwise_distances: Dict[str, float] = Field(default_factory=dict)
     min_distance: float = 1.0
-    separation_acceptable: bool = True
+    is_contrast_sufficient: bool = True
+    calibration_adjustments: Dict[str, SpectralFormantProfile] = Field(default_factory=dict)
+
+class CharacterCastAssignment(BaseModel):
+    character_id: str
+    canonical_name: str
+    voice_id: str
+    assigned_provider: Literal["gemini_tts", "qwen3_tts"] = "gemini_tts"
+    gender: Literal["male", "female", "neutral"] = "neutral"
+    dialect: str = "Standard"
+    casting_rationale: str = ""
+    baseline_formants: SpectralFormantProfile = Field(default_factory=SpectralFormantProfile)
+    pronunciation_overrides: Dict[str, str] = Field(default_factory=dict)
+    locked: bool = True
+    version: str = "1.0.0"
+
+class CastLock(BaseModel):
+    character_id: str = ""
+    character_name: str = ""
+    voice_id: str
+    casting_version: str = "1.0.0"
+    locked: bool = True
+    locked_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
+    locked_by: str = "Director"
+    selection_rank: int = 1
+    selection_rationale: str = ""
+    casting_evidence: Dict[str, Any] = Field(default_factory=dict)
+    calibration_overrides: Dict[str, Any] = Field(default_factory=dict)
+
+class CastLockManifest(BaseModel):
+    project_slug: str = Field(default="", validation_alias=AliasChoices("project_slug", "project_id"))
+    version: str = "1.0.0"
+    locks: Dict[str, CastLock] = Field(default_factory=dict)
+    recast_history: List[Dict[str, Any]] = Field(default_factory=list)
+    updated_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
+
+    def get_lock(self, character_name_or_id: str) -> Optional[CastLock]: ...
 ```
 
 ### 2. Central Voice Registry ([`audiobook_factory.casting.registry.VoiceProfileRegistry`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/registry.py))
@@ -3263,9 +3306,8 @@ class VoiceProfileRegistry:
         self,
         language_code: str = "hi-IN",
         gender: Optional[str] = None,
-        dialect: Optional[str] = None,
         exclude_voice_ids: Optional[Set[str]] = None,
-        limit: int = 25,
+        limit: int = 30,
     ) -> str: ...
 ```
 
@@ -3299,12 +3341,49 @@ class StudioCastingDirector:
         """Casts an entire character roster for a project ensemble."""
 ```
 
-### 4. Scene Acoustic Calibrator ([`audiobook_factory.casting.calibrator.SceneAcousticCalibrator`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/calibrator.py))
+### 4. Cast Lock Manager ([`audiobook_factory.casting.cast_lock.CastLockManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/cast_lock.py))
+
+```python
+class CastLockManager:
+    """Manages project-level Cast Locks with audit trails and recast cache invalidation."""
+    def __init__(self, project_dir: Path | str): ...
+    def save(self) -> None: ...
+    def lock_character(
+        self,
+        character_id: str,
+        character_name: str,
+        voice_id: str,
+        evaluation_record: Optional[CastingEvaluationRecord] = None,
+        selection_rationale: str = "",
+        calibration_overrides: Optional[Dict[str, Any]] = None,
+        locked_by: str = "Director",
+    ) -> CastLock: ...
+    def get_lock(self, character_name_or_id: str) -> Optional[CastLock]: ...
+    def is_locked(self, character_name_or_id: str) -> bool: ...
+    def recast_character(
+        self,
+        character_name_or_id: str,
+        new_voice_id: str,
+        reason: str,
+        recast_by: str = "Director",
+        new_calibration: Optional[Dict[str, Any]] = None,
+    ) -> CastLock: ...
+```
+
+### 5. Scene Acoustic Calibrator ([`audiobook_factory.casting.calibrator.SceneAcousticCalibrator`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/calibrator.py))
 
 ```python
 class SceneAcousticCalibrator:
     """Calculates pairwise acoustic Euclidean distances (>= 0.65) and generates surgical EQ formants."""
-    def calculate_pairwise_distance(self, profile_a: CanonicalVoiceProfile, profile_b: CanonicalVoiceProfile) -> float: ...
+    def __init__(self, registry: Optional[VoiceProfileRegistry] = None): ...
+
+    def calculate_speaker_distance(
+        self,
+        speaker_a: str,
+        speaker_b: str,
+        voice_map: Dict[str, Any],
+    ) -> float:
+        """Calculates mathematical auditory separation distance [0.0, 1.0] between two speakers."""
 
     def calibrate_scene_segments(
         self,
@@ -3315,9 +3394,75 @@ class SceneAcousticCalibrator:
         """Injects complementary parametric EQ curves for co-speakers with distance < 0.65 without digital resampling."""
 ```
 
-### 5. Quality Gate 2.8: Auditory Distinction Gate ([`audiobook_factory.gates.gate28_distinction.AuditoryDistinctionGate`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/gate28_distinction.py))
+### 6. Provider Voice Adapters ([`audiobook_factory.casting.adapters`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/))
 
 ```python
+class BaseVoiceAdapter(ABC):
+    """Abstract Provider-Specific Voice Adapter."""
+    @abstractmethod
+    def adapt_segment_to_provider(
+        self,
+        segment: Dict[str, Any],
+        character_cast: Optional[CharacterCastAssignment] = None,
+    ) -> Dict[str, Any]: ...
+
+    @abstractmethod
+    def get_provider_capabilities(self) -> ProviderCapabilities: ...
+
+class GeminiVoiceAdapter(BaseVoiceAdapter):
+    """Adapter for Google Gemini Flash Speech Synthesis."""
+    def adapt_segment_to_provider(
+        self,
+        segment: Dict[str, Any],
+        character_cast: Optional[CharacterCastAssignment] = None,
+    ) -> Dict[str, Any]:
+        """Translates calibrated segment into Gemini TTS payload dict."""
+
+class QwenVoiceAdapter(BaseVoiceAdapter):
+    """Adapter for Qwen3-TTS / CosyVoice zero-shot voice cloning and speech synthesis."""
+    def __init__(self, reference_bank_dir: Optional[Path | str] = None): ...
+    def adapt_segment_to_provider(
+        self,
+        segment: Dict[str, Any],
+        character_cast: Optional[CharacterCastAssignment] = None,
+    ) -> Dict[str, Any]:
+        """Translates calibrated segment into Qwen3-TTS payload dict."""
+```
+
+### 7. Control Plane Routing Bridge ([`audiobook_factory.casting.gateway_bridge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/gateway_bridge.py))
+
+```python
+def execute_casting_llm(
+    prompt: str,
+    system_instruction: Optional[str] = None,
+    task: str = "directing",
+    model: Optional[str] = None,
+    temperature: float = 0.20,
+    max_output_tokens: Optional[int] = 8192,
+    session_id: Optional[str] = None,
+    user_id: str = "casting_director",
+    json_mode: bool = True,
+    **kwargs: Any,
+) -> Union[Dict[str, Any], List[Any], str]:
+    """
+    Executes an AI Casting Director request strictly through ModelGateway.
+    Routes via KeyLeaseManager (Concurrency = 1) across the 123+ API key inventory
+    with AntiBanGuard 11.0 RPM pacing and BLOCK_NONE creative literature framing.
+    """
+```
+
+### 8. Quality Gate 2.8: Auditory Distinction Gate ([`audiobook_factory.gates.gate28_distinction.AuditoryDistinctionGate`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/gate28_distinction.py))
+
+```python
+class AuditoryDistinctionVerdict(BaseModel):
+    passed: bool = True
+    min_scene_distance: float = 1.0
+    audited_scenes_count: int = 0
+    audited_dialogue_turns: int = 0
+    violations: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    scene_matrices: List[SceneContrastMatrix] = Field(default_factory=list)
+
 class AuditoryDistinctionGate:
     """Authoritative Pre-TTS Auditory Distinction Gatekeeper."""
     @classmethod
