@@ -14,11 +14,11 @@
 - **Phase 2: Research Subsystem (COMPLETED, AUDITED & CERTIFIED)**:
   - 2-System pre-production architecture (`LexicalCorpusScanner`, `BookBible`, `NovelStateMaintainer`).
   - NR-GATE-06 atomic two-phase commit with rollback; NR-GATE-03 voice collision elimination.
-  - All Room 1 agents wired to `ModelGateway.generate_text()` via `gateway_bridge.py`. 119+ tests green.
-- **Phase 3: Standalone Translation Engine (MERGED & INTEGRATING)**:
+  - All Room 1 agents wired to `ModelGateway.generate_text()` via `gateway_bridge.py`. Docs fully updated in NOVEL_RESEARCHER_ARCHITECTURE.md, ARCHITECTURE.md, API_REFERENCE.md.
+- **Phase 3: Standalone Translation Engine (COMPLETED, AUDITED & HARDENED)**:
   - Option D decoupled core: `TranslationEngine`, `BilingualMacroChunker` (<=2200 words), `DeterministicParityGate`.
-  - Zero-import isolation: 0 imports from audio, TTS, or screenplay in translation core.
-  - Single-pass `MultiAgentTranslationCollective` with 70/30 canon fidelity & dual-rule invariant.
-  - Wiring to `ModelGateway` for key-leasing, rate pacing, and session affinity.
+  - Zero-import isolation: 0 imports from audio, TTS, or screenplay in translation core. Localized atomic replace in `memory_store.py`.
+  - Adversarial audit passed: Permanently removed `urllib` and `_direct_gemini_call` from `engine.py`. Fail-closed policy enforced in `gateway_bridge.py`. Zero unmetered HTTP calls.
+  - 102/102 translation tests and 168+ multi-phase regression tests 100% green.
 - **Next Milestone: Phase 4 - Universal Dramaturgy (`origin/dramaturgy`)**:
-  - Merge Chapter Dramatic AST and dual-host adapters.
+  - Merge Chapter Dramatic AST, dual-host podcast adapters, and 8-Pillar certification harness.

@@ -10,8 +10,6 @@ import os
 import re
 import time
 import json
-import urllib.request
-import urllib.error
 from typing import Any, Callable, Dict, List, Optional
 
 from .contracts import (
@@ -188,59 +186,11 @@ class TranslationEngine:
             except TypeError:
                 return self.llm_fn(prompt=user_prompt)
 
-        # Standalone direct HTTP execution (zero audio/studio imports)
-        return self._direct_gemini_call(
-            user_prompt=user_prompt,
-            system_instruction=system_instruction,
-            thinking_budget=thinking_budget,
-            temperature=temperature,
+        # Fail closed: No unmetered direct HTTP calls allowed
+        raise RuntimeError(
+            "No LLM callable configured for TranslationEngine and direct unmetered HTTP calls are forbidden. "
+            "Please provide an LLM callable or configure ModelGateway."
         )
-
-    def _direct_gemini_call(
-        self,
-        user_prompt: str,
-        system_instruction: str,
-        thinking_budget: int = 1024,
-        temperature: float = 0.35,
-    ) -> str:
-        """Isolated direct HTTP request to Google Gemini API."""
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            raise RuntimeError(
-                "No LLM callable injected and GEMINI_API_KEY environment variable is not set."
-            )
-
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={api_key}"
-        headers = {"Content-Type": "application/json"}
-
-        gen_config: Dict[str, Any] = {
-            "temperature": temperature,
-            "maxOutputTokens": 8192,
-        }
-        if thinking_budget > 0:
-            gen_config["thinkingConfig"] = {"thinkingBudget": thinking_budget}
-
-        payload: Dict[str, Any] = {
-            "contents": [{"parts": [{"text": user_prompt}]}],
-            "systemInstruction": {"parts": [{"text": system_instruction}]},
-            "generationConfig": gen_config,
-        }
-
-        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=90.0) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                candidates = data.get("candidates", [])
-                if not candidates:
-                    raise RuntimeError("Gemini returned no candidates.")
-                parts = candidates[0].get("content", {}).get("parts", [])
-                text_parts = [p.get("text", "") for p in parts if "text" in p]
-                return "".join(text_parts).strip()
-        except urllib.error.HTTPError as e:
-            err_body = e.read().decode("utf-8") if e.fp else str(e)
-            raise RuntimeError(f"Gemini API HTTP {e.code} Error: {err_body}")
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"Gemini API Network Error: {e.reason}")
 
     @staticmethod
     def _sanitize_output(text: str) -> str:

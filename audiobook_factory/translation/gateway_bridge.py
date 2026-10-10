@@ -80,15 +80,12 @@ def execute_translation_llm(
             **kwargs,
         )
         raw_text = (response.text or "").strip()
-    except ImportError:
-        logger.warning("  [!] ModelGateway not available in standalone environment. Using direct HTTP fallback.")
-        from audiobook_factory.translation.engine import TranslationEngine
-        raw_text = TranslationEngine(model_name=model)._direct_gemini_call(
-            user_prompt=prompt,
-            system_instruction=effective_sys_prompt,
-            thinking_budget=thinking_budget or 1024,
-            temperature=temperature,
-        )
+    except ImportError as err:
+        logger.error("  [!] ModelGateway not available in environment. Fails closed to eliminate unmetered rogue HTTP calls.")
+        raise RuntimeError(
+            "ModelGateway from audiobook_factory.core.models.gateway is required for translation LLM calls. "
+            "Direct unmetered HTTP calls are strictly forbidden."
+        ) from err
     except Exception as e:
         logger.error(f"  [!] Translation ModelGateway dispatch failed: {e}")
         raise

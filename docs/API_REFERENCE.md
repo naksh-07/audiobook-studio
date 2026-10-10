@@ -782,9 +782,399 @@ def audit_book_master(project_dir: Path, strict: bool = False) -> Dict[str, Any]
 
 ---
 
-## 🧠 Literary Translation Intelligence & Memory 2.0 ([`audiobook_factory.translation`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/translation/))
+## 🔬 Novel Researcher & Pre-Production Subsystem ([`audiobook_factory.preproduction`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/) & [`audiobook_factory.metadata`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/))
 
-*(See full architectural manual: [`docs/LITERARY_TRANSLATION_INTELLIGENCE.md`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/docs/LITERARY_TRANSLATION_INTELLIGENCE.md))*
+*(See full architectural specification: [`docs/NOVEL_RESEARCHER_ARCHITECTURE.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/NOVEL_RESEARCHER_ARCHITECTURE.md))*
+
+Room 1 implements a decoupled **2-System Pre-Production Architecture**:
+- **System 1: Stateless Novel Researcher Engine** (`audiobook_factory/preproduction/`): Pure stateless compute, deterministic full-corpus lexical analysis, Google Search Grounding with bidirectional validation, and pure vocals-only acoustic design. Zero direct filesystem I/O.
+- **System 2: Canonical Metadata & State Maintainer** (`audiobook_factory/metadata/`): Authoritative Pydantic v2 schemas (`BookBible`, `BookEntity`, `EpistemicProvenance`), transactional multi-file persistence (`NovelStateMaintainer`), thread concurrency locking (`_STATE_LOCK = threading.RLock()`), and Windows 11 atomic replace hardening (`_atomic_replace`).
+
+---
+
+### System 1: Stateless Novel Researcher Engine
+
+#### 1. Pre-Production Control Plane Bridge ([`audiobook_factory.preproduction.gateway_bridge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/gateway_bridge.py))
+
+Authoritative routing bridge ensuring 100% of Pre-Production Room 1 LLM calls route through [`ModelGateway`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py) with Concurrency=1 key leases from [`KeyLeaseManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py), 11.0 RPM rate pacing via `AntiBanGuard`, official stealth SDK headers (`x-goog-api-client`), session affinity sticky binding, permissive `BLOCK_NONE` creative safety framing, and resilient `json_repair`.
+
+```python
+def execute_preproduction_llm(
+    prompt: str,
+    system_instruction: Optional[str] = None,
+    task: str = "directing",
+    model: Optional[str] = None,
+    json_mode: bool = True,
+    temperature: float = 0.3,
+    max_output_tokens: Optional[int] = None,
+    thinking_budget: Optional[int] = None,
+    session_id: Optional[str] = None,
+    user_id: str = "preproduction_worker",
+    tools: Optional[List[Dict[str, Any]]] = None,
+    **kwargs: Any,
+) -> Union[Dict[str, Any], List[Any], str]:
+    """
+    Executes a Pre-Production Room 1 LLM request strictly through ModelGateway.
+    
+    Args:
+        prompt: Raw prompt text containing book samples and instructions.
+        system_instruction: System prompt framing dramatic acting or extraction rules.
+        task: ModelGateway task type ('directing', 'extraction', 'translation', 'utility').
+        model: Specific model ID override (defaults to active task model).
+        json_mode: If True, parses output into JSON (dict or list); else returns raw text.
+        temperature: Sampling temperature (clamped 0.2 - 0.4 for factual dramaturgy).
+        max_output_tokens: Maximum tokens in response.
+        thinking_budget: Gemini Flash thinking budget (default 1024).
+        session_id: Context session ID for sticky key affinity binding.
+        user_id: Caller identity for single-user quota tracking.
+        tools: Optional tool definitions (e.g. [{'googleSearch': {}}]).
+        **kwargs: Additional parameters forwarded to ModelGateway.generate_text.
+
+    Returns:
+        Parsed JSON dictionary/list or cleaned text response.
+    """
+```
+
+#### 2. Full-Corpus Lexical Scanner ([`audiobook_factory.preproduction.lexical_scanner`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/lexical_scanner.py))
+
+Deterministic, 0-token, 0ms full-corpus scanner indexing dialogue speaker attributions, proper nouns, and entity frequencies across all novel chapters with UTF-8 replacement defense (`errors="replace"`).
+
+```python
+@dataclass
+class EntityOccurrence:
+    """Statistical and provenance facts for a candidate entity discovered in the text corpus."""
+    name: str
+    first_chapter: int = 1
+    total_mentions: int = 1
+    dialogue_speaker_count: int = 0
+    chapters_appeared: Set[int] = field(default_factory=set)
+    introductory_quote: str = ""
+    associated_titles: Set[str] = field(default_factory=set)
+    co_occurring_names: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+
+    def to_dict(self) -> Dict[str, Any]: ...
+
+class LexicalCorpusIndex:
+    """Searchable in-memory index of all entities, dialogue speakers, and citations across the novel."""
+    def __init__(self, entities: Dict[str, EntityOccurrence], total_chapters: int, total_words: int): ...
+    def get_mention_count(self, name: str, aliases: Optional[List[str]] = None) -> int: ...
+    def get_first_chapter(self, name: str) -> int: ...
+    def get_intro_sentence(self, name: str) -> str: ...
+    def get_top_speaking_characters(self, limit: int = 40) -> List[EntityOccurrence]: ...
+    def to_summary_dict(self) -> Dict[str, Any]: ...
+
+class LexicalCorpusScanner:
+    """Deterministic Full-Novel Lexical Scanner."""
+    @classmethod
+    def scan_project_dir(cls, project_dir: Path | str) -> LexicalCorpusIndex: ...
+    @classmethod
+    def scan_chapters(cls, chapters: List[Dict[str, Any]] | List[str] | List[Tuple[Any, ...]]) -> LexicalCorpusIndex: ...
+```
+
+#### 3. Novel DeepSearch Engine ([`audiobook_factory.preproduction.novel_deepsearch`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/novel_deepsearch.py))
+
+Antigravity-native DeepSearch engine conducting multi-angle Google Search Grounded research with bidirectional corpus verification (**NR-GATE-02**).
+
+```python
+class LiteraryDNAProfile(BaseModel):
+    tradition: str = "UNIVERSAL_CONTEMPORARY"  # e.g. RURAL_REALISM_PATHOS, VICTORIAN_GOTHIC, DARK_FANTASY
+    primary_genre: str = "Literary Fiction"
+    sub_genres: List[str] = Field(default_factory=list)
+    historical_era: str = "contemporary"
+    setting_geography: str = "Universal"
+    publication_year: Optional[str] = None
+    narrative_tone: str = "dramatic and immersive"
+    source_fidelity_tier: str = "STANDARD_ADULT"  # 'RAW_UNRATED', 'STANDARD_ADULT', 'FAMILY_FRIENDLY'
+
+class CanonicalCharacter(BaseModel):
+    english_name: str
+    hindi_name: str = ""                       # Phonetically verified Devanagari transliteration
+    role_prominence: str = "major"             # 'lead', 'major', 'minor', 'incidental'
+    gender: str = "neutral"                    # 'male', 'female', 'neutral'
+    age_group: str = "adult"                   # 'child', 'youth', 'adult', 'elder'
+    occupation_status: str = ""
+    vocal_weight: str = "balanced"             # 'heavy_deep', 'light_agile', 'authoritative', etc.
+    aliases: List[str] = Field(default_factory=list)
+
+class WorldAcousticSetting(BaseModel):
+    primary_materials: List[str] = Field(default_factory=lambda: ["wood", "cloth", "stone"])
+    architectural_style: str = "domestic interior and natural exterior"
+    geography_climate: str = "temperate"
+    banned_anachronisms: List[str] = Field(default_factory=list)
+
+class MusicalTradition(BaseModel):
+    cultural_tradition: str = "cinematic orchestral and subtle acoustic"
+    signature_instruments: List[str] = Field(default_factory=list)
+    primary_moods: List[str] = Field(default_factory=list)
+
+class LinguisticDialectProfile(BaseModel):
+    recommended_hindustani_register: str = "balanced literary Hindustani"
+    regional_cadence: str = "neutral literary"
+    acceptable_loanwords: List[str] = Field(default_factory=list)
+    proverb_transposition_style: str = "sense-for-sense cultural equivalent"
+
+class DeepSearchNovelDossier(BaseModel):
+    book_title: str
+    author: str
+    project_slug: str = "novel"
+    literary_dna: LiteraryDNAProfile = Field(default_factory=LiteraryDNAProfile)
+    characters: List[CanonicalCharacter] = Field(default_factory=list)
+    world_acoustics: WorldAcousticSetting = Field(default_factory=WorldAcousticSetting)
+    musical_tradition: MusicalTradition = Field(default_factory=MusicalTradition)
+    linguistic_dialect: LinguisticDialectProfile = Field(default_factory=LinguisticDialectProfile)
+    world_lore_entities: Dict[str, Dict[str, str]] = Field(default_factory=dict)
+    research_summary: str = ""
+    search_citations: List[str] = Field(default_factory=list)
+
+class NovelDeepSearchEngine:
+    def __init__(self, model: Optional[str] = None): ...
+    @classmethod
+    def research_novel(
+        cls, title: str, author: str, sample_text: str = "", project_slug: str = "",
+        call_llm_fn: Optional[Callable[..., Any]] = None, model: Optional[str] = None
+    ) -> DeepSearchNovelDossier: ...
+    def conduct_deepsearch(
+        self, title: str, author: str, sample_text: str = "", project_slug: str = "",
+        call_llm_fn: Optional[Callable[..., Any]] = None, lexical_index: Optional[Any] = None
+    ) -> DeepSearchNovelDossier: ...
+    @classmethod
+    def verify_against_corpus(
+        cls, dossier: DeepSearchNovelDossier, lexical_index: Optional[Any] = None
+    ) -> Tuple[List[CanonicalCharacter], List[Dict[str, Any]]]: ...
+```
+
+#### 4. Vocal Acoustic Director ([`audiobook_factory.preproduction.vocal_acoustic_director`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/vocal_acoustic_director.py))
+
+Pure vocals-only acoustic environment designer, room impulse reverberation modeler, and 4D parametric EQ formant filter complex builder.
+
+```python
+class VocalSpaceProfile(BaseModel):
+    reverb_type: str = "medium_room"
+    wet_mix: float = Field(default=0.12, ge=0.01, le=0.45)
+    predelay_ms: int = Field(default=18, ge=2, le=80)
+    decay_time_s: float = Field(default=1.2, ge=0.2, le=5.0)
+    proximity_staging: Literal[
+        "intimate_whisper", "conversational_close", "medium_room",
+        "spatial_echo", "distant_shout", "direct_voice", "dry_outdoor"
+    ] = "conversational_close"
+    high_shelf_damping_db: float = -1.5
+    low_shelf_warmth_db: float = 0.0
+    dominant_materials: List[str] = Field(default_factory=lambda: ["wood", "stone", "cloth"])
+
+class VocalSpacesManifest(BaseModel):
+    project_id: str
+    book_title: str
+    primary_era: str = "universal_contemporary"
+    spaces: Dict[str, VocalSpaceProfile] = Field(default_factory=dict)
+    def to_legacy_sonic_bible(self) -> Dict[str, Any]: ...
+
+class VocalAcousticDirector:
+    def __init__(self, model: Optional[str] = None): ...
+    def design_vocal_spaces(
+        self, novel_text_sample: str, book_metadata: Dict[str, Any],
+        call_llm_fn: Optional[Callable[..., Any]] = None
+    ) -> VocalSpacesManifest: ...
+    @classmethod
+    def build_vocal_filter_complex(
+        cls, character_entity: Optional[Any] = None, space_name: str = "",
+        spaces_manifest: Optional[VocalSpacesManifest] = None,
+        pitch_shift_pct: Optional[float] = None, tempo_scale: Optional[float] = None,
+        eq_formant: Optional[str] = None
+    ) -> str: ...
+    @classmethod
+    def build_room_reverb_filter(cls, space_profile: VocalSpaceProfile) -> str: ...
+```
+
+#### 5. Additional Pre-Production Agents & Orchestrator
+- [`BookDNAAgent`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/book_dna_agent.py#L29):
+  - `analyze_book_dna(novel_text_sample: str, book_metadata: Dict[str, Any], call_llm_fn: Optional[Callable] = None, enable_web_research: bool = True) -> Dict[str, Any]`
+- [`DramatisPersonaeAgent`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/dramatis_personae_agent.py#L21):
+  - `extract_dramatis_personae(novel_text_sample: str, book_metadata: Dict[str, Any], book_dna: Optional[Dict] = None, call_llm_fn: Optional[Callable] = None) -> List[Dict[str, Any]]`
+- [`PhoneticLexiconDramaturge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/phonetic_lexicon_dramaturge.py#L20):
+  - `extract_lexicon_and_phonetics(novel_text_sample: str, book_metadata: Dict[str, Any], call_llm_fn: Optional[Callable] = None) -> Dict[str, Any]`
+- [`SonicWorldArchitect`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/sonic_world_architect.py#L21):
+  - `design_sonic_bible(novel_text_sample: str, book_metadata: Dict[str, Any], call_llm_fn: Optional[Callable] = None) -> Dict[str, Any]`
+- [`PreProductionSupervisor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/preproduction_supervisor.py#L36):
+  - `execute_preproduction(project_dir: Path | str, force: bool = False, call_llm_fn: Optional[Callable] = None) -> Dict[str, Any]`
+  - Helper: `run_preproduction(project_dir: Path | str, force: bool = False, model: Optional[str] = None) -> Dict[str, Any]`
+
+---
+
+### System 2: Canonical Metadata & State Maintainer
+
+#### 1. Centralized Book Bible Models ([`audiobook_factory.metadata.book_bible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py))
+
+```python
+class EpistemicProvenance(BaseModel):
+    """Forensic provenance tracking entity origin: text-extracted, web-verified, or derived."""
+    origin: Literal["CORPUS_EXTRACTED", "WEB_VERIFIED", "INFERRED_DERIVED"] = "CORPUS_EXTRACTED"
+    first_chapter: int = 1
+    corpus_mention_count: int = 1
+    evidence_quote: str = ""
+    web_citation: Optional[str] = None
+
+class BookEntity(BaseModel):
+    canonical_id: str = ""
+    english_name: str
+    hindi_name: str = ""
+    taxonomy: Literal["PROPER_NAME", "HERALDIC_MONIKER", "OCCUPATIONAL_ROLE"] = "PROPER_NAME"
+    aliases: List[str] = Field(default_factory=list)
+    category: str = "character"
+    gender: Optional[str] = None
+    is_child: bool = False
+    vocal_weight: str = "authoritative"
+    description: str = ""
+    first_appearance_chapter: int = 1
+    pronunciation_hint: str = ""
+    sociolect_archetype: Optional[str] = "NEUTRAL"
+    default_honorific_level: Optional[str] = "tum"
+    speech_quirks: str = ""
+    language_profile: Optional[Dict[str, Any]] = None
+    is_canonical: bool = True
+    confidence: float = 1.0
+    provenance: EpistemicProvenance = Field(default_factory=EpistemicProvenance)
+
+    # 4D Acoustic Voice Allocation
+    assigned_voice: Optional[str] = None
+    pitch_shift_pct: float = 0.0
+    tempo_scale: float = 1.0
+    eq_formant: str = ""
+
+# Backward-compatibility type aliases
+CharacterEntry = BookEntity
+NovelEntity = BookEntity
+
+class DynamicRelationship(BaseModel):
+    from_entity: str
+    to_entity: str
+    default_pronoun: str = "tum"
+    current_pronoun: str = "tum"
+    respect_level: int = 3
+    intimacy_level: int = 2
+    hostility_level: int = 0
+    authority_level: int = 0
+    notes: str = ""
+    evidence_log: List[str] = Field(default_factory=list)
+
+class WorldRule(BaseModel):
+    rule_id: str
+    category: str = "general"
+    statement: str
+    immutable: bool = True
+
+class FlaggedConflict(BaseModel):
+    entity_or_concept: str
+    source_chapter: int = 1
+    conflict_type: str
+    description: str = ""
+    candidate_data: Dict[str, Any] = Field(default_factory=dict)
+    resolved: bool = False
+    resolution_notes: str = ""
+
+class BookBible(BaseModel):
+    schema_version: str = "2.0.0"
+    book_title: str = "Unknown"
+    author: str = "Unknown"
+    narrative_voice: str = "Neutral literary dramatic Hindustani"
+    characters: Dict[str, BookEntity] = Field(default_factory=dict)
+    locations: Dict[str, str] = Field(default_factory=dict)
+    organizations: Dict[str, str] = Field(default_factory=dict)
+    creatures: Dict[str, str] = Field(default_factory=dict)
+    objects: Dict[str, str] = Field(default_factory=dict)
+    titles: Dict[str, str] = Field(default_factory=dict)
+    terminology: Dict[str, str] = Field(default_factory=dict)
+    terminology_variants: Dict[str, str] = Field(default_factory=dict)
+    relationships: List[DynamicRelationship] = Field(default_factory=list)
+    world_rules: List[WorldRule] = Field(default_factory=list)
+    flagged_conflicts: List[FlaggedConflict] = Field(default_factory=list)
+    candidate_entities: List[BookEntity] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    def find_character(self, name: str) -> Optional[BookEntity]: ...
+    def find_place(self, name: str) -> Optional[str]: ...
+    def find_language_profile(self, name: str) -> Any: ...
+    def is_hard_canon_entity(self, name: str) -> bool: ...
+    def get_immutable_world_rules(self) -> List[WorldRule]: ...
+    def get_version_hash(self) -> str: ...
+    def get_canonical_lexicon(self) -> Dict[str, str]: ...
+    def sync_pronunciation_lexicon(self, project_dir: Path) -> Any: ...
+    def export_legacy_glossary(self) -> Dict[str, Any]: ...
+    def save(self, project_dir: Path) -> None: ...
+    @classmethod
+    def load_from_project(cls, project_dir: Path) -> BookBible: ...
+    def import_legacy_glossary(self, glossary_path: Path) -> None: ...
+    def propose_new_entity(self, entity: BookEntity, chapter_num: int) -> bool: ...
+```
+
+#### 2. Master State Maintainer ([`audiobook_factory.metadata.state_maintainer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/state_maintainer.py))
+
+```python
+class MasterPreProductionState(BaseModel):
+    """Immutable container of all locked novel pre-production assets."""
+    project_slug: str
+    book_title: str
+    book_dna: Dict[str, Any] = Field(default_factory=dict)
+    book_bible: BookBible
+    vocal_spaces: Any = Field(default=None)
+    cast_lock: Dict[str, Any] = Field(default_factory=dict)
+    voice_registry: Dict[str, Any] = Field(default_factory=dict)
+    character_roster: Dict[str, Any] = Field(default_factory=dict)
+    sonic_bible: Dict[str, Any] = Field(default_factory=dict)
+
+class NovelStateMaintainer:
+    """
+    Central Persistence & Master State Manager for Novel Research & Pre-Production.
+    Guarantees atomic multi-file commit and bidirectional synchronization.
+    """
+    @classmethod
+    def commit_master_preproduction(
+        cls,
+        project_dir: Path | str,
+        book_metadata: Dict[str, Any],
+        book_dna: Dict[str, Any],
+        book_bible: BookBible,
+        vocal_spaces: VocalSpacesManifest,
+        roster: Dict[str, Any],
+        voice_registry: Dict[str, Any],
+        cast_lock: Dict[str, Any],
+    ) -> MasterPreProductionState:
+        """
+        Executes a transactional, atomic multi-file commit of all pre-production master assets.
+        Implements NR-GATE-06: All files are staged and atomically swapped into place.
+        Windows 11 Hardening: 5-attempt retry loop on os.replace eliminates WinError 5/32.
+        """
+        ...
+
+    @classmethod
+    def discover_and_lock_character(
+        cls,
+        project_dir: Path | str,
+        speaker_name: str,
+        gender: Optional[str] = None,
+        use_hindi: Optional[bool] = None,
+        book_bible: Optional[BookBible] = None,
+    ) -> Dict[str, Any]:
+        """
+        Dynamically registers, casts, and locks an emerging novel character under _STATE_LOCK.
+        Enforces NR-GATE-03 >= 4% pitch distance and [0.70, 1.30] pitch bounds.
+        """
+        ...
+
+    @classmethod
+    def load_master_state(cls, project_dir: Path | str) -> Optional[MasterPreProductionState]:
+        """Loads and validates all preproduction master state files for a project."""
+        ...
+```
+
+---
+
+## 🧠 Literary Translation Intelligence & Memory 2.0 ([`audiobook_factory.translation`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/))
+
+*(See full architectural manual: [`docs/LITERARY_TRANSLATION_INTELLIGENCE.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/LITERARY_TRANSLATION_INTELLIGENCE.md))*
+
+> [!NOTE]
+> Canonical novel data models ([`BookBible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py#L184) and [`BookEntity`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py#L26)) are centrally defined in [`audiobook_factory.metadata.book_bible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py).
+> The translation package re-exports them via [`audiobook_factory.translation.book_bible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/book_bible.py) for 100% backward compatibility.
 
 ### 1. `BookBible` & `BookEntity` ([`audiobook_factory.translation.book_bible`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/translation/book_bible.py))
 *Persistent canonical repository (`book_bible.json`) with SHA-256 versioning and one-way legacy glossary projection.*
@@ -1765,7 +2155,7 @@ def get_dramatic_fiction_framing(title: Optional[str] = None, author: Optional[s
 
 ---
 
-## 🎛️ Model & Keys Manager Subsystem ([`audiobook_factory.core.models`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/))
+## 🎛️ Model & Keys Manager Subsystem ([`audiobook_factory.core.models`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/))
 
 The `audiobook_factory.core.models` package provides the production control plane governing LLM generation, speech synthesis (TTS), key leasing, rate-limiting, and error resiliency across all 5 production rooms.
 
@@ -1773,7 +2163,7 @@ The `audiobook_factory.core.models` package provides the production control plan
 
 ### 1. Data Structures & Types
 
-#### [`CallerIdentity`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L106)
+#### [`CallerIdentity`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py#L106)
 *Cryptographic and operational tuple identifying a caller process, thread, or user session.*
 
 ```python
@@ -1787,7 +2177,7 @@ class CallerIdentity:
     workload_type: str = "text"  # "text" or "tts"
 ```
 
-#### [`KeyLease`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L117)
+#### [`KeyLease`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py#L117)
 *Active lease handle guaranteeing exclusive single-request mutual exclusion.*
 
 ```python
@@ -1804,7 +2194,7 @@ class KeyLease:
     status: str = "ACTIVE"
 ```
 
-#### [`GenerationResult`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/adapters/base.py#L16)
+#### [`GenerationResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/adapters/base.py#L16)
 *Standardized payload returned by text generation adapters.*
 
 ```python
@@ -1821,7 +2211,7 @@ class GenerationResult:
     provider: str = ""
 ```
 
-#### [`SpeechResult`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/adapters/base.py#L30)
+#### [`SpeechResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/adapters/base.py#L30)
 *Standardized payload returned by speech synthesis adapters.*
 
 ```python
@@ -1836,7 +2226,7 @@ class SpeechResult:
     provider: str = ""
 ```
 
-#### [`ModelCapability`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L48)
+#### [`ModelCapability`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/registry.py#L48)
 *Complete technical specification and capability profile for a model.*
 
 ```python
@@ -1861,7 +2251,7 @@ class ModelCapability:
     notes: str = ""
 ```
 
-#### [`ModelTier`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L20), [`Modality`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L29) & [`TaskCategory`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L36)
+#### [`ModelTier`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/registry.py#L20), [`Modality`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/registry.py#L29) & [`TaskCategory`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/registry.py#L36)
 
 ```python
 class ModelTier(Enum):
@@ -1886,7 +2276,7 @@ class TaskCategory(Enum):
     ALIGNMENT = "alignment"            # Forced alignment phoneme sync
 ```
 
-#### [`NormalizedApiError`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/policy_engine.py#L43)
+#### [`NormalizedApiError`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/policy_engine.py#L43)
 *Normalized error metadata returned by policy classifier.*
 
 ```python
@@ -1898,7 +2288,7 @@ class NormalizedApiError(NamedTuple):
     suggested_action: str      # "ROTATE_KEY", "ROTATE_MODEL", "COOL_DOWN", "ABORT_PAYLOAD", "HALT_POOL"
 ```
 
-#### [`ExecutionPlan`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/router.py#L40)
+#### [`ExecutionPlan`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/router.py#L40)
 *Execution blueprint emitted by RequestRouter.*
 
 ```python
@@ -1938,7 +2328,7 @@ class ApiHttpError(Exception):
     def __init__(self, status_code: int, error_body: str = "", headers: Optional[Dict[str, str]] = None): ...
 ```
 
-#### Circuit Breaker Lifecycle ([`CircuitBreaker`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/policy_engine.py#L242))
+#### Circuit Breaker Lifecycle ([`CircuitBreaker`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/policy_engine.py#L242))
 - `CLOSED`: Normal operation. Requests flow unimpeded.
 - `OPEN`: Tripped after 2 consecutive server failures (500/502/503/504). Blocks requests to that `(provider, model)` pair for a 30.0s cooldown.
 - `HALF_OPEN`: Cooldown expired. Allows a single canary request to test upstream provider recovery.
@@ -1947,7 +2337,7 @@ class ApiHttpError(Exception):
 
 ### 3. Core Engine Classes
 
-#### [`ModelGateway`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/gateway.py#L61)
+#### [`ModelGateway`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py#L61)
 *Unified thread-safe production facade used by all 5 rooms.*
 
 ```python
@@ -2027,7 +2417,7 @@ class ModelGateway:
         """Administratively resets exhausted keys, quota ledgers, and tripwires for today."""
 ```
 
-#### [`KeyLeaseManager`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L130)
+#### [`KeyLeaseManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py#L130)
 *High-performance ACID SQLite Key Inventory & Lease Manager.*
 
 ```python
@@ -2108,7 +2498,7 @@ class KeyLeaseManager:
         """Returns live statistics of inventory and active leases."""
 ```
 
-#### [`AntiBanGuard`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L379)
+#### [`AntiBanGuard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/anti_ban_guard.py#L379)
 *The Central Control Plane for Anti-Ban Protection (The 7 Iron Shields).*
 
 ```python
@@ -2164,7 +2554,7 @@ class AntiBanGuard:
         """Resets all internal states, tripwires, and limiters."""
 ```
 
-#### [`ModelRegistry`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L422)
+#### [`ModelRegistry`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/registry.py#L422)
 *Canonical Model Registry & Capability Specification.*
 
 ```python
@@ -2197,7 +2587,7 @@ class ModelRegistry:
         """Registers a new model capability profile."""
 ```
 
-#### [`RequestRouter`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/router.py#L51)
+#### [`RequestRouter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/router.py#L51)
 *Intelligent Request Router matching task requirements to eligible healthy resources.*
 
 ```python
