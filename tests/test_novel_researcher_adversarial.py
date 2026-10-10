@@ -173,23 +173,29 @@ class TestNovelResearcherAdversarial(unittest.TestCase):
         from audiobook_factory.metadata.state_maintainer import NovelStateMaintainer
         from audiobook_factory.metadata.book_bible import BookBible
         from audiobook_factory.preproduction.vocal_acoustic_director import VocalSpacesManifest
-        
-        # Read-only directory
-        proj_dir = self.temp_dir / "proj_readonly"
-        proj_dir.mkdir(parents=True)
-        # Make it read-only
-        proj_dir.chmod(0o555)
-        
+        import sys
+
         bible = BookBible(book_title="Readonly")
         v_spaces = VocalSpacesManifest(project_id="ro", book_title="Readonly")
-        
-        with self.assertRaises(Exception):
-            NovelStateMaintainer.commit_master_preproduction(
-                proj_dir, {}, {}, bible, v_spaces, {}, {}, {}
-            )
-            
-        # Reset permissions so tearDown can delete it
-        proj_dir.chmod(0o777)
+
+        if sys.platform == "win32":
+            # On Windows, os.chmod does not affect directory write permissions.
+            # Using an existing file as proj_dir triggers NotADirectoryError / FileExistsError on subpath creation.
+            proj_dir = self.temp_dir / "proj_not_a_dir.txt"
+            proj_dir.write_text("I am a file, not a directory", encoding="utf-8")
+        else:
+            proj_dir = self.temp_dir / "proj_readonly"
+            proj_dir.mkdir(parents=True)
+            proj_dir.chmod(0o555)
+
+        try:
+            with self.assertRaises(Exception):
+                NovelStateMaintainer.commit_master_preproduction(
+                    proj_dir, {}, {}, bible, v_spaces, {}, {}, {}
+                )
+        finally:
+            if sys.platform != "win32" and proj_dir.exists():
+                proj_dir.chmod(0o777)
 
 if __name__ == "__main__":
     unittest.main()

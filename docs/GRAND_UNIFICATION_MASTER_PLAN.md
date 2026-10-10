@@ -39,7 +39,7 @@ All 8 specialized branches fork from common baseline `308e0eb` (`v5.2`):
 | :---: | :--- | :--- | :--- | :---: | :--- |
 | **L1** | `origin/model-and-keys-manager` | [`audiobook_factory/core/models/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/) | **ACID Key Lease Manager**, 7 Iron Shields Anti-Ban Guard, 50+ Model Registry, Polymorphic Adapters (`gemini`, `openai_compat`, `local_gpu`), `ModelGateway` Facade, `keys` CLI | **MERGED & VERIFIED** | 43/43 Dedicated + 80/80 Extraction Green |
 | **L2** | `origin/extraction-system` | [`audiobook_factory/extraction/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/) | Forensic Ingestion (PDF XY-cut, EPUB aside filter, LaTeX math/table AST blocks, Gate 0.1) | **INTEGRATED ON MAIN** | 80/80 Green (100%) |
-| **L3** | `origin/research-system` | `audiobook_factory/preproduction/`<br/>`audiobook_factory/metadata/` | **2-System Decoupled Novel Researcher**: Book DNA, Cast Lock ($\ge 4.0\%$ pitch spacing), Dramatis Personae, Gate NR-GATE-02 bidirectional grounding | **QUEUED (Phase 2)** | 4 test suites |
+| **L3** | `origin/research-system` | [`audiobook_factory/preproduction/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/)<br/>[`audiobook_factory/metadata/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/) | **2-System Decoupled Novel Researcher**: Book DNA, Cast Lock ($\ge 4.0\%$ pitch spacing, $[0.70, 1.30]$ bounds), Dramatis Personae, Gate NR-GATE-06 atomic commit & rollback | **MERGED & VERIFIED** | 26/26 Green (100%) |
 | **L4** | `origin/translation` | `audiobook_factory/translation/` | **Option D Standalone Translation**: Single-pass deliberative translation (Gemini Flash `thinking_budget=1024`), macro-chunking, full-text deterministic parity gates, zero audio imports | QUEUED (Phase 3) | 8 test suites |
 | **L5** | `origin/dramaturgy` | `audiobook_factory/dramaturgy/`<br/>`audiobook_factory/adapters/` | **Option C Universal Dramaturgy AST**: `dramatic_plan.json`, `AudiobookAdapter` (verbatim prose & Anti-Swap attribution), `PodcastAdapter` (2-host dynamics), Gate 2.5 Validator | QUEUED (Phase 4) | 8 test suites |
 | **L6** | `origin/tts-system` | `audiobook_factory/tts/` | **Option C 4-Tier TTS Platform Core**: `GenericTTSClient`, `LongFormTTSClient`, `MultiCastStudioClient`, TakeBank, net-silence stitching, float-domain DSP | QUEUED (Phase 5) | 8 test suites |
@@ -150,15 +150,46 @@ Phase 1 has been completed, wired, hardened, and verified on `main`:
 
 ---
 
+## 5.3 Phase 2 Detailed Blueprint & Execution Sign-Off: `research-system`
+
+### 5.3.1 Objectives & Deliverables
+- **2-System Pre-Production Architecture**:
+  - **System 1: Stateless Novel Researcher Engine** ([`audiobook_factory/preproduction/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/)):
+    - [`lexical_scanner.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/lexical_scanner.py): Zero-token corpus regex sweep (`LexicalCorpusScanner`) indexing dialogue mentions and proper nouns.
+    - [`novel_deepsearch.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/novel_deepsearch.py): Factual grounding and literary lore extraction.
+    - [`vocal_acoustic_director.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/vocal_acoustic_director.py): Pure vocals-only acoustic environment designer (`vocal_spaces.json`, room impulse reverb).
+    - Agents: `book_dna_agent.py`, `dramatis_personae_agent.py`, `phonetic_lexicon_dramaturge.py`, `sonic_world_architect.py`, `preproduction_supervisor.py`.
+  - **System 2: Canonical Metadata & State Maintainer** ([`audiobook_factory/metadata/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/)):
+    - [`book_bible.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py): Centralized Pydantic schemas (`BookBible`, `BookEntity`, `NovelEntity`, `DynamicRelationship`, `WorldRule`, `FlaggedConflict`, `EpistemicProvenance`).
+    - [`state_maintainer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/state_maintainer.py): Thread-safe (`_STATE_LOCK`) master state maintainer enforcing **NR-GATE-06** atomic two-phase commit with rollback, and dynamic character locking with **NR-GATE-03** voice collision prevention ($\ge 4\%$ acoustic step, $[0.70, 1.30]$ pitch bounds).
+  - **Character Caster Hardening** ([`audiobook_factory/character_caster.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/character_caster.py)): Clamped natural speech bounds and non-dict JSON recovery.
+  - **Translation Decoupling** ([`audiobook_factory/translation/book_bible.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/book_bible.py)): Re-export shim pointing to centralized `metadata.book_bible`.
+  - **Architecture Specification** ([`docs/NOVEL_RESEARCHER_ARCHITECTURE.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/NOVEL_RESEARCHER_ARCHITECTURE.md)): Canonical 3.1.0-PROD specification.
+
+### 5.3.2 Forensic Verification & Audit Ledger (Phase 2 Sign-Off)
+Phase 2 has been merged, cross-platform hardened, and verified on `main`:
+1. **Commit Chain**:
+   - `8b255d0`: *feat(preproduction): merge research-system (Phase 2) into main*
+2. **Platform Hardening on Windows 11**:
+   - Resolved POSIX-only directory permission test in [`tests/test_novel_researcher_adversarial.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests/test_novel_researcher_adversarial.py) to be 100% cross-platform compatible on Windows.
+3. **Test Matrix**:
+   - Novel Researcher Test Suites: 26/26 Green (100% pass in 1.02s).
+   - Control Plane Test Suite: 43/43 Green (100%).
+   - Extraction Subsystem Test Suite: 37/37 Green (100%).
+   - Total Verified Regression Tests: 106+ passing tests with 0 failures, 0 errors.
+
+---
+
 ## 6. Forward Milestones Summary
 
 | Phase | Subsystem | Status | Target Test Baseline | Key Deliverable |
 | :---: | :--- | :---: | :---: | :--- |
 | **Phase 1** | Model & Keys Manager | **COMPLETED & VERIFIED** | 43/43 + 80/80 + 881 Green | Production Control Plane, 123-Key Fleet & Anti-Ban Guard |
-| **Phase 2** | Novel Researcher & Pre-Production | **READY TO EXECUTE** | ~980 Tests | Deterministic Cast Lock & World Knowledge (`origin/research-system`) |
-| **Phase 3** | Standalone Translation (Option D) | Queued | ~1,020 Tests | Single-Pass Macro-Chunker & Parity Gates (`origin/translation`) |
+| **Phase 2** | Novel Researcher & Pre-Production | **COMPLETED & VERIFIED** | 26/26 + 43/43 + 37/37 Green | 2-System Pre-Production, Cast Lock & State Maintainer (`origin/research-system`) |
+| **Phase 3** | Standalone Translation (Option D) | **READY TO EXECUTE** | ~1,020 Tests | Single-Pass Macro-Chunker & Parity Gates (`origin/translation`) |
 | **Phase 4** | Universal Dramaturgy (Option C) | Queued | ~1,070 Tests | Chapter Dramatic AST & Dual-Host Adapters (`origin/dramaturgy`) |
 | **Phase 5** | Studio TTS Platform Core | Queued | ~1,150 Tests | 4-Tier TTS Engine, TakeBank & Net-Silence (`origin/tts-system`) |
 | **Phase 6** | Pro-Grade AI Vocal Mastering | Queued | ~1,200 Tests | C++ JUCE / FFmpeg Vocal Mastering & M4B (`origin/audio-mixing-and-production`) |
 | **Phase 7** | Enterprise DAG Orchestrator & UI | Queued | ~1,250 Tests | SQLite WAL Pipeline Ledger & Studio Panel UI (`origin/Voculs`) |
+
 
