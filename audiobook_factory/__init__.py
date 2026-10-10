@@ -89,10 +89,23 @@ _LAZY_IMPORTS: Dict[str, Tuple[str, str]] = {
     "build_dramatized_script_llm": (".script_builder", "build_dramatized_script_llm"),
     "build_narrator_script": (".script_builder", "build_narrator_script"),
     
-    # TTS
+    # TTS & Modular Platform Core (Phase 5)
     "TTSDispatcher": (".tts_dispatcher", "TTSDispatcher"),
     "UnregisteredSpeakerError": (".tts_dispatcher", "UnregisteredSpeakerError"),
     "probe_key_health": (".tts_dispatcher", "probe_key_health"),
+    "GenericTTSClient": (".tts", "GenericTTSClient"),
+    "LongFormTTSClient": (".tts", "LongFormTTSClient"),
+    "MultiCastStudioClient": (".tts", "MultiCastStudioClient"),
+    "UniversalInputGuard": (".tts", "UniversalInputGuard"),
+    "SemanticProseChunker": (".tts", "SemanticProseChunker"),
+    "TwoTierAudioQualityGate": (".tts", "TwoTierAudioQualityGate"),
+    "FormantSculptor": (".tts", "FormantSculptor"),
+    "TakeBankManager": (".tts", "TakeBankManager"),
+    "TTSCoreOrchestrator": (".tts", "TTSCoreOrchestrator"),
+    "ModelAdapterRegistry": (".tts", "ModelAdapterRegistry"),
+    "CanonicalTTSRequest": (".tts", "CanonicalTTSRequest"),
+    "SynthesizedAudioChunk": (".tts", "SynthesizedAudioChunk"),
+    "EditorialDSPEngine": (".tts", "EditorialDSPEngine"),
     
     # Soundscape (Legacy)
     "detect_chapter_mood": (".soundscape", "detect_chapter_mood"),

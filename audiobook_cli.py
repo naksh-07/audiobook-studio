@@ -177,6 +177,13 @@ def main():
     p_keys.add_argument("--limit", type=int, default=25, help="Number of audit log records to display (default: 25)")
     p_keys.add_argument("--key", default=None, help="API key to register (used with 'add')")
 
+    # tts (Modular Platform Core)
+    p_tts = subparsers.add_parser("tts", help="Ad-hoc speech synthesis via modular TTS Platform Core")
+    p_tts.add_argument("text", help="Text or prompt to synthesize")
+    p_tts.add_argument("--voice", default="Puck", help="Voice identifier (default: Puck)")
+    p_tts.add_argument("--model", default="gemini-3.8-flash", help="TTS model (default: gemini-3.8-flash)")
+    p_tts.add_argument("--out", default="output.wav", help="Output WAV path (default: output.wav)")
+
     args = parser.parse_args()
 
     if not args.subcommand:
@@ -206,6 +213,14 @@ def main():
             a.book = a.target
             cmd_podcast(a)
 
+    def _handle_tts(a):
+        from audiobook_factory.tts.facades.generic_client import GenericTTSClient
+        client = GenericTTSClient(model=a.model, default_voice=a.voice)
+        print(f"[*] Synthesizing speech via GenericTTSClient ({a.model}, voice: {a.voice})...")
+        out_path = Path(a.out)
+        res = client.speak(text=a.text, output_path=out_path, voice=a.voice)
+        print(f"[+] Audio successfully synthesized: {res} ({out_path.stat().st_size} bytes)")
+
     cmds = {
         "extract": cmd_extract,
         "translate": cmd_translate,
@@ -219,6 +234,7 @@ def main():
         "audit": cmd_audit,
         "audit-book": cmd_audit_book,
         "keys": cmd_keys,
+        "tts": _handle_tts,
     }
 
     try:
