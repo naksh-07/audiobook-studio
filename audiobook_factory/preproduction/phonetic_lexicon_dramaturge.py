@@ -34,8 +34,7 @@ class PhoneticLexiconDramaturge:
         book_metadata: Dict[str, Any],
         call_llm_fn: Optional[Callable[..., Any]] = None,
     ) -> Dict[str, Any]:
-        """Extracts locations, factions, creatures, and terms with Devanagari pronunciations."""
-        model = self._resolve_model()
+        model = self.model or ("mock-model" if call_llm_fn else self._resolve_model())
         book_title = book_metadata.get("title", "Unknown Novel")
         author = book_metadata.get("author", "Unknown Author")
 

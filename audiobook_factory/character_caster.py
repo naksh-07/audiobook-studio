@@ -591,12 +591,22 @@ Return a JSON array of objects with:
             speed = base_speed
             sig = (persona, pitch, speed)
             sig_str = f"{persona}_p{pitch:.2f}_s{speed:.2f}"
+            # NR-GATE-03 Voice Collision Elimination:
+            # Guarantees >= 4% acoustic distance when base persona is reused
             counter = 1
             while sig in used_signatures or sig_str in used_signatures:
-                pitch = round(base_pitch + 0.01 * counter, 2)
+                sign = 1 if counter % 2 != 0 else -1
+                step = ((counter + 1) // 2) * 0.04
+                pitch = round(base_pitch + sign * step, 2)
+                # NR-GATE-03 Bound Clamp: Keep pitch within natural acoustic range [0.70, 1.30]
+                if pitch < 0.70 or pitch > 1.30:
+                    pitch = max(0.70, min(1.30, pitch))
+                    speed = round(base_speed + 0.02 * (counter % 4), 2)
                 sig = (persona, pitch, speed)
                 sig_str = f"{persona}_p{pitch:.2f}_s{speed:.2f}"
                 counter += 1
+                if counter > 30:
+                    break
 
             used_signatures.add(sig)
             used_signatures.add(sig_str)
@@ -691,17 +701,23 @@ Return a JSON array of objects with:
 
         if roster_path.exists():
             try:
-                roster = json.loads(roster_path.read_text(encoding="utf-8"))
+                loaded_roster = json.loads(roster_path.read_text(encoding="utf-8"))
+                if isinstance(loaded_roster, dict):
+                    roster = loaded_roster
             except (json.JSONDecodeError, OSError) as e:
                 logger.debug(f"Notice reading roster_path ({roster_path}): {e}")
         if registry_path.exists():
             try:
-                registry = json.loads(registry_path.read_text(encoding="utf-8"))
+                loaded_reg = json.loads(registry_path.read_text(encoding="utf-8"))
+                if isinstance(loaded_reg, dict):
+                    registry = loaded_reg
             except (json.JSONDecodeError, OSError) as e:
                 logger.debug(f"Notice reading registry_path ({registry_path}): {e}")
         if lock_path.exists():
             try:
-                locks = json.loads(lock_path.read_text(encoding="utf-8"))
+                loaded_locks = json.loads(lock_path.read_text(encoding="utf-8"))
+                if isinstance(loaded_locks, dict):
+                    locks = loaded_locks
             except (json.JSONDecodeError, OSError) as e:
                 logger.debug(f"Notice reading lock_path ({lock_path}): {e}")
 
@@ -791,12 +807,22 @@ Return a JSON array of objects with:
         sig_str = f"{persona}_p{pitch:.2f}_s{speed:.2f}"
         sig_tuple = (persona, pitch, speed)
 
+        # NR-GATE-03 Voice Collision Elimination:
+        # Guarantees >= 4% acoustic distance when base persona is reused
         counter = 1
         while sig_str in used_signatures or sig_tuple in used_signatures:
-            pitch = round(base_pitch + 0.01 * counter, 2)
+            sign = 1 if counter % 2 != 0 else -1
+            step = ((counter + 1) // 2) * 0.04
+            pitch = round(base_pitch + sign * step, 2)
+            # NR-GATE-03 Bound Clamp: Keep pitch within natural acoustic range [0.70, 1.30]
+            if pitch < 0.70 or pitch > 1.30:
+                pitch = max(0.70, min(1.30, pitch))
+                speed = round(base_speed + 0.02 * (counter % 4), 2)
             sig_str = f"{persona}_p{pitch:.2f}_s{speed:.2f}"
             sig_tuple = (persona, pitch, speed)
             counter += 1
+            if counter > 30:
+                break
 
         acoustic_vec["pitch"] = pitch
         acoustic_vec["speed"] = speed

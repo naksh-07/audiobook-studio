@@ -10,17 +10,26 @@ One-time master ingestion room producing locked novel master state:
 from .book_dna_agent import BookDNAAgent
 from .dramatis_personae_agent import DramatisPersonaeAgent
 from .sonic_world_architect import SonicWorldArchitect
+from .vocal_acoustic_director import VocalAcousticDirector, VocalSpacesManifest, VocalSpaceProfile
 from .phonetic_lexicon_dramaturge import PhoneticLexiconDramaturge
 from .novel_deepsearch import NovelDeepSearchEngine, DeepSearchNovelDossier
+from .lexical_scanner import LexicalCorpusScanner, LexicalCorpusIndex
 from .preproduction_supervisor import PreProductionSupervisor, run_preproduction
 
 __all__ = [
     "NovelDeepSearchEngine",
     "DeepSearchNovelDossier",
+    "LexicalCorpusScanner",
+    "LexicalCorpusIndex",
     "BookDNAAgent",
     "DramatisPersonaeAgent",
     "SonicWorldArchitect",
+    "VocalAcousticDirector",
+    "VocalSpacesManifest",
+    "VocalSpaceProfile",
     "PhoneticLexiconDramaturge",
     "PreProductionSupervisor",
     "run_preproduction",
 ]
+
+

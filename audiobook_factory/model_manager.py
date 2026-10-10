@@ -328,6 +328,10 @@ class ModelManager:
         6. Strictly halting (raising LLMUnavailableError) if all eligible candidates fail.
         """
         now = time.time()
+        is_mock = os.environ.get("MOCK_OFFLINE", "").lower() in ("true", "1")
+        if is_mock or os.environ.get("GEMINI_API_KEY", "").startswith("mock"):
+            return os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-pro")
+
         # Check active cached model for this task
         with self._lock:
             if not force_refresh and task in self._active_task_models:

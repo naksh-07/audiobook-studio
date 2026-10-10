@@ -4,18 +4,18 @@
 <!-- LINE_BUDGET_HARD_CAP: 50 LINES -->
 # Active Context: Audiobook Studio Antigravity Plugin & Studio Engine (v6.0)
 
-## Current Focus: Grand Unification DAG - Phase 1 Complete, Heading to Phase 2
+## Current Focus: Grand Unification DAG - Phase 2 (Research Subsystem) Merge
 - **Master Plan**: [GRAND_UNIFICATION_MASTER_PLAN.md](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GRAND_UNIFICATION_MASTER_PLAN.md) (7-Layer Topological Merge DAG).
-- **Phase 1: Model & Keys Manager (MERGED & WIRED TO MAIN)**:
-  - Merged `origin/model-and-keys-manager` into `main` (commit `df8fa4c`).
-  - Win32 dead-PID probe fixed via `kernel32.OpenProcess` (`0415196`).
-  - Fleet verified: 123 active healthy Gemini keys, zero-secret public aliases.
-  - Control plane test suite: 43/43 tests 100% green.
-  - Multimodal gateway support: `GeminiProviderAdapter` handles inline `parts` kwargs.
-- **Active Subsystem Wiring (Extraction Subsystem)**:
-  - `GeminiVisionPDFExtractor` in `audiobook_factory/extraction/parsers/pdf/vision_extractor.py` routed through `ModelGateway` control plane with atomic key leasing and stealth headers (`ee4d355`).
-  - Legacy shim `audiobook_factory/pdf/vision_extractor.py` re-exports standalone engine.
-  - `PersistentKeyPool.lease_key`, `record_success`, and backoff methods synchronize transparently with `KeyLeaseManager`.
-  - Full suite verified: 80/80 tests 100% green in 15.7s.
-- **Next Milestone: Phase 2 - Research Subsystem (`origin/research-system`)**:
-  - Merge `origin/research-system` to bring in autonomous novel-agnostic research, style bible synthesis, character profiling, and pronunciation lexicon generation.
+- **Phase 1: Model & Keys Control Plane (COMPLETED & VERIFIED)**:
+  - 123 active healthy Gemini keys verified in SQLite inventory, zero-secret public aliases.
+  - Windows 11 Win32 dead-PID crash recovery via `kernel32.OpenProcess`.
+  - ModelGateway facade & GeminiProviderAdapter inline base64 `parts` kwargs.
+  - GeminiVisionPDFExtractor & PersistentKeyPool transparently wired. 80/80 tests passing.
+- **Phase 2: Research Subsystem (MERGED & INTEGRATED)**:
+  - 2-System Pre-Production Architecture: System 1 Stateless Engine (`LexicalCorpusScanner`, `NovelDeepSearchEngine`, `BookDNAAgent`, `VocalAcousticDirector`) + System 2 Canonical State Maintainer (`BookBible`, `NovelStateMaintainer`, `_STATE_LOCK`).
+  - NR-GATE-06: Two-phase commit with automatic backup rollback on disk/IO error.
+  - NR-GATE-03: Voice collision elimination ($\ge 4\%$ acoustic step, $[0.70, 1.30]$ pitch bounds).
+  - Centralized `audiobook_factory/metadata/book_bible.py` with backward-compatible translation re-export shim.
+  - Full test suites: `test_novel_researcher_phase1-3`, `test_novel_researcher_adversarial`, `test_multi_agent_preproduction`.
+- **Next Milestone: Phase 3 - Translation Collective (`origin/translation`)**:
+  - Merge `origin/translation` bringing in 4-agent translation collective, 70/30 canon fidelity, and dual-rule invariant.

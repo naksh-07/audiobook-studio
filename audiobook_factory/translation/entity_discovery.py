@@ -83,7 +83,7 @@ class EntityDiscoveryEngine:
         # Refine candidate classification and Devanagari transliteration using LLM
         import os
         is_mock_offline = os.environ.get("MOCK_OFFLINE", "").lower() in ("true", "1")
-        if candidates and not is_mock_offline:
+        if candidates and (not is_mock_offline or call_llm_fn):
             try:
                 candidate_names = [c.name for c in candidates]
                 prompt = (
@@ -115,6 +115,15 @@ class EntityDiscoveryEngine:
                         temperature=0.1,
                         max_retries=3,
                     )
+
+                if isinstance(llm_results, dict):
+                    # Unwrap dict if wrapped in keys like 'entities', 'candidates', 'results'
+                    for k in ("entities", "candidates", "results", "data"):
+                        if isinstance(llm_results.get(k), list):
+                            llm_results = llm_results[k]
+                            break
+                    else:
+                        llm_results = list(llm_results.values()) if any(isinstance(v, dict) for v in llm_results.values()) else []
 
                 if isinstance(llm_results, list):
                     res_map = {item.get("name"): item for item in llm_results if isinstance(item, dict) and "name" in item}
@@ -209,10 +218,10 @@ class ChapterEntityHarvester:
             if global_glossary:
                 bible.import_from_legacy_glossary(global_glossary)
 
-        # Skip LLM if offline or text is empty
+        # Skip LLM if offline without mock function or text is empty
         import os
         is_mock_offline = os.environ.get("MOCK_OFFLINE", "").lower() in ("true", "1")
-        if not chapter_text.strip() or is_mock_offline:
+        if not chapter_text.strip() or (is_mock_offline and not call_llm_fn):
             return bible.export_legacy_glossary()
 
         # Prepare excerpt: first 8000 chars + middle 4000 chars if long
@@ -335,8 +344,30 @@ Output JSON: An object with:
                         else:
                             bible.terminology[t_clean] = h_clean
 
-            # Save updated Bible and export glossary
+            # Save updated Bible, export glossary, and sync cast_lock
             if p_dir:
+                # Synchronize new character voice casting with cast_lock.json & voice_registry.json
+                try:
+                    from audiobook_factory.metadata.state_maintainer import NovelStateMaintainer
+                    for c_name, c_ent in bible.characters.items():
+                        NovelStateMaintainer.discover_and_lock_character(
+                            project_dir=p_dir,
+                            speaker_name=c_name,
+                            gender=c_ent.gender or "male",
+                            book_bible=bible,
+                        )
+                        # Also register Hindi moniker if distinct
+                        h_name = c_ent.hindi_name or c_name
+                        if h_name != c_name:
+                            NovelStateMaintainer.discover_and_lock_character(
+                                project_dir=p_dir,
+                                speaker_name=h_name,
+                                gender=c_ent.gender or "male",
+                                book_bible=bible,
+                            )
+                except Exception as ce:
+                    logger.warning(f"  [!] Cast-lock sync notice in ChapterEntityHarvester: {ce}")
+
                 bible.save(p_dir)
                 # Also update character_roster.json if present
                 roster_file = p_dir / "character_roster.json"

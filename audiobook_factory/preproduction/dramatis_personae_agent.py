@@ -36,8 +36,7 @@ class DramatisPersonaeAgent:
         book_dna: Optional[Dict[str, Any]] = None,
         call_llm_fn: Optional[Callable[..., Any]] = None,
     ) -> List[Dict[str, Any]]:
-        """Extracts complete character dossier across novel text."""
-        model = self._resolve_model()
+        model = self.model or ("mock-model" if call_llm_fn else self._resolve_model())
         book_title = book_metadata.get("title", "Unknown Novel")
         author = book_metadata.get("author", "Unknown Author")
 
