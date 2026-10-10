@@ -30,6 +30,7 @@ def compute_canonical_segment_filename(
     text: str,
     sp_cfg: Optional[Dict[str, Any]] = None,
     default_voice: str = DEFAULT_VOICE,
+    prefix: str = "c",
 ) -> str:
     """Computes deterministic, reproducible audio chunk filename matching synthesis cache."""
     cfg = sp_cfg or {}
@@ -43,10 +44,11 @@ def compute_canonical_segment_filename(
     presence_boost_db = float(cfg.get("presence_boost_db", 0.0))
     volume_gain_db = float(cfg.get("volume_gain_db", 0.0))
     eq_profile = str(cfg.get("eq_formant_profile", "")).strip()
-    calib_str = f"{voice}:{speed:.2f}:{pitch:.2f}:{bass_boost_db:.1f}:{clarity_cut_db:.1f}:{lowpass_hz}:{highpass_hz}:{presence_boost_db:.1f}:{volume_gain_db:.1f}:{eq_profile}"
+    pan = float(cfg.get("pan", 0.0))
+    calib_str = f"{voice}:{speed:.2f}:{pitch:.2f}:{bass_boost_db:.1f}:{clarity_cut_db:.1f}:{lowpass_hz}:{highpass_hz}:{presence_boost_db:.1f}:{volume_gain_db:.1f}:{eq_profile}:{pan:.2f}"
     cache_key = f"{text}|{calib_str}".encode("utf-8")
     text_hash = hashlib.md5(cache_key).hexdigest()[:8]
-    return f"c{chapter_num:03d}_s{seg_num:04d}_{text_hash}.wav"
+    return f"{prefix}{chapter_num:03d}_s{seg_num:04d}_{text_hash}.wav"
 
 
 def slice_and_declick_batch(

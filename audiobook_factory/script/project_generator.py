@@ -151,6 +151,7 @@ def generate_project_scripts(
                 chapter_num=real_ch,
                 chapter_id=chap_file.stem,
                 return_dramatic_plan=True,
+                performance_bible=pb,
             )
             try:
                 d_plan.save_to_file(dramaturgy_dir / f"{chap_file.stem}_dramatic_plan.json")

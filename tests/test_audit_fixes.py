@@ -265,8 +265,8 @@ The escape of the Brazilian boa constrictor earned Harry his longest-ever punish
         import struct
         from audiobook_factory.tts_dispatcher import synthesize_gemini_tts
 
-        clipped_sample = struct.pack("<h", 32767)
-        clipped_pcm = clipped_sample * int(2.0 * 24000)
+        clipped_block = struct.pack("<h", 32767) * 50 + struct.pack("<h", -32767) * 50
+        clipped_pcm = clipped_block * int(2.0 * 24000 / 100)
 
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps({

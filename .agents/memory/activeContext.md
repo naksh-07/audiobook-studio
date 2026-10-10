@@ -4,26 +4,23 @@
 <!-- LINE_BUDGET_HARD_CAP: 50 LINES -->
 # Active Context: Audiobook Studio Antigravity Plugin & Studio Engine (v6.0)
 
-## Current Focus: Grand Unification DAG - Phase 3 (Standalone Translation Engine) Active
+## Current Focus: Grand Unification DAG - Phase 4 (Universal Dramaturgy & Adapters) Merged
 - **Master Plan**: [GRAND_UNIFICATION_MASTER_PLAN.md](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GRAND_UNIFICATION_MASTER_PLAN.md) (7-Layer Topological Merge DAG).
 - **Phase 1: Model & Keys Control Plane (COMPLETED & VERIFIED)**:
-  - 123 active healthy Gemini keys in SQLite inventory, zero-secret public aliases.
-  - Win32 dead-PID crash recovery via `kernel32.OpenProcess`.
-  - ModelGateway facade & GeminiProviderAdapter inline base64 `parts` kwargs.
-  - GeminiVisionPDFExtractor & PersistentKeyPool transparently wired. 80/80 tests passing.
+  - 123 active keys in SQLite inventory, zero-secret public aliases (`key_XXXX`).
+  - Win32 dead-PID crash recovery via `kernel32.OpenProcess`. ModelGateway facade wired. 80/80 tests green.
 - **Phase 2: Research Subsystem (COMPLETED, AUDITED & CERTIFIED)**:
-  - 2-System pre-production architecture (`LexicalCorpusScanner`, `BookBible`, `NovelStateMaintainer`).
-  - NR-GATE-06 atomic two-phase commit with rollback; NR-GATE-03 voice collision elimination.
-  - All Room 1 agents wired to `ModelGateway.generate_text()` via `gateway_bridge.py`. Docs fully updated in NOVEL_RESEARCHER_ARCHITECTURE.md, ARCHITECTURE.md, API_REFERENCE.md.
+  - 2-System pre-production (`LexicalCorpusScanner`, `BookBible`, `NovelStateMaintainer`).
+  - NR-GATE-06 atomic two-phase commit, NR-GATE-03 voice collision clamp. ModelGateway wired.
+- **Room 1.5: Standalone Chapter Glossary Subsystem (COMPLETED & AUDITED)**:
+  - `ChapterGlossary` contracts, zero-token fast-path `ChapterLexicalScanner`, tri-partite taxonomy, dynamic voice lock.
+  - Multi-consumer projections (`to_translation_glossary`, `to_scripting_roster`, `to_dramaturgy_characters`). 10/10 tests green.
 - **Phase 3: Standalone Translation Engine (COMPLETED, AUDITED & HARDENED)**:
-  - Option D decoupled core: `TranslationEngine`, `BilingualMacroChunker` (<=2200 words), `DeterministicParityGate`.
-  - Zero-import isolation: 0 imports from audio, TTS, or screenplay in translation core. Localized atomic replace in `memory_store.py`.
-  - Adversarial audit passed: Permanently removed `urllib` and `_direct_gemini_call` from `engine.py`. Fail-closed policy enforced in `gateway_bridge.py`. Zero unmetered HTTP calls.
-  - 102/102 translation tests and 168+ multi-phase regression tests 100% green.
-- **Room 1.5: Standalone Glossary Subsystem (COMPLETED & VERIFIED)**:
-  - Sits between Room 1 (Research) and downstream consumers (Translation, Dramaturgy, TTS casting).
-  - Pydantic v2 `ChapterGlossary` contracts with multi-consumer projections (`to_translation_glossary`, `to_scripting_roster`, `to_dramaturgy_characters`).
-  - Zero-token fast-path `ChapterLexicalScanner`, Tri-Partite taxonomy (`PROPER_NAME`, `HERALDIC_MONIKER`, `OCCUPATIONAL_ROLE`), dynamic voice casting lock.
-  - Zero rogue endpoints: 100% routed through `ModelGateway` / `gateway_bridge.py`. 8/8 dedicated tests 100% green.
-- **Next Milestone: Phase 4 - Universal Dramaturgy (`origin/dramaturgy`)**:
-  - Merge Chapter Dramatic AST, dual-host podcast adapters, and 8-Pillar certification harness.
+  - Option D decoupled core (`TranslationEngine`, `BilingualMacroChunker`, `DeterministicParityGate`).
+  - Zero-import isolation, fail-closed `gateway_bridge.py`, zero unmetered HTTP calls. 102/102 tests green.
+- **Phase 4: Universal Dramaturgy, Format Adapters & 8-Pillar Certification (MERGED)**:
+  - Core: Universal Dramatic AST (`dramaturgy/contracts.py`, `SceneAnalyzer`, `BeatPlanner`, `PerformanceBible`).
+  - Adapters: `AudiobookAdapter` (Gate 2.5) & `PodcastAdapter` (Sameer/Priya, Alex/Maya, breathability <=22 words).
+  - 8-Pillar Harness: `StudioCertificationRunner` (P1 Ingestion to P8 Packaging, Gate 6 compliance).
+  - Multi-format packaging: `.m4b` audiobook (-19 LUFS) & `.m4a` podcast (-16 LUFS with stereo pan -0.25/+0.25).
+- **Next Milestone**: Run Phase 4 test matrix & invoke auditors (`debugger-detective` & `architect-planner`) for Phase 4 sign-off.

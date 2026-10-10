@@ -89,7 +89,8 @@ class PipelineOrchestrator:
         adult_literary_mode: bool = True,
         force_gate: bool = False,
         chapters: Optional[List[int]] = None,
-    ) -> Path:
+        format_mode: str = "audiobook",
+    ) -> Any:
         """
         Executes the complete 6-stage autonomous novel pipeline:
         1. Ingestion & Extraction (EPUB / PDF)
@@ -159,65 +160,104 @@ class PipelineOrchestrator:
                 logger.info("\n[Stage 2/6] Translation skipped (English/Native language selected).")
 
             # -------------------------------------------------------------
-            # Stage 3: Screenplay Attribution (Sliding Window, No Truncation)
+            # Stage 3: Script Adaptation (Audiobook vs Podcast vs Both)
             # -------------------------------------------------------------
-            with telemetry.stage_timer(run_id, "Screenplay Attribution", 3):
-                logger.info("\n[Stage 3/6] Generating screenplay scripts with dialogue attribution...")
-                if dramatized:
-                    try:
-                        from audiobook_factory.character_caster import CharacterCaster
-                        logger.info("[*] Running Autonomous Character Discovery & Casting Director...")
-                        CharacterCaster.discover_and_cast_project(
-                            project_dir=project_dir,
-                            use_hindi=hindi,
-                            default_narrator_voice=voice,
-                        )
-                    except Exception as e:
-                        logger.warning(f"  [!] Character discovery notice: {e}")
+            script_files = []
+            if format_mode in ("audiobook", "both"):
+                with telemetry.stage_timer(run_id, "Screenplay Attribution", 3):
+                    logger.info("\n[Stage 3/6] Generating audiobook screenplay scripts with dialogue attribution...")
+                    if dramatized:
+                        try:
+                            from audiobook_factory.character_caster import CharacterCaster
+                            logger.info("[*] Running Autonomous Character Discovery & Casting Director...")
+                            CharacterCaster.discover_and_cast_project(
+                                project_dir=project_dir,
+                                use_hindi=hindi,
+                                default_narrator_voice=voice,
+                            )
+                        except Exception as e:
+                            logger.warning(f"  [!] Character discovery notice: {e}")
 
-                scripts_dir = generate_project_scripts(
-                    project_dir=project_dir,
-                    use_hindi=hindi,
-                    dramatized=dramatized,
-                    chapters=chapters,
-                )
-
-                script_files = sorted(scripts_dir.glob("chapter_*_script.json"))
-                if not script_files:
-                    raise RuntimeError(f"No script files generated in {scripts_dir}")
-
-                # Inline Gate 1 & Gate 6A: Voice Collision, Roster Sanity & Voice Continuity
-                verify_screenplay_project_gates(project_dir)
-
-            # -------------------------------------------------------------
-            # Stage 4: Concurrent Multi-Voice Synthesis & Vocal Mastering
-            # -------------------------------------------------------------
-            with telemetry.stage_timer(run_id, "Vocals-Only Audio Production", 4):
-                logger.info(f"\n[Stage 4/5] Multi-Voice Synthesis & Vocal Broadcast Mastering across {len(script_files)} chapters (Workers: {workers})...")
-                for s_file in script_files:
-                    m = re.search(r"chapter_(\d+)", s_file.stem, re.IGNORECASE)
-                    ch_num = int(m.group(1)) if m else 1
-                    if chapters and ch_num not in chapters:
-                        continue
-                    logger.info(f"\n--- Producing Chapter {ch_num} (Vocals-Only) ---")
-                    self.produce_chapter(
+                    scripts_dir = generate_project_scripts(
                         project_dir=project_dir,
-                        chapter_num=ch_num,
-                        voice=voice,
-                        workers=workers,
-                        duck_db=duck_db,
-                        spatial_staging=spatial_staging,
+                        use_hindi=hindi,
+                        dramatized=dramatized,
+                        chapters=chapters,
+                    )
+                    script_files = sorted(scripts_dir.glob("chapter_*_script.json"))
+                    if not script_files:
+                        raise RuntimeError(f"No script files generated in {scripts_dir}")
+                    verify_screenplay_project_gates(project_dir)
+
+            if format_mode in ("podcast", "both"):
+                with telemetry.stage_timer(run_id, "Podcast Script Generation", 3):
+                    logger.info("\n[Stage 3/6] Generating 2-Host conversational podcast episode plans & scripts...")
+                    from audiobook_factory.podcast import generate_project_podcasts
+                    generate_project_podcasts(
+                        project_dir=project_dir,
+                        use_hindi=hindi,
+                        chapters=chapters,
                     )
 
             # -------------------------------------------------------------
-            # Stage 5: Final M4B Containerization with Chapter Markers
+            # Stage 4: Concurrent Synthesis & Vocal Mastering
             # -------------------------------------------------------------
-            with telemetry.stage_timer(run_id, "M4B Container Packaging", 5):
-                logger.info("\n[Stage 5/5] Packaging final M4B container with chapter navigation & cover art...")
-                final_m4b = package_m4b_audiobook(project_dir, cover_image=cover_image)
+            if format_mode in ("audiobook", "both") and script_files:
+                with telemetry.stage_timer(run_id, "Vocals-Only Audio Production", 4):
+                    logger.info(f"\n[Stage 4/5] Multi-Voice Synthesis & Vocal Broadcast Mastering across {len(script_files)} chapters (Workers: {workers})...")
+                    for s_file in script_files:
+                        m = re.search(r"chapter_(\d+)", s_file.stem, re.IGNORECASE)
+                        ch_num = int(m.group(1)) if m else 1
+                        if chapters and ch_num not in chapters:
+                            continue
+                        logger.info(f"\n--- Producing Chapter {ch_num} (Audiobook Vocals-Only) ---")
+                        self.produce_chapter(
+                            project_dir=project_dir,
+                            chapter_num=ch_num,
+                            voice=voice,
+                            workers=workers,
+                            duck_db=duck_db,
+                            spatial_staging=spatial_staging,
+                        )
 
-                # Inline Gate 6C: Table of Contents Monotonicity & Chapter Boundaries
-                verify_packaging_gates(project_dir)
+            podcast_master_files = []
+            if format_mode in ("podcast", "both"):
+                with telemetry.stage_timer(run_id, "Podcast Audio Production", 4):
+                    from audiobook_factory.podcast.orchestrator import PodcastOrchestrator
+                    pod_orch = PodcastOrchestrator()
+                    pod_plans = sorted((project_dir / "podcasts").glob("*_podcast_plan.json"))
+                    logger.info(f"\n[Stage 4/5] 2-Host Podcast Synthesis & -16.0 LUFS Broadcast Mastering across {len(pod_plans)} episodes...")
+                    for pf in pod_plans:
+                        m = re.search(r"chapter_(\d+)", pf.stem, re.IGNORECASE)
+                        ch_num = int(m.group(1)) if m else 1
+                        if chapters and ch_num not in chapters:
+                            continue
+                        logger.info(f"\n--- Producing Podcast Episode for Chapter {ch_num} ---")
+                        pod_res = pod_orch.produce_podcast_episode(
+                            project_dir=project_dir,
+                            chapter_num=ch_num,
+                            use_hindi=hindi,
+                            workers=workers,
+                        )
+                        podcast_master_files.append(Path(pod_res["master_file"]))
+
+            # -------------------------------------------------------------
+            # Stage 5: Packaging Deliverables (M4B / M4A)
+            # -------------------------------------------------------------
+            final_m4b = None
+            packaged_podcasts = []
+            from audiobook_factory.packaging import package_project
+            with telemetry.stage_timer(run_id, "Packaging Deliverables", 5):
+                pkg_res = package_project(
+                    project_dir=project_dir,
+                    format_mode=format_mode,
+                    cover_image=cover_image,
+                )
+                if "audiobook_m4b" in pkg_res.get("artifacts", {}):
+                    final_m4b = Path(pkg_res["artifacts"]["audiobook_m4b"])
+                    verify_packaging_gates(project_dir)
+                if "podcast_episodes" in pkg_res.get("artifacts", {}):
+                    packaged_podcasts = [Path(p) for p in pkg_res["artifacts"]["podcast_episodes"]]
 
             telemetry.end_run(run_id, status="SUCCESS")
             report_file = project_dir / "TELEMETRY_REPORT.json"
@@ -231,14 +271,19 @@ class PipelineOrchestrator:
         progress = ledger.get_progress()
 
         logger.info("\n=======================================================")
-        logger.info("   [SUCCESS] NOVEL AUDIOBOOK PRODUCTION COMPLETED!    ")
-        logger.info(f"   Deliverable   : {final_m4b}")
+        logger.info("   [SUCCESS] STUDIO PRODUCTION RUN COMPLETED!          ")
+        if final_m4b:
+            logger.info(f"   Audiobook M4B : {final_m4b}")
+        if packaged_podcasts:
+            logger.info(f"   Podcast M4As  : {len(packaged_podcasts)} episodes")
         logger.info(f"   Telemetry     : {report_file}")
-        logger.info(f"   Total Segments: {progress['completed']}/{progress['total_segments']}")
-        logger.info(f"   Audio Duration: {progress['total_duration_min']} minutes")
         logger.info(f"   Total Elapsed : {elapsed_min} minutes")
         logger.info("=======================================================\n")
 
+        if format_mode == "both":
+            return {"audiobook_m4b": final_m4b, "podcast_episodes": packaged_podcasts}
+        elif format_mode == "podcast":
+            return packaged_podcasts[0] if packaged_podcasts else (podcast_master_files[0] if podcast_master_files else project_dir / "podcasts")
         return final_m4b
 
     def produce_chapter(

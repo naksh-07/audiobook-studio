@@ -120,13 +120,14 @@ Output JSON: A list of objects matching by "index":
             idx = seg.get("index")
             if idx in enrich_map:
                 e = enrich_map[idx]
-                if e.get("actioning"):
+                # Preserve pre-existing DramaticPlan objectives to eliminate representation drift
+                if e.get("actioning") and not seg.get("actioning"):
                     seg["actioning"] = e["actioning"]
-                if e.get("subtext"):
+                if e.get("subtext") and not seg.get("subtext"):
                     seg["subtext"] = e["subtext"]
-                if e.get("underlying_emotion"):
+                if e.get("underlying_emotion") and not seg.get("underlying_emotion"):
                     seg["underlying_emotion"] = e["underlying_emotion"]
-                if e.get("intensity_level"):
+                if e.get("intensity_level") and (not seg.get("intensity_level") or seg.get("intensity_level") == "medium"):
                     seg["intensity_level"] = e["intensity_level"]
                 if isinstance(e.get("acting"), dict):
                     seg.setdefault("acting", {})

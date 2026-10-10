@@ -32,6 +32,129 @@ flowchart LR
 
 ---
 
+## 🎖️ The 8-Pillar Studio Production Certification Harness
+
+The master quality arbiter of Audiobook Studio is the **8-Pillar Studio Production Certification Harness** ([`StudioCertificationRunner`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/certification/runner.py)). Operating at the release tier, it conducts an autonomous, deterministic evaluation of the entire project across **8 studio engineering pillars**, generating an authoritative compliance scorecard ([`STUDIO_CERTIFICATION_REPORT.json`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/certification/contracts.py#L34-L79)) for both Audiobook and Podcast tracks:
+
+```mermaid
+flowchart TD
+    subgraph CertHarness["🎖️ StudioCertificationRunner.certify_project(project_dir, format_mode)"]
+        P1["Pillar 1: Ingestion & Extraction Provenance (P1_EXTRACTION)<br/>• Gate 0.1 Complete Text Coverage (>= 50 words)<br/>• 0 Empty Markdown Chapters | OCR Noise < 8%"]
+        P2["Pillar 2: Literary Translation Integrity (P2_TRANSLATION)<br/>• Gate 0 / T0-T15 Dual-Rule Invariant<br/>• 0 Placeholder Markers ([UNTRANSLATED], [TODO])"]
+        P3["Pillar 3: Dramaturgy SPU & Beat Alignment (P3_DRAMATURGY)<br/>• Gate 2.5 Monotonic Segment Numbering<br/>• Zero Orphan Scene / Beat References"]
+        P4["Pillar 4: Anti-Swap Dialogue Attribution (P4_ATTRIBUTION)<br/>• Gate 2 0% Speaker Turn Inversion (A <-> B)<br/>• Zero Dialogue Swallowed by Narrator"]
+        P5["Pillar 5: Vocal Performance Clamping (P5_PERFORMANCE)<br/>• Clamped Temperature (0.30 - 0.52)<br/>• Ban on Theatrical Over-Projection Keywords"]
+        P6["Pillar 6: EBU R128 Loudness Compliance (P6_LOUDNORM)<br/>• -19.0 LUFS (Audiobook) / -16.0 LUFS (Podcast)<br/>• True Peak Ceiling <= -1.4 dBTP"]
+        P7["Pillar 7: 2-Host Spatial Staging (P7_SPATIAL)<br/>• Host A Pan <= -0.20 | Host B Pan >= +0.20<br/>• Mono-Centered for Audiobook Track"]
+        P8["Pillar 8: Container Packaging & Show Notes (P8_PACKAGING)<br/>• Verified .m4b (Audiobook) / .m4a (Podcast)<br/>• TOC Monotonicity & Embedded Artwork"]
+    end
+
+    P1 & P2 & P3 & P4 & P5 & P6 & P7 & P8 --> Scorecard["STUDIO_CERTIFICATION_REPORT.json<br/>overall_score: 0-100% | is_certified: bool"]
+```
+
+### 1. The 8 Studio Production Pillars
+
+#### Pillar 1: Ingestion & Extraction Provenance (`P1_EXTRACTION`)
+- **Underlying Gate**: Gate 0.1 Forensic Document Extraction.
+- **Verification Mandate**: Inspects `extracted/` markdown chapters.
+- **Scoring & Rules**:
+  - Requires `extracted/` directory to exist with non-empty markdown files.
+  - Slashes 30 points and fails closed if corrupted or empty files ($< 50$ bytes) are detected.
+  - Word count floor must exceed 50 words per chapter.
+- **Fail Condition**: Missing `extracted/` directory, empty files, or corrupted extraction.
+
+#### Pillar 2: Literary Translation Dual-Rule Integrity (`P2_TRANSLATION`)
+- **Underlying Gates**: Gate 0, Gate 1A, and Gates T0–T15.
+- **Verification Mandate**: Audits `translation/` markdown files for dual-rule fidelity.
+- **Scoring & Rules**:
+  - Automatically skipped (`status = "SKIPPED"`, score 100%) if project is original English language.
+  - Audits text for untranslated placeholder markers: scans for `[UNTRANSLATED]`, `[TODO]`, `[TRANSLATION_FAILED]`. Each occurrence reduces score by 25 points and triggers a critical finding.
+  - Enforces the **Dual-Rule Invariant**: dignity for classical prose vs raw visceral reality for combat/intimacy without puritanical bowdlerization.
+- **Fail Condition**: Detected placeholder markers or truncated translation files.
+
+#### Pillar 3: Dramaturgy SPU & Beat Alignment (`P3_DRAMATURGY`)
+- **Underlying Gate**: Gate 2.5 Dramatic Fidelity Validator.
+- **Verification Mandate**: Audits dramatic plans (`dramaturgy/*_plan.json`, `podcasts/*_podcast_plan.json`) and scripts (`scripts/*.json`).
+- **Scoring & Rules**:
+  - Asserts that all segment indices are monotonically sequential ($index_1 < index_2 < index_3$).
+  - Slashes 30 points on non-monotonic or scrambled indices.
+  - Verifies all referenced `scene_id` and `beat_id` attributes resolve to valid nodes in the enclosing `DramaticPlan`.
+- **Fail Condition**: Non-monotonic segment indices or orphan beat references.
+
+#### Pillar 4: Anti-Swap Dialogue Attribution (`P4_ATTRIBUTION`)
+- **Underlying Gate**: Gate 2 Screenplay Attribution Auditor.
+- **Verification Mandate**: Screens all screenplay segments in `scripts/*.json` for attribution accuracy.
+- **Scoring & Rules**:
+  - **Zero Speaker Turn Inversion**: Slashes 20 points per empty speaker assignment.
+  - **Anti-Swallow Dialogue Guard**: Scans `Narrator` lines for enclosed quotation marks (`"..."` or `“...”`). Flags possible quote leakage from Narrator to character, deducting 5 points per incident.
+  - Whitelist validation against canonical character roster.
+- **Fail Condition**: Empty speaker fields or character dialogue swallowed into narrator segments.
+
+#### Pillar 5: Vocal Performance & Restraint Clamping (`P5_PERFORMANCE`)
+- **Underlying Gate**: Gate 2.8 Dramatic Performance Pre-Mix Gate.
+- **Verification Mandate**: Inspects acting directives in `scripts/*.json` to enforce vocal restraint.
+- **Scoring & Rules**:
+  - Enforces temperature clamping (`0.30 - 0.52`).
+  - Scans for banned theatrical keywords: `screeching`, `melodramatic`, `theatrical over-projection`, `hysterical`.
+  - Deducts 20 points per banned keyword and logs a critical gate violation.
+- **Fail Condition**: Any presence of banned histrionic acting directives.
+
+#### Pillar 6: EBU R128 Broadcast Loudness Compliance (`P6_LOUDNORM`)
+- **Underlying Gates**: Gate 5 Master Probe & Gate 6B Loudness Continuity.
+- **Verification Mandate**: Evaluates mastered audio files across active production tracks:
+  - **Audiobook Track**: Inspects `mastered/*_mastered.wav` and `mastered/*_mastered.m4a` against the **-19.0 LUFS** target ($\pm 1.0$ LU) and **-1.5 dBTP** True Peak ceiling.
+  - **Podcast Track**: Inspects `podcasts/*_podcast.m4a` and `podcasts/*_podcast_master.wav` against the **-16.0 LUFS** target ($\pm 1.0$ LU) and **-1.0 dBTP** True Peak ceiling.
+- **Fail Condition**: Loudness drift exceeding $\pm 1.0$ LU or True Peak clipping.
+
+#### Pillar 7: Multi-Host Spatial Staging (`P7_SPATIAL`)
+- **Underlying Gate**: 2-Host Stereo Azimuth Matrix.
+- **Verification Mandate**: Evaluates spatial separation for conversational tracks:
+  - **Audiobook Track**: Panning audit is safely skipped (`status = "SKIPPED"`, score 100%) because audiobooks are mastered mono-centered ($0.0$ pan).
+  - **Podcast Track**: Audits `podcasts/*_podcast_plan.json`. Asserts that Host A is panned left ($pan \le -0.20$) and Host B is panned right ($pan \ge +0.20$). Deducts 10 points for insufficient spatial separation.
+- **Fail Condition**: Host azimuth pan collapsed into center channel ($|pan| < 0.10$).
+
+#### Pillar 8: Chapter Container Metadata & Packaging (`P8_PACKAGING`)
+- **Underlying Gates**: Gate 6C TOC Monotonicity & Gate 6D Container Specifications.
+- **Verification Mandate**: Verifies final deliverable containers:
+  - **Audiobook Track**: Verifies that a valid `.m4b` container exists with embedded chapter markers and square cover art ($\ge 1400 \times 1400$ px).
+  - **Podcast Track**: Verifies that valid `.m4a` / `.mp3` episode files exist in `packaged_podcasts/` or `podcasts/` with show notes.
+- **Fail Condition**: Missing deliverable container files or non-monotonic chapter seek tables.
+
+---
+
+### 2. Certification Data Contracts & Schemas
+
+Defined in [`audiobook_factory/certification/contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/certification/contracts.py):
+
+```python
+AuditStatus = Literal["PASSED", "WARNING", "FAILED", "SKIPPED"]
+
+class PillarAuditResult(BaseModel):
+    pillar_id: str = Field(..., description="e.g. 'P1_EXTRACTION', 'P6_LOUDNORM'")
+    pillar_name: str
+    score: float = Field(..., ge=0.0, le=100.0)
+    status: AuditStatus = "PASSED"
+    critical_findings: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    telemetry: Dict[str, Any] = Field(default_factory=dict)
+
+class StudioCertificationReport(BaseModel):
+    project_id: str
+    book_title: str
+    timestamp: float = Field(default_factory=time.time)
+    overall_score: float = Field(..., ge=0.0, le=100.0)
+    is_certified: bool
+    format_mode: str = "audiobook"  # "audiobook", "podcast", or "both"
+    pillars: Dict[str, PillarAuditResult] = Field(default_factory=dict)
+    summary_notes: List[str] = Field(default_factory=list)
+
+    def save_to_file(self, filepath: Path) -> Path: ...
+    @classmethod
+    def load_from_file(cls, filepath: Path) -> StudioCertificationReport: ...
+```
+
+---
+
 ## 📋 Comprehensive Quality Gate Specifications
 
 ### Gate 0.1: Forensic Document Extraction Quality Gate (Pillar 1)
@@ -489,23 +612,43 @@ All judges emit strongly-typed, schema-validated Pydantic v2 verdict objects:
 
 ---
 
-## 🏃 Running Quality Gate Audits via CLI
+## 🏃 Running Quality Gate Audits via CLI & Python API
 
-You can audit any active project directory or document extraction directly using the unified CLI:
+### Unified CLI Audits
 
 ```bash
-# Ingestion extraction audit with fail-closed Gate 0.1 enforcement
+# 1. Full 8-Pillar Studio Production Certification & Gate 6 Master Audit
+python audiobook_cli.py audit-book audiobooks/projects/my_project
+
+# 2. Single Chapter Multi-Gate Verification Audit (Gates 0, 1, 2, 3, 4.5, 5)
+python audiobook_cli.py audit my_project --chapter 1
+
+# 3. Ingestion Extraction Audit with fail-closed Gate 0.1 enforcement
 python audiobook_cli.py extract books/sample_novel.epub
 
-# Ingestion extraction with Gate 0.1 override (bypass REVIEW failure)
+# 4. Ingestion Extraction with Gate 0.1 override (bypass REVIEW failure)
 python audiobook_cli.py extract books/sample_novel.epub --force-gate
 
-# Full project master certification (Gates 6A, 6B, 6C, 6D, 6E)
-python audiobook_cli.py audit audiobooks/projects/my_project
-
-# Verify individual chapter script compliance (Gate 2 & Gate 2.5 Dramatic Fidelity)
-python audiobook_cli.py script audiobooks/projects/my_project --audit-only
-
-# Execute full dramatized screenplay generation with Gate 2.5 validation
-python audiobook_cli.py script audiobooks/projects/my_project --dramatized
+# 5. Packaging Verification with Gate 6 strict enforcement
+python audiobook_cli.py package my_project --format both --enforce-gate6
 ```
+
+### Programmatic Studio Certification API
+
+```python
+from pathlib import Path
+from audiobook_factory.certification import StudioCertificationRunner
+
+# Execute autonomous 8-Pillar Studio Certification across both deliverables
+project_dir = Path("audiobooks/projects/my_project")
+report = StudioCertificationRunner.certify_project(project_dir, format_mode="both")
+
+print(f"Overall Compliance Score: {report.overall_score}%")
+print(f"Certified For Release: {report.is_certified}")
+
+for pillar_id, res in report.pillars.items():
+    print(f"[{res.status}] {res.pillar_name} -> {res.score}%")
+    for defect in res.critical_findings:
+        print(f"  [CRITICAL] {defect}")
+```
+

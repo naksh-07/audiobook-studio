@@ -42,7 +42,8 @@ def test_p0_1_batching_disabled_by_default():
     # When no explicit override is provided, batching must be disabled
     with patch.dict(os.environ, {}, clear=False):
         os.environ.pop("TTS_BATCHING_ENABLED", None)
-        assert os.environ.get("TTS_BATCHING_ENABLED", "false").lower() in ("false", "0", "no")
+        resolved_batching = os.environ.get("TTS_BATCHING_ENABLED", "false").lower() in ("true", "1", "yes")
+        assert resolved_batching is False
         import importlib
         import audiobook_factory.tts.constants as tts_consts
         importlib.reload(tts_consts)

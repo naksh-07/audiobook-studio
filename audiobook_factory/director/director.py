@@ -21,13 +21,14 @@ from audiobook_factory.contracts import (
     TimelineLedger,
 )
 
+from audiobook_factory.director.sound_design_director import SoundDesignDirectorMixin
 from audiobook_factory.director.dramaturgy import DramaturgyMixin
 from audiobook_factory.director.music_director import MusicDirectorMixin
 from audiobook_factory.director.foley_director import FoleyDirectorMixin
 from audiobook_factory.director.scene_acoustics import SceneAcousticsMixin
 
 
-class AgentDirector(DramaturgyMixin, MusicDirectorMixin, FoleyDirectorMixin, SceneAcousticsMixin):
+class AgentDirector(SoundDesignDirectorMixin, MusicDirectorMixin, FoleyDirectorMixin, SceneAcousticsMixin):
     def __init__(
         self,
         sound_bank: Optional[SoundBank] = None,

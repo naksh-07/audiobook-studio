@@ -1,17 +1,20 @@
-# 🏛️ Architecture: Audiobook Studio (Plugin & Pure Vocals-Only Engine v5.2)
+# 🏛️ Architecture: Audiobook Studio (Option C Pure Vocals-Only Engine v5.2)
 
 ## Executive Overview
 
-**Audiobook Studio (Vocals-Only Studio Engine v5.2)** is an autonomous, studio-grade audiobook production framework and Google Antigravity Plugin engineered specifically for **crystal-clear, multi-voice character acting and pristine vocal narration** modeled after the benchmark standards of **Audible Studios**.
+**Audiobook Studio (Option C Pure Vocals-Only Engine v5.2)** is an autonomous, studio-grade vocal production framework and Google Antigravity Plugin engineered specifically for **broadcast-grade spoken audio across multiple deliverables**:
+1. **Audible-Standard Multi-Cast Audiobooks**: Pristine verbatim prose preservation, em-dash dialogue framing, transparent measured narration (temperature 0.32), and two-pass linear EBU R128 mastering at **-19.0 LUFS** / **-1.5 dBTP**.
+2. **Conversational 2-Host Narrative Podcasts**: High-retention audio-first shows featuring calibrated host dynamics (Sameer/Priya in Hindustani, Alex/Maya in English), organic breathability ($\le 22$ words per breath, 140ms pre-roll breath pauses), 5-part retention arcs, stereo spatial staging (-0.25 Left / +0.25 Right), and **-16.0 LUFS** broadcast podcast mastering.
 
 > [!IMPORTANT]
-> **Active Production Engine: Pure Vocals-Only**:
-> Background music (BGM), sound effects (SFX), 5-track stem mixdowns, and Archive.org sound bank harvesting are **permanently decoupled and archived** in `archive/cinematic_audio/`.
-> The engine is 100% focused on Audible-standard vocal clarity, multi-character acting, dialogue nuance, and broadcast-grade vocal mastering.
+> **Pure Vocals-Only Architectural Invariant**:
+> Background music (BGM), sound effects (SFX), 5-track stem mixdowns, and Archive.org sound scraping are **permanently decoupled and archived** in [`archive/cinematic_audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/archive/cinematic_audio/). Production compute is 100% focused on vocal clarity, multi-character acting nuance, conversational breathability, and Audible/EBU R128 compliance.
 
 ---
 
-## 🏗️ High-Level 5-Room Vocals-Only Blueprint
+## 🏗️ High-Level Option C Architecture
+
+The system strictly implements **Option C: Shared Understanding & Dramaturgy Core with Specialized Format Adapters**:
 
 ```mermaid
 flowchart TD
@@ -32,23 +35,35 @@ flowchart TD
         Collective --> DualRule["Dual-Rule Invariant ('Nothing Above Source')<br/>Classic Reverent Pathos vs Raw Unrated Realism"]
     end
 
-    subgraph Room3["🎭 Room 3: Screenplay & Forensic Attribution"]
-        DualRule --> Screenplay["Sliding-Window Screenplay Dramaturgy (script_builder.py)"]
-        Screenplay --> Auditor["DialogueAttributionAuditor (Anti-Swap QA)<br/>Speaker Tagging ([SPEAKER]:) & Quote Disentanglement"]
-        Auditor --> Blocking["Physical Blocking & Spatial Headroom"]
+    subgraph Room3["🎭 Room 3: Universal Dramaturgy Core (dramaturgy/)"]
+        DualRule --> SceneAn["SceneAnalyzer (Organic Scene Boundary Discovery)"]
+        SceneAn --> BeatPl["BeatPlanner (Stanislavski Actioning, SPU Slicing & Tension Curves)"]
+        BeatPl --> PBible["PerformanceBible (Vocal Profiles & Restraint Clamping)"]
+        PBible --> DramAST["Immutable Chapter Dramatic AST (dramatic_plan.json)"]
     end
 
-    subgraph Room4["🎙️ Room 4: 4D Formants & Voice Performance"]
-        Blocking --> Caster["Character Caster (4D Acoustic Formants)<br/>Pitch Δ, Tempo, Bass Boost & Parametric EQ Profiles"]
+    subgraph Room3Adapters["🎙️ Room 3 Adapters: Specialized Scripting Adapters (adapters/)"]
+        DramAST -->|Audible Flow Standard| AudiobookAd["AudiobookAdapter (adapters/audiobook.py)<br/>• Prose-Lead Framing ('वक्ता ने पूछा—')<br/>• Unbroken Character Dialogue Turns<br/>• Transparent Measured Narration (0.32 temp)<br/>• Anti-Swap Dialogue Attribution (0% Inversion)"]
+        DramAST -->|Conversational Spoken-First| PodcastAd["PodcastAdapter (adapters/podcast.py)<br/>• 2-Host Dynamic (Inquisitive Driver <-> Domain Expert)<br/>• SpokenBreathabilityTransformer (<= 22 words, 140ms breath)<br/>• 5-Part Retention Arc (Cold Open to Show Outro)<br/>• Stereo Spatial Staging (-0.25 Left / +0.25 Right)"]
+    end
+
+    subgraph Room4["🎙️ Room 4: 4D Formant Multi-Voice TTS & Editorial"]
+        AudiobookAd & PodcastAd --> Caster["Character Caster & 4D Acoustic Formants<br/>Pitch Δ (+/-4-12%), Tempo & Parametric EQ Curves"]
         Caster --> TTS["Gemini Flash TTS Key Pool (120+ Active Keys)<br/>Prosodic Acting, Speech Tags & Breath Marks"]
         TTS --> Critic["TakeAuditionCritic & Audio Take QA"]
         Critic --> Editorial["Dialogue Editorial Layer (DE-01 - DE-07)<br/>Endpoint Snapping, Hann Micro-Fades & Turn Latency"]
     end
+    end
 
-    subgraph Room5["🎛️ Room 5: Broadcast Vocal Mastering & Packaging"]
-        Editorial --> VocalMaster["Studio Vocal Mastering Engine<br/>SOXR 48kHz / 24-bit + Dual-Pass Loudnorm EBU R128 (-19 LUFS)"]
-        VocalMaster --> Packager["FFMETADATA1 Chapter Generator & AAC Packager"]
-        Packager --> Deliverable["Deliverable M4B Audiobook (Chapter Markers & Cover Art)"]
+    subgraph Room5["🎛️ Room 5: Broadcast Mastering & Multi-Format Packaging"]
+        Editorial --> TrackSplit{"Format Mode Dispatch"}
+        TrackSplit -->|Audiobook Track| M4BMaster["Studio Vocal Master: -19.0 LUFS / -1.5 dBTP<br/>SOXR 48kHz / 24-bit + Dual-Pass Linear Loudnorm<br/>Chaptered .m4b with Embedded Cover Art"]
+        TrackSplit -->|Podcast Track| M4AMaster["Podcast Master: -16.0 LUFS / -1.0 dBTP<br/>Stereo Spatial Azimuth Staging (-0.25 / +0.25)<br/>AAC .m4a / .mp3 with Show Notes & Chapters"]
+    end
+
+    subgraph CertHarness["🎖️ 8-Pillar Studio Production Certification Harness"]
+        M4BMaster & M4AMaster --> Runner["StudioCertificationRunner (certification/runner.py)<br/>P1 Extraction | P2 Translation | P3 Dramaturgy | P4 Attribution<br/>P5 Performance | P6 Loudness | P7 Spatial | P8 Packaging"]
+        Runner --> Report["STUDIO_CERTIFICATION_REPORT.json (Gate 6 Compliance)"]
     end
 
     Room1 --> Room1_5
@@ -56,13 +71,15 @@ flowchart TD
     Room1_5 -.->|"Roster & Aliases"| Room3
     Room1_5 -.->|"Dynamic Voice Lock"| Room4
     Room2 --> Room3
-    Room3 --> Room4
+    Room3 --> Room3Adapters
+    Room3Adapters --> Room4
     Room4 --> Room5
+    Room5 --> CertHarness
 ```
 
 ---
 
-## 🚪 Deep-Dive: The 5 Production Rooms
+## 🏛️ The 5-Room Pure Vocals-Only Pipeline
 
 ### Room 1: Pre-Production World, Lore & Canonical State Studio
 *Subsystems: System 1 Researcher Engine ([`audiobook_factory/preproduction/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/)) & System 2 Metadata Maintainer ([`audiobook_factory/metadata/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/))*
@@ -144,33 +161,62 @@ Room 1.5 is the decoupled, single-pass per-chapter lexical analysis, entity disc
    - *Raw Unrated Fiction*: Unapologetic preservation of raw street curses, visceral combat gore, and unvarnished somatic intimacy without forced "19-to-21" escalation.
 7. **Universal Novel-Agnostic Invariant**: 100% purged of novel-specific hardcoded regexes or character bindings. All entities are classified dynamically into `BookBible`.
 
+### Room 3: Universal Dramaturgy Core
+*Modules:* [`audiobook_factory/dramaturgy/scene_analyzer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/dramaturgy/scene_analyzer.py), [`audiobook_factory/dramaturgy/beat_planner.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/dramaturgy/beat_planner.py), [`audiobook_factory/dramaturgy/performance_bible.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/dramaturgy/performance_bible.py), [`audiobook_factory/dramaturgy/contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/dramaturgy/contracts.py)
+
+1. **Organic Scene Boundary Discovery (`SceneAnalyzer`)**: Discovers natural scene boundaries using multi-signal heuristics (`TIME_PATTERNS`, `LOCATION_PATTERNS`) or 2-pass LLM scene comprehension, computing scene questions, stakes, and entry/exit states.
+2. **Beat Planning & Actioning (`BeatPlanner`)**: Slices scenes into 2–5 atomic beats with Stanislavski transitive action verbs (`threaten`, `deflect`, `reassure`, `confess`), underlying desires, core fears, subtext, and continuous tension trajectories ($0.0 \to 1.0$).
+3. **SPU Semantic Paragraph Unit Alignment**: Binds each scene and beat to exact paragraph indices (`start_paragraph_idx`, `end_paragraph_idx`) and cryptographic SHA-256 anchors, eliminating paragraph desynchronization.
+4. **Performance Bible & Subtext Directing**: Pre-computes actor vocal profiles and locks narrator pacing, preventing double-inference drift in [`StanislavskiSubtextDirector`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/dramaturgy/subtext_director.py).
+5. **Immutable Dramatic AST**: Atomically serializes `chapter_XXX_dramatic_plan.json` conforming to the [`DramaticPlan`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/dramaturgy/contracts.py#L353-L415) schema.
+
 ---
 
-### Room 3: Screenplay Dramaturgy & Forensic Attribution
-*Modules: `audiobook_factory/script/` & `audiobook_factory/script/agents/`*
+### Room 3 Adapters: Specialized Scripting Adapters
+*Modules:* [`audiobook_factory/adapters/base.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/adapters/base.py), [`audiobook_factory/adapters/audiobook.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/adapters/audiobook.py), [`audiobook_factory/adapters/podcast.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/adapters/podcast.py)
 
-1. **Sliding-Window Screenplay Dramaturgy**: Ingests pristine Devanagari Markdown from Room 2, parses into 500-word beat-aligned micro-chunks with 5-layer context stack, attributing dialogue turns, actioning verbs, and dramatic delivery styles.
-2. **Dialogue Attribution Auditor**: Dedicated QA agent preventing $A \leftrightarrow B$ speaker turn inversions, quote misattributions to Narrator, and speech tag leakage (`"उसने कहा"`).
-3. **Physical Blocking & Staging**: Encodes character blocking (`sitting`, `standing`, `leaning_close`, `retreating`) and stereo azimuth panning.
+1. **BaseScriptAdapter Lifecycle**:
+   - `pre_adapt()`: Pre-flight context validation.
+   - `adapt()`: Transforms source prose and `DramaticPlan` into standardized segment dictionaries.
+   - `post_adapt()`: Binds `PerformanceBible` profiles and clamps narrator transparency.
+   - `validate()`: Executes Gate 2.5 `DramaticValidator`.
+2. **Audiobook Script Adapter (`AudiobookAdapter`)**:
+   - Preserves 100% verbatim authorial prose.
+   - Prose-lead framing (`"वक्ता ने पूछा—"`) ensures seamless em-dash flow.
+   - Narrator Transparency Invariant: Clamped to `0.32` temperature with calm, measured delivery.
+   - Anti-Swap Dialogue Attribution Auditor guarantees 0% speaker turn inversion ($A \leftrightarrow B$).
+3. **Dedicated 2-Host Podcast Adapter (`PodcastAdapter`)**:
+   - Conversational persona dynamics: Sameer & Priya (Hindi) / Alex & Maya (English).
+   - `SpokenBreathabilityTransformer`: Splits sentences to $\le 22$ words per breath with 140ms pre-roll breath pauses.
+   - 5-part retention arc: `cold_open_hook` $\to$ `show_intro` $\to$ `scene_deepdive` $\to$ `cognitive_reset_banter` $\to$ `show_outro`.
+   - Stereo spatial staging: Host A at $-0.25$ (Left-Mid) and Host B at $+0.25$ (Right-Mid).
 
 ---
 
 ### Room 4: 4D Formants & Voice Performance Realization
-*Modules: `audiobook_factory/character_caster.py`, `audiobook_factory/tts/`, `audiobook_factory/performance/take_critic.py`*
+*Modules:* [`audiobook_factory/character_caster.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/character_caster.py), [`audiobook_factory/tts_dispatcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts_dispatcher.py), [`audiobook_factory/dialogue_editorial.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/dialogue_editorial.py), [`audiobook_factory/performance/take_critic.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/performance/take_critic.py)
 
-1. **4D Acoustic Formant Modulation**: Pitch delta ($\pm 4-12\%$), tempo scaling, bass boost, and parametric EQ curves (`equalizer=f=...`) dynamically applied via FFmpeg DSP to prevent vocal convergence when multiple characters share base voices.
+1. **4D Acoustic Formant Modulation**: Modulates pitch delta ($\pm 4-12\%$), tempo rate, and 4D parametric EQ curves (`equalizer=f=...`) via FFmpeg DSP to prevent vocal convergence across shared base TTS voices.
 2. **Formant-Sensitive Hash Caching**: Filename hashing incorporates the active EQ formant profile for deterministic cache invalidation.
 3. **120+ Key Gemini Flash TTS Pool**: Concurrent token-bucket rate limiting with anti-bot jitter and permanent `BLOCK_NONE` safety settings.
 4. **TakeAuditionCritic & Audio Take QA**: Judicial multi-take evaluation on climactic scenes, evaluating acoustic alignment, audio take clarity, and pronunciation accuracy.
+5. **Dialogue Editorial Layer (DE-01 - DE-07)**:
+   - Endpoint zero-crossing snapping (-52 dBFS speech floor).
+   - Hann micro-fades (12ms pre-speech fade-in / 18ms post-speech fade-out).
+   - Contextual turn latency (250ms–700ms) based on emotional pacing.
 
----
+### Room 5: Broadcast Vocal Mastering & Multi-Format Packaging
+*Modules:* [`audiobook_factory/mastering.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering.py), [`audiobook_factory/podcast/orchestrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/orchestrator.py), [`audiobook_factory/packaging.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/packaging.py)
 
-### Room 5: Dialogue Editorial & Broadcast Vocal Mastering
-*Modules: `audiobook_factory/dialogue_editing/`, `audiobook_factory/mastering.py`, `audiobook_factory/packager.py`*
-
-1. **Dialogue Editorial Layer (DE-01 - DE-07)**: Endpoint zero-crossing snapping (-52 dBFS speech floor), Hann micro-fades (12ms pre-speech, 18ms post-speech), and dramatic turn latency.
-2. **Broadcast EBU R128 Vocal Master**: Standardized `-19.0 LUFS` ($\pm 0.5$ LU) integrated loudness and `-1.5 dBTP` true-peak ceiling at 48kHz / 24-bit.
-3. **Chaptered M4B Container**: Streamlined packaging into `.m4b` container with FFMETADATA1 chapter markers, TOC navigation, and embedded high-resolution cover artwork.
+1. **Audiobook Mastering & Packaging**:
+   - Target Loudness: Broadcast EBU R128 **-19.0 LUFS** ($\pm 0.5$ LU) with a **-1.5 dBTP** True Peak ceiling.
+   - Two-pass measured linear loudnorm (`-f null -` measurement pass, `linear=true` application pass).
+   - Resampling: SOXR 48kHz / 24-bit studio pipeline.
+   - Output Container: Single chapterized `.m4b` container with embedded cover art and TOC navigation.
+2. **Podcast Mastering & Packaging**:
+   - Target Loudness: Broadcast Podcast **-16.0 LUFS** with a **-1.0 dBTP** True Peak ceiling.
+   - Stereo Spatial Staging: Hardware pan DSP panning Host A to $-0.25$ Left and Host B to $+0.25$ Right.
+   - Output Container: High-fidelity 192kbps AAC `.m4a` with embedded episode metadata and show notes.
 
 ---
 
@@ -304,7 +350,60 @@ All production rooms interface strictly with [`ModelGateway`](file:///c:/Users/S
 
 ---
 
+## 🎖️ 8-Pillar Studio Production Certification Harness
+
+The entire production lifecycle is verified by the **8-Pillar Studio Production Certification Harness** ([`audiobook_factory/certification/runner.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/certification/runner.py)), which generates a comprehensive JSON scorecard ([`StudioCertificationReport`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/certification/contracts.py#L34-L79)):
+
+| Pillar | Quality Gate | Target Specification | Fail Condition |
+|---|---|---|---|
+| **P1: Ingestion & Extraction** | Gate 0.1 | Document completeness, $\ge 50$ words coverage floor, 0 empty chapters, PDF OCR noise $< 8\%$. | Word count floor violated, missing extracted markdown files. |
+| **P2: Literary Translation** | Gate 0 / T0–T15 | Sense-for-sense fidelity, "Nothing Above Source", no placeholder markers (`[UNTRANSLATED]`, `[TODO]`). | Untranslated placeholders detected, severe text truncation. |
+| **P3: Dramaturgy Alignment** | Gate 2.5 | SPU paragraph alignment, monotonic segment indices, 0 orphan scene or beat references. | Non-monotonic indices, broken beat links. |
+| **P4: Dialogue Attribution** | Gate 2 | Anti-Swap Attribution Auditor: 0% speaker turn inversion ($A \leftrightarrow B$), 0 quote leakage to Narrator. | Empty speaker, quotes swallowed into Narrator lines. |
+| **P5: Vocal Performance** | Gate 2.8 | Clamped temperature (`0.30 - 0.52`), physical vocal anchors, ban on theatrical over-projection keywords. | Banned histrionic directives (`screeching`, `hysterical`). |
+| **P6: EBU R128 Loudness** | Gate 5 / Gate 6B | Mastered files present, **-19.0 LUFS** (Audiobook) / **-16.0 LUFS** (Podcast), True Peak $\le -1.4$ dBTP. | Missing master files, loudness delta $> 1.0$ LU. |
+| **P7: Spatial Staging** | Multi-Host Staging | Host A pan $\le -0.20$ (Left), Host B pan $\ge +0.20$ (Right). Mono-centered for audiobook track. | Host panning insufficiently separated ($< \pm 0.20$). |
+| **P8: Container Packaging** | Gate 6C / Gate 6D | Valid `.m4b` container for Audiobooks; valid `.m4a` container for Podcasts; verified TOC seek table. | Missing deliverable container file. |
+
+---
+
+## 📁 Repository Directory Map
+
+```text
+audiobook-factory/
+├── audiobook_cli.py                     # Unified CLI entrypoint
+├── plugin.json                          # Google Antigravity Plugin manifest
+├── audiobook_factory/
+│   ├── core/                            # Shared Control Plane
+│   │   └── models/                      # ModelGateway, KeyLeaseManager, AntiBanGuard
+│   ├── extraction/                      # Pillar 1 Forensic Ingestion
+│   ├── preproduction/                   # Room 1 System 1 Stateless Novel Researcher
+│   ├── metadata/                        # Room 1 System 2 BookBible & NovelStateMaintainer
+│   ├── glossary/                        # Room 1.5 Chapter Glossary & Metadata Hub
+│   ├── translation/                     # Room 2 Decoupled Option D Translation Engine
+│   ├── dramaturgy/                      # Room 3 Universal Dramaturgy Core
+│   ├── adapters/                        # Room 3 Format Adapters (Audiobook & Podcast)
+│   ├── podcast/                         # Dedicated 2-Host Podcast Engine
+│   ├── tts/                             # Room 4 Speech synthesis & audio slicing
+│   ├── dialogue_editorial.py            # DE-01 - DE-07 micro-fades and endpoint snapping
+│   ├── mastering.py                     # Room 5 Two-pass linear loudnorm EBU R128
+│   ├── packaging/                       # ChapterMetadataGenerator & multi-format delivery
+│   └── certification/                   # 8-Pillar Studio Certification Harness (P1-P8)
+└── docs/                                # Production-grade technical documentation
+```
+
+---
+
 ## 📦 Decoupled & Archived Subsystems
 
-The legacy 5-track cinematic audio engine (dynamic BGM scoring, SQLite FTS5 sound bank harvesting, and multitrack stem mixdowns) has been safely decoupled and archived in `archive/cinematic_audio/`.
-The active production pipeline on `prestable-v4.0-baseline` is **100% focused on pure vocal excellence**.
+The legacy cinematic mix subcommands (`direct`, `render`, `bgm`, `stems`, `bank`) belong to the decoupled 5-track cinematic audio engine and are permanently archived in [`archive/cinematic_audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/archive/cinematic_audio/). They are not part of the active Vocals-Only studio engine.
+
+---
+
+## 🔗 Related Documentation
+- [🎙️ Podcast System Architecture](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
+- [🎭 Dramaturgy & Adaptation System](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/DRAMATURGY_AND_ADAPTATION_SYSTEM.md)
+- [📚 Glossary & Chapter Metadata Subsystem](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GLOSSARY_AND_METADATA_SUBSYSTEM.md)
+- [🛡️ Quality Gates & 8-Pillar Certification](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/QUALITY_GATES.md)
+- [💻 CLI Reference Manual](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/CLI_REFERENCE.md)
+- [🎛️ Audio Engineering & Mastering](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)

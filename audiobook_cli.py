@@ -21,35 +21,23 @@ if sys.platform == "win32":
 WORKSPACE_DIR = Path(__file__).resolve().parent
 PROJECTS_DIR = WORKSPACE_DIR / "audiobooks" / "projects"
 
-# Modular command handlers from audiobook_factory.cli
-try:
-    from audiobook_factory.cli.commands.pipeline import (
-        cmd_extract,
-        cmd_translate,
-        cmd_script,
-        cmd_synthesize,
-        cmd_master,
-        cmd_produce,
-        cmd_auto,
-    )
-except ImportError:
-    cmd_extract = cmd_translate = cmd_script = cmd_synthesize = cmd_master = cmd_produce = cmd_auto = None
-
-try:
-    from audiobook_factory.cli.commands.audio import (
-        cmd_package,
-    )
-except ImportError:
-    cmd_package = None
-
-try:
-    from audiobook_factory.cli.commands.audit import (
-        cmd_audit_book,
-        cmd_audit,
-    )
-except ImportError:
-    cmd_audit_book = cmd_audit = None
-
+from audiobook_factory.cli.commands.pipeline import (
+    cmd_extract,
+    cmd_translate,
+    cmd_script,
+    cmd_podcast,
+    cmd_synthesize,
+    cmd_master,
+    cmd_produce,
+    cmd_auto,
+)
+from audiobook_factory.cli.commands.audio import (
+    cmd_package,
+)
+from audiobook_factory.cli.commands.audit import (
+    cmd_audit_book,
+    cmd_audit,
+)
 from audiobook_factory.cli.commands.keys import (
     cmd_keys,
 )
@@ -60,6 +48,7 @@ __all__ = [
     "cmd_extract",
     "cmd_translate",
     "cmd_script",
+    "cmd_podcast",
     "cmd_synthesize",
     "cmd_master",
     "cmd_produce",
@@ -67,6 +56,7 @@ __all__ = [
     "cmd_package",
     "cmd_audit_book",
     "cmd_audit",
+    "cmd_keys",
     "WORKSPACE_DIR",
     "PROJECTS_DIR",
 ]
@@ -97,11 +87,33 @@ def main():
     p_script.add_argument("book", help="Project book slug")
     p_script.add_argument("--hindi", action="store_true", help="Use translated Hindi chapters")
     p_script.add_argument("--dramatized", action="store_true", help="Multi-voice character attribution mode")
+    p_script.add_argument("--adapter", choices=["audiobook", "podcast"], default="audiobook", help="Format script adapter: audiobook (default) or podcast")
     p_script.add_argument("--flow", action="store_true", default=True, help="Enable Audible Flow mode (preserves prose and tags, eliminates Foley)")
     p_script.add_argument("--cast-mode", choices=["ensemble", "solo"], default="ensemble", help="Cast mode: ensemble (multi-voice cast) or solo (master narrator)")
     p_script.add_argument("--chapter", type=int, default=None, help="Specific chapter number to script")
     p_script.add_argument("--chapters", type=str, default=None, help="Comma-separated or range of chapters (e.g. 1-2 or 1,2)")
     p_script.add_argument("--overwrite", action="store_true", help="Overwrite existing script files")
+
+    # podcast
+    p_podcast = subparsers.add_parser("podcast", help="Generate 2-Host conversational narrative podcast episodes or whitepaper audio")
+    p_podcast.add_argument("target", help="Project book slug OR input research paper path (.pdf, .md, .txt)")
+    p_podcast.add_argument("--hindi", action="store_true", help="Generate Hindi/Hindustani podcast (default)")
+    p_podcast.add_argument("--english", action="store_true", help="Generate English podcast")
+    p_podcast.add_argument("--produce", action="store_true", help="Synthesize and master podcast episode to -16.0 LUFS broadcast audio")
+    p_podcast.add_argument("--chapter", type=int, default=None, help="Specific chapter number")
+    p_podcast.add_argument("--chapters", type=str, default=None, help="Comma-separated or range of chapters (e.g. 1-2 or 1,2)")
+    p_podcast.add_argument("--workers", default=3, type=int, help="Number of concurrent TTS synthesis workers (default: 3)")
+    p_podcast.add_argument("--target-lufs", default=-16.0, type=float, help="Target broadcast integrated loudness (default: -16.0 LUFS)")
+    p_podcast.add_argument("--overwrite", action="store_true", help="Overwrite existing podcast files")
+    p_podcast.add_argument("--output-dir", default=None, help="Target project output directory")
+    p_podcast.add_argument("--style", choices=["conversational_podcast", "formal_lecture", "narrative_audiobook"], default="conversational_podcast", help="Verbalization style")
+    p_podcast.add_argument("--host-a-name", default="Dr. Vance", help="Lead explainer host name")
+    p_podcast.add_argument("--host-a-voice", default="Charon", help="Lead explainer host voice")
+    p_podcast.add_argument("--host-b-name", default="Maya", help="Inquisitive co-host name")
+    p_podcast.add_argument("--host-b-voice", default="Aoede", help="Inquisitive co-host voice")
+    p_podcast.add_argument("--mock", action="store_true", help="Run in mock/offline mode")
+    p_podcast.add_argument("--script-only", action="store_true", help="Generate podcast_script.json only")
+    p_podcast.add_argument("--force-gate", action="store_true", help="Force bypass of extraction quality gate review")
 
     # synthesize
     p_synth = subparsers.add_parser("synthesize", help="Synthesize audio segments via Gemini Cloud TTS")
@@ -118,8 +130,9 @@ def main():
     p_master.add_argument("--chapters", type=str, default=None, help="Comma-separated or range of chapters (e.g. 1-2 or 1,2)")
 
     # package
-    p_pack = subparsers.add_parser("package", help="Assemble final chapterized M4B container")
+    p_pack = subparsers.add_parser("package", help="Assemble final chapterized container (Audiobook M4B or Podcast M4A)")
     p_pack.add_argument("book", help="Project book slug or path")
+    p_pack.add_argument("--format", choices=["audiobook", "podcast", "both"], default="audiobook", help="Target delivery format: audiobook (default), podcast, or both")
     p_pack.add_argument("--cover", default=None, help="Cover art image path")
     p_pack.add_argument("--enforce-gate6", action="store_true", help="Abort packaging if any Gate 6 verification check fails")
 
@@ -131,6 +144,7 @@ def main():
     p_auto = subparsers.add_parser("auto", help="Run entire end-to-end vocals-only pipeline in one command")
     p_auto.add_argument("file", help="Input book path")
     p_auto.add_argument("--hindi", action="store_true", help="Translate English book to Hindi")
+    p_auto.add_argument("--format", choices=["audiobook", "podcast", "both"], default="audiobook", help="Output format: audiobook (default), podcast, or both")
     p_auto.add_argument("--backend", default="gemini_tts", choices=["gemini_tts"], help="TTS engine (default: gemini_tts)")
     p_auto.add_argument("--voice", default="Aoede", help="Voice persona")
     p_auto.add_argument("--dramatized", action="store_true", help="Multi-voice dramatization")
@@ -156,19 +170,6 @@ def main():
     p_audit.add_argument("book", help="Project book slug")
     p_audit.add_argument("--chapter", type=int, required=True, help="Chapter number to audit")
 
-    # podcast
-    p_podcast = subparsers.add_parser("podcast", help="Generate dual-host podcast audio from research paper or whitepaper (.pdf, .md, .txt)")
-    p_podcast.add_argument("file", help="Input research paper/document path")
-    p_podcast.add_argument("--output-dir", default=None, help="Target project output directory")
-    p_podcast.add_argument("--style", choices=["conversational_podcast", "formal_lecture", "narrative_audiobook"], default="conversational_podcast", help="Verbalization style")
-    p_podcast.add_argument("--host-a-name", default="Dr. Vance", help="Lead explainer host name")
-    p_podcast.add_argument("--host-a-voice", default="Charon", help="Lead explainer host voice")
-    p_podcast.add_argument("--host-b-name", default="Maya", help="Inquisitive co-host name")
-    p_podcast.add_argument("--host-b-voice", default="Aoede", help="Inquisitive co-host voice")
-    p_podcast.add_argument("--mock", action="store_true", help="Run in mock/offline mode")
-    p_podcast.add_argument("--script-only", action="store_true", help="Generate podcast_script.json only")
-    p_podcast.add_argument("--force-gate", action="store_true", help="Force bypass of extraction quality gate review")
-
     # keys
     p_keys = subparsers.add_parser("keys", help="Inspect and audit API key inventory, leases, and quota fleet status")
     p_keys.add_argument("keys_action", nargs="?", default="status", choices=["status", "list", "add", "sweep", "test", "audit", "reset"], help="Action: status, list, add, sweep, test, audit, reset (default: status)")
@@ -183,27 +184,33 @@ def main():
         sys.exit(1)
 
     def _handle_podcast(a):
-        from audiobook_factory.podcast.orchestrator import process_document_to_podcast
-        res = process_document_to_podcast(
-            source_file=a.file,
-            output_dir=a.output_dir,
-            style=a.style,
-            host_a_name=a.host_a_name,
-            host_a_voice=a.host_a_voice,
-            host_b_name=a.host_b_name,
-            host_b_voice=a.host_b_voice,
-            script_only=a.script_only,
-            mock_mode=a.mock,
-            force_gate=a.force_gate,
-        )
-        if res.status != "SUCCESS":
-            print(f"\n[!] Podcast production failed: {res.error_message}", file=sys.stderr)
-            sys.exit(1)
+        target_path = Path(a.target)
+        if target_path.exists() and target_path.is_file():
+            from audiobook_factory.podcast.orchestrator import process_document_to_podcast
+            res = process_document_to_podcast(
+                source_file=target_path,
+                output_dir=a.output_dir,
+                style=a.style,
+                host_a_name=a.host_a_name,
+                host_a_voice=a.host_a_voice,
+                host_b_name=a.host_b_name,
+                host_b_voice=a.host_b_voice,
+                script_only=a.script_only,
+                mock_mode=a.mock,
+                force_gate=a.force_gate,
+            )
+            if res.status != "SUCCESS":
+                print(f"\n[!] Podcast production failed: {res.error_message}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            a.book = a.target
+            cmd_podcast(a)
 
     cmds = {
         "extract": cmd_extract,
         "translate": cmd_translate,
         "script": cmd_script,
+        "podcast": _handle_podcast,
         "synthesize": cmd_synthesize,
         "master": cmd_master,
         "package": cmd_package,
@@ -211,7 +218,6 @@ def main():
         "auto": cmd_auto,
         "audit": cmd_audit,
         "audit-book": cmd_audit_book,
-        "podcast": _handle_podcast,
         "keys": cmd_keys,
     }
 
