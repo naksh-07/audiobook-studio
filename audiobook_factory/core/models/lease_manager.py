@@ -404,7 +404,7 @@ class KeyLeaseManager:
                     {order_clause}
                     LIMIT 1;
                 """
-                params: tuple = (preferred_key_alias, model, provider, now_ts, now_ts, today, now_ts) if preferred_key_alias else (model, provider, now_ts, now_ts, today, now_ts)
+                params: tuple = (model, provider, now_ts, now_ts, today, now_ts, preferred_key_alias) if preferred_key_alias else (model, provider, now_ts, now_ts, today, now_ts)
                 row = conn.execute(query, params).fetchone()
             else:
                 query = f"""
@@ -422,7 +422,7 @@ class KeyLeaseManager:
                     {order_clause}
                     LIMIT 1;
                 """
-                params = (preferred_key_alias, provider, now_ts, now_ts) if preferred_key_alias else (provider, now_ts, now_ts)
+                params = (provider, now_ts, now_ts, preferred_key_alias) if preferred_key_alias else (provider, now_ts, now_ts)
                 row = conn.execute(query, params).fetchone()
 
             if not row:

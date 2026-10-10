@@ -29,6 +29,10 @@ from audiobook_factory.key_manager import (
     AllKeysExhaustedTodayError,
 )
 from audiobook_factory.cadence import get_stealth_sdk_headers, get_human_cadence_controller
+from audiobook_factory.tts.gateway_bridge import (
+    execute_tts_synthesize,
+    extract_pcm_and_duration_from_audio,
+)
 
 
 # Permissive safety settings for dramatic literary fiction (Zero Moral Policing Invariant)
@@ -53,7 +57,7 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
 
     def __init__(self, model_name: str = "gemini-3.8-flash", config: Optional[Dict[str, Any]] = None):
         super().__init__(model_name=model_name, config=config)
-        self.api_endpoint_template = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+        self.api_endpoint_template = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         self.max_retries = self.config.get("max_retries", 4)
         self.timeout_sec = self.config.get("timeout_sec", 45)
 
@@ -88,126 +92,51 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
 
     def synthesize_chunk(self, request: CanonicalTTSRequest) -> SynthesizedAudioChunk:
         """
-        Executes single-request speech synthesis with key pool rotation, stealth headers, and retries.
+        Executes single-request speech synthesis routed through ModelGateway
+        with ACID key leasing, stealth headers, and retries.
         """
-        pool = get_persistent_key_pool()
-        cadence = get_human_cadence_controller()
-
         # Build style descriptor NLP from DeliveryIntent
         style_desc = self.build_style_descriptor(request.delivery_intent, speaker=request.speaker)
 
-        part_payload: Dict[str, Any] = {"text": request.spoken_text}
-        if style_desc:
-            part_payload["speechMetadata"] = {"style": style_desc}
+        session_id = f"scene_{request.segment_uid[:8]}" if request.segment_uid else "tts_session"
 
-        # Temperature clamp (0.30 - 0.52, Narrator locked at 0.32)
-        if request.speaker == "Narrator":
-            clamped_temp = 0.32
-        else:
-            clamped_temp = max(0.30, min(request.temperature, 0.52))
+        speech_result = execute_tts_synthesize(
+            text=request.spoken_text,
+            voice_name=request.voice_id,
+            model=self.model_name,
+            speaker=request.speaker,
+            temperature=request.temperature,
+            session_id=session_id,
+            max_retries=self.max_retries,
+            timeout_sec=self.timeout_sec,
+            style_desc=style_desc,
+        )
 
-        payload = {
-            "contents": [{"parts": [part_payload]}],
-            "generationConfig": {
-                "responseModalities": ["AUDIO"],
-                "speechConfig": {
-                    "voiceConfig": {
-                        "prebuiltVoiceConfig": {
-                            "voiceName": request.voice_id
-                        }
-                    }
-                },
-                "temperature": clamped_temp,
-            },
-            "safetySettings": GEMINI_PERMISSIVE_SAFETY,
-        }
+        # Extract PCM and calculate duration
+        pcm_bytes, dur_sec, sample_rate = extract_pcm_and_duration_from_audio(
+            speech_result.audio_bytes,
+            mime_type=speech_result.mime_type,
+            default_sample_rate=speech_result.sample_rate or request.sample_rate or 24000,
+        )
 
-        json_data = json.dumps(payload).encode("utf-8")
-        last_error: Optional[Exception] = None
+        metadata = dict(speech_result.metadata)
+        metadata.setdefault("attempt", 1)
+        metadata.setdefault("key_preview", "CONTROL_PLANE")
+        metadata["style_descriptor"] = style_desc
+        metadata["temperature"] = (
+            0.32 if request.speaker == "Narrator" else max(0.30, min(request.temperature, 0.52))
+        )
 
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                api_key = pool.get_key(service="tts", provider="gemini", model=self.model_name)
-            except Exception as e:
-                # If key pool throws (e.g. mock test environment or key exhausted)
-                api_key = os.environ.get("GEMINI_API_KEY", "MOCK_KEY")
-
-            key_preview = api_key[:8] + "..." if api_key else "UNKNOWN"
-
-            url = self.api_endpoint_template.format(model=self.model_name, key=api_key)
-            headers = get_stealth_sdk_headers(api_key=api_key)
-            headers["Content-Type"] = "application/json"
-
-
-            req = urllib.request.Request(url, data=json_data, headers=headers, method="POST")
-
-            try:
-                with urllib.request.urlopen(req, timeout=self.timeout_sec) as response:
-                    res_body = response.read().decode("utf-8")
-                    data = json.loads(res_body)
-
-                try:
-                    pool.record_success(api_key, model=self.model_name, provider="gemini")
-                    cadence.record_success(api_key)
-                except Exception:
-                    pass
-
-                audio_bytes, dur_sec = self._parse_audio_response(data)
-
-                return SynthesizedAudioChunk(
-                    segment_uid=request.segment_uid,
-                    pcm_bytes=audio_bytes,
-                    sample_rate=request.sample_rate,
-                    num_channels=1,
-                    duration_sec=dur_sec,
-                    provider_model=self.model_name,
-                    voice_id=request.voice_id,
-                    metadata={
-                        "attempt": attempt,
-                        "key_preview": key_preview,
-                        "style_descriptor": style_desc,
-                        "temperature": clamped_temp,
-                    },
-                )
-
-            except urllib.error.HTTPError as e:
-                err_text = ""
-                try:
-                    err_text = e.read().decode("utf-8")
-                except Exception:
-                    pass
-                classification = classify_gemini_error(e.code, err_text)
-                try:
-                    if e.code == 429:
-                        pool.mark_temporary_backoff(api_key, retry_after=5.0, model=self.model_name, provider="gemini")
-                    elif e.code in (400, 403):
-                        pool.mark_key_invalid(api_key, error_msg=err_text, provider="gemini")
-                    cadence.record_failure(api_key, e.code)
-                except Exception:
-                    pass
-
-                last_error = RuntimeError(f"Gemini TTS HTTP {e.code}: {err_text}")
-                logger.warning(
-                    f"[!] Gemini TTS attempt {attempt}/{self.max_retries} failed on key {key_preview}: "
-                    f"HTTP {e.code} ({classification})"
-                )
-                time.sleep(1.0 * attempt)
-
-            except json.JSONDecodeError as e:
-                last_error = RuntimeError(f"Gemini TTS returned malformed non-JSON payload: {e}")
-                logger.warning(
-                    f"[!] Gemini TTS attempt {attempt}/{self.max_retries} received malformed JSON on key {key_preview}: {e}"
-                )
-                time.sleep(1.0 * attempt)
-
-            except Exception as e:
-                last_error = e
-                logger.warning(
-                    f"[!] Gemini TTS attempt {attempt}/{self.max_retries} unexpected error on key {key_preview}: {e}"
-                )
-                time.sleep(1.0 * attempt)
-
-        raise last_error or RuntimeError(f"Gemini TTS synthesis failed after {self.max_retries} retries.")
+        return SynthesizedAudioChunk(
+            segment_uid=request.segment_uid,
+            pcm_bytes=pcm_bytes,
+            sample_rate=sample_rate,
+            num_channels=1,
+            duration_sec=dur_sec,
+            provider_model=self.model_name,
+            voice_id=request.voice_id,
+            metadata=metadata,
+        )
 
     async def synthesize_chunk_async(self, request: CanonicalTTSRequest) -> SynthesizedAudioChunk:
         """Asynchronous synthesis wrapper executing in worker thread pool."""

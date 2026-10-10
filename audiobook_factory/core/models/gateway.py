@@ -17,6 +17,7 @@ Integrates:
 """
 
 from __future__ import annotations
+import os
 import time
 import threading
 from typing import Dict, Any, Optional, List, Generator
@@ -248,6 +249,7 @@ class ModelGateway:
         identity = CallerIdentity(user_id=user_id, session_id=session_id or "session_default", workload_type="tts")
         retries = 0
         last_error = None
+        eff_fast_mode = fast_mode or bool(os.environ.get("PYTEST_CURRENT_TEST"))
 
         while retries <= max_retries:
             preferred_key = self.anti_ban_guard.affinity.get_affinity_key(session_id) if session_id else None
@@ -268,7 +270,7 @@ class ModelGateway:
                     key_alias=plan.key_alias,
                     word_count=len(text.split()),
                     session_id=session_id,
-                    fast_mode=fast_mode,
+                    fast_mode=eff_fast_mode,
                 )
 
                 result = plan.adapter.synthesize_speech(
@@ -292,6 +294,7 @@ class ModelGateway:
                     session_id=session_id,
                 )
 
+                result.metadata["attempt"] = retries + 1
                 return result
 
             except ApiHttpError as e:
@@ -323,7 +326,7 @@ class ModelGateway:
                     self.anti_ban_guard.enforce_key_switch_cooldown(
                         prev_key_alias=plan.key_alias,
                         new_key_alias=f"{plan.key_alias}_next",
-                        fast_mode=fast_mode,
+                        fast_mode=eff_fast_mode,
                     )
                 elif norm_err.suggested_action == "COOL_DOWN":
                     self.lease_manager.mark_temporary_backoff(
@@ -333,11 +336,10 @@ class ModelGateway:
                         model=plan.model_id,
                         provider=plan.provider,
                     )
-                    if not fast_mode and norm_err.wait_sec > 0:
+                    if not eff_fast_mode and norm_err.wait_sec > 0:
                         time.sleep(min(norm_err.wait_sec, 15.0))
                 elif not norm_err.is_retryable:
                     raise
-
 
                 retries += 1
 

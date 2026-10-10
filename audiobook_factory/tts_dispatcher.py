@@ -53,6 +53,8 @@ from audiobook_factory.tts import (
     FormantProfile,
     TakeBankManager,
     CandidateTake,
+    execute_tts_synthesize,
+    extract_pcm_and_duration_from_audio,
     # Legacy / Dispatcher Invariants
     DEFAULT_BACKEND,
     DEFAULT_VOICE,
@@ -115,6 +117,8 @@ __all__ = [
     "FormantProfile",
     "TakeBankManager",
     "CandidateTake",
+    "execute_tts_synthesize",
+    "extract_pcm_and_duration_from_audio",
     # Legacy / Dispatcher Invariants
     "DEFAULT_BACKEND",
     "DEFAULT_VOICE",

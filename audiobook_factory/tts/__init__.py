@@ -50,6 +50,10 @@ from audiobook_factory.tts.facades import (
 )
 from audiobook_factory.tts.formant_sculptor import FormantSculptor, FormantProfile
 from audiobook_factory.tts.take_bank_manager import TakeBankManager, CandidateTake
+from audiobook_factory.tts.gateway_bridge import (
+    execute_tts_synthesize,
+    extract_pcm_and_duration_from_audio,
+)
 
 # Constants & Helpers
 from audiobook_factory.tts.constants import (
@@ -137,6 +141,8 @@ __all__ = [
     "FormantProfile",
     "TakeBankManager",
     "CandidateTake",
+    "execute_tts_synthesize",
+    "extract_pcm_and_duration_from_audio",
     # Legacy / Dispatcher Invariants
     "DEFAULT_BACKEND",
     "DEFAULT_VOICE",

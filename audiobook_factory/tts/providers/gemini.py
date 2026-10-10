@@ -651,7 +651,7 @@ def synthesize_gemini_multispeaker_batch(
                 logger.warning(f"  [EMERGENCY FALLBACK] Gemini key pool exhausted. Falling back to local WinRT synthesis for batch {batch.batch_id}")
                 return _synthesize_local_batch_winrt(batch, output_file, voice_map=voice_map)
             raise
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         key_exhausted_or_invalid = False
         logger.info(f"  [TTS GEMINI 3.8 FLASH] Synthesizing multi-speaker batch '{batch.batch_id}' via '{model}'...")
         for network_attempt in range(3):

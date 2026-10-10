@@ -36,6 +36,7 @@ class SpeechResult:
     tokens_used: int = 0
     model_id: str = ""
     provider: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class BaseProviderAdapter(ABC):

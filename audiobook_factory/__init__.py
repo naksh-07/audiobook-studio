@@ -110,6 +110,7 @@ _LAZY_IMPORTS: Dict[str, Tuple[str, str]] = {
     "CanonicalTTSRequest": (".tts", "CanonicalTTSRequest"),
     "SynthesizedAudioChunk": (".tts", "SynthesizedAudioChunk"),
     "EditorialDSPEngine": (".tts", "EditorialDSPEngine"),
+    "execute_tts_synthesize": (".tts", "execute_tts_synthesize"),
     
     # Soundscape (Legacy)
     "detect_chapter_mood": (".soundscape", "detect_chapter_mood"),
