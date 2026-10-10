@@ -166,7 +166,7 @@ Phase 1 has been completed, wired, hardened, and verified on `main`:
   - **Translation Decoupling** ([`audiobook_factory/translation/book_bible.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/book_bible.py)): Re-export shim pointing to centralized `metadata.book_bible`.
   - **Architecture Specification** ([`docs/NOVEL_RESEARCHER_ARCHITECTURE.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/NOVEL_RESEARCHER_ARCHITECTURE.md)): Canonical 3.1.0-PROD specification.
 
-### 5.3.2 Forensic Verification & Audit Ledger (Phase 2 Sign-Off)
+#### 5.3.2 Forensic Verification & Audit Ledger (Phase 2 Sign-Off)
 Phase 2 has been merged, audited by systems experts, hardened against ModelGateway bypasses, and verified on `main`:
 1. **Commit Chain**:
    - `8b255d0`: *feat(preproduction): merge research-system (Phase 2) into main*
@@ -174,30 +174,67 @@ Phase 2 has been merged, audited by systems experts, hardened against ModelGatew
    - `4fe1b37`: *refactor(preproduction): route all Room 1 agents through ModelGateway and harden state maintainer*
    - `96fe636`: *test: isolate MOCK_OFFLINE environment variable across preproduction and model manager test suites*
 2. **Adversarial Expert Audit & Remediation Highlights**:
-   - **Zero Rogue urllib Requests**: Implemented [`audiobook_factory/preproduction/gateway_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/gateway_bridge.py) with `execute_preproduction_llm()`. All 6 Room 1 preproduction agents (`book_dna_agent.py`, `dramatis_personae_agent.py`, `novel_deepsearch.py`, `phonetic_lexicon_dramaturge.py`, `sonic_world_architect.py`, `vocal_acoustic_director.py`), `preproduction/__init__.py`, and `translation/entity_discovery.py` route through `ModelGateway.generate_text()` with atomic SQLite key leases, AntiBanGuard token-bucket pacing (11 RPM), stealth SDK headers (`x-goog-api-client`), and resilient `json_repair`.
-   - **Downstream Coupling Elimination**: Decoupled `metadata/book_bible.py` and `character_caster.py` with graceful fallbacks, preventing circular imports from Room 4 TTS or Room 3 screenplay.
-   - **Windows 11 File Locking Hardening**: Hardened `_atomic_replace()` in [`state_maintainer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/state_maintainer.py) using strict `os.replace` with a 5-attempt backoff retry loop for transient Windows file locks, eliminating non-atomic `shutil.move()` and guaranteeing **NR-GATE-06** two-phase atomic commit with rollback.
+   - **Zero Rogue urllib Requests**: Implemented [`audiobook_factory/preproduction/gateway_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/gateway_bridge.py) with `execute_preproduction_llm()`. All 6 Room 1 preproduction agents route through `ModelGateway.generate_text()` with atomic SQLite key leases, AntiBanGuard token-bucket pacing (11 RPM), stealth SDK headers (`x-goog-api-client`), and resilient `json_repair`.
+   - **Downstream Coupling Elimination**: Decoupled `metadata/book_bible.py` and `character_caster.py` with graceful fallbacks.
+   - **Windows 11 File Locking Hardening**: Hardened `_atomic_replace()` in [`state_maintainer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/state_maintainer.py) using strict `os.replace` with a 5-attempt backoff retry loop.
    - **Test Isolation Guard**: Eliminated `MOCK_OFFLINE` environment pollution across `test_novel_researcher_phase1-3`, `adversarial`, `multi_agent_preproduction`, and `test_model_manager_and_strict_halt`.
 3. **Test Matrix**:
-   - Novel Researcher & Gateway Bridge Suites: 30/30 Green (100% pass in 1.40s).
-   - Control Plane Test Suite: 43/43 Green (100%).
-   - Extraction Subsystem Test Suite: 37/37 Green (100%).
+   - Novel Researcher & Gateway Bridge Suites: 30/30 Green.
+   - Control Plane Test Suite: 43/43 Green.
+   - Extraction Subsystem Test Suite: 37/37 Green.
    - Model Manager & Strict Halt Suite: 16/16 Green (14 passed, 2 skipped, 0 failures).
    - Total Verified Regression Tests: 119+ passing tests with 0 failures, 0 errors.
-4. **Sign-Off Status**: COMPLETED, AUDITED, HARDENED, & OFFICIALLY SIGNED OFF. Ready for Phase 3 (`origin/translation`).
+4. **Sign-Off Status**: COMPLETED, AUDITED, HARDENED, & OFFICIALLY SIGNED OFF.
+
+---
+
+## 5.4 Phase 3 Detailed Blueprint & Execution Sign-Off: `origin/translation` (Option D)
+
+### 5.4.1 Objectives & Deliverables
+- **Decoupled Standalone Literary Translation Core** ([`audiobook_factory/translation/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/)):
+  - [`engine.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/engine.py): `TranslationEngine` single-pass macro-chunk translation runner with full dependency injection.
+  - [`chunker.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/chunker.py): `BilingualMacroChunker` ($\le 2,200$ words per chunk with $\approx 150$ trailing target words sliding context).
+  - [`parity_gate.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/parity_gate.py): `DeterministicParityGate` zero-token full-text structural verification (paragraph count, quote count, length ratio, compound negation tracking).
+  - [`alignment.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/alignment.py): `ParagraphAlignmentEngine` tracking paragraph-level English $\leftrightarrow$ Hindi provenance.
+  - [`prompt_builder.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/prompt_builder.py): Dynamic prompt builder supporting `RAW_UNRATED` vs `CLASSIC_REVERENT` Dual-Rule Invariant.
+  - Agents ([`agents/collective.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/agents/collective.py)): `MultiAgentTranslationCollective` consensus unifying `DraftTranslator`, `CadenceSpecialist`, `IdiomDramaturge`, and `TranslationCritic`.
+  - Standalone CLI ([`cli.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/cli.py)): CLI utility supporting `translate` and `parity` subcommands.
+
+### 5.4.2 Forensic Verification & Audit Ledger (Phase 3 Sign-Off)
+Phase 3 has been merged, audited by systems experts, hardened against ModelGateway bypasses, and verified on `main`:
+1. **Commit Chain**:
+   - `8b3fe54`: *feat(translation): merge Option D standalone translation engine (Phase 3) into main*
+   - `504a797`: *refactor(translation): route Room 2 through ModelGateway, decouple audio_utils, and harden parity gates*
+2. **Adversarial Expert Audit & Remediation Highlights**:
+   - **Control Plane Gateway Bridge**: Created [`audiobook_factory/translation/gateway_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/gateway_bridge.py) with `execute_translation_llm()`. All 4 translation agents and `TranslationEngine` default to `execute_translation_llm()`, ensuring atomic key leasing via `KeyLeaseManager`, AntiBanGuard token-bucket pacing (11 RPM), stealth SDK headers, and sticky session affinity across chapter macro-chunks.
+   - **Elimination of Unmetered Raw Fallbacks**: Eliminated raw `urllib.request.urlopen` fallback loops; `ModelGateway` is authoritative and fails closed.
+   - **Robust Markdown Sanitization**: Hardened `_sanitize_output` in `gateway_bridge.py` and `engine.py` to independently strip opening and closing markdown fences (`^```(?:markdown|json|md)?`), preventing fence leakage on truncated responses.
+   - **Parity Gate Audit in Collective**: `MultiAgentTranslationCollective.translate_block()` audits `result.parity.passed_all_gates` and logs warnings on structural omissions.
+   - **Audio Decoupling**: Replaced `from audiobook_factory.audio_utils import _atomic_replace` in `memory_store.py` with local Windows-hardened atomic replace, achieving 100% zero-import isolation across all translation modules (verified by `test_03_assert_zero_forbidden_imports_across_all_translation_modules`).
+   - **AST Hardcoded Model Elimination**: Extracted `DEFAULT_TRANSLATION_MODEL` into exempt `contracts.py`, achieving a 100% pass rate on `test_13_assert_zero_hardcoded_model_strings`.
+3. **Test Matrix**:
+   - Standalone Translation Suite: 83/83 Green.
+   - Root Translation & Collective Suites: 22/22 Green.
+   - Pre-Production Subsystem Suites: 30/30 Green.
+   - Control Plane Test Suites: 43/43 Green.
+   - Forensic Extraction Test Suites: 37/37 + 18/18 Green.
+   - Model Manager & Strict Halt Suite: 16/16 Green (14 passed, 2 skipped, 0 failures).
+   - Total Verified Regression Tests: **225+ passing tests with 0 failures, 0 errors**.
+4. **Sign-Off Status**: COMPLETED, AUDITED, HARDENED, & OFFICIALLY SIGNED OFF. Ready for Phase 4 (`origin/dramaturgy`).
 
 ---
 
 ## 6. Forward Milestones Summary
 
 | Phase | Subsystem | Status | Target Test Baseline | Key Deliverable |
-| :---: | :--- | :---: | :---: | :--- |
+| :--- | :--- | :---: | :---: | :--- |
 | **Phase 1** | Model & Keys Manager | **COMPLETED & VERIFIED** | 43/43 + 80/80 + 881 Green | Production Control Plane, 123-Key Fleet & Anti-Ban Guard |
-| **Phase 2** | Novel Researcher & Pre-Production | **COMPLETED & VERIFIED** | 26/26 + 43/43 + 37/37 Green | 2-System Pre-Production, Cast Lock & State Maintainer (`origin/research-system`) |
-| **Phase 3** | Standalone Translation (Option D) | **READY TO EXECUTE** | ~1,020 Tests | Single-Pass Macro-Chunker & Parity Gates (`origin/translation`) |
-| **Phase 4** | Universal Dramaturgy (Option C) | Queued | ~1,070 Tests | Chapter Dramatic AST & Dual-Host Adapters (`origin/dramaturgy`) |
+| **Phase 2** | Novel Researcher & Pre-Production | **COMPLETED & VERIFIED** | 30/30 + 43/43 + 37/37 Green | 2-System Pre-Production, Cast Lock & State Maintainer (`origin/research-system`) |
+| **Phase 3** | Standalone Translation (Option D) | **COMPLETED & VERIFIED** | 105/105 + 225+ Unified Green | Single-Pass Macro-Chunker, DeterministicParityGate & Gateway Bridge (`origin/translation`) |
+| **Phase 4** | Universal Dramaturgy (Option C) | **READY TO EXECUTE** | ~1,070 Tests | Chapter Dramatic AST & Dual-Host Adapters (`origin/dramaturgy`) |
 | **Phase 5** | Studio TTS Platform Core | Queued | ~1,150 Tests | 4-Tier TTS Engine, TakeBank & Net-Silence (`origin/tts-system`) |
 | **Phase 6** | Pro-Grade AI Vocal Mastering | Queued | ~1,200 Tests | C++ JUCE / FFmpeg Vocal Mastering & M4B (`origin/audio-mixing-and-production`) |
 | **Phase 7** | Enterprise DAG Orchestrator & UI | Queued | ~1,250 Tests | SQLite WAL Pipeline Ledger & Studio Panel UI (`origin/Voculs`) |
+
 
 
