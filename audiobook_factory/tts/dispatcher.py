@@ -924,6 +924,31 @@ class TTSDispatcher:
                         f"\n[!] PRE-FLIGHT SYNTHESIS HALT: Chapter {chapter_num}, Segment {seg_idx} has invalid speaker: {e}"
                     )
                     raise
+        # Pre-flight Gate 2.8: Auditory Distinction & Casting Sanity Gate
+        try:
+            from audiobook_factory.gates.gate28_distinction import AuditoryDistinctionGate
+            AuditoryDistinctionGate.audit_chapter_script(
+                script, self.project_dir, strict=self.strict_speakers
+            )
+        except Exception as e:
+            if self.strict_speakers:
+                logger.error(f"\n[!] GATE 2.8 AUDITORY DISTINCTION HALT: Chapter {chapter_num}: {e}")
+                raise
+            else:
+                logger.warning(f"  [Gate 2.8 Warning] Chapter {chapter_num} distinction audit: {e}")
+
+        # Pre-flight Gate 2.9: Attribution & Config Sanity Gate (0% Speaker Swap & Anti-Swallow)
+        try:
+            from audiobook_factory.gates.pre_synthesis import PreSynthesisGate
+            PreSynthesisGate.audit_script(
+                script, self.project_dir, format_mode="audiobook", strict=self.strict_speakers
+            )
+        except Exception as e:
+            if self.strict_speakers:
+                logger.error(f"\n[!] GATE 2.9 PRE-TTS ATTRIBUTION SANITY HALT: Chapter {chapter_num}: {e}")
+                raise
+            else:
+                logger.warning(f"  [Gate 2.9 Warning] Chapter {chapter_num} pre-TTS sanity audit: {e}")
 
         td_mod = sys.modules.get("audiobook_factory.tts_dispatcher")
         cadence_fn = getattr(td_mod, "get_human_cadence_controller", get_human_cadence_controller) if td_mod else get_human_cadence_controller

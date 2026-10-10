@@ -27,7 +27,6 @@ from .registry import VoiceProfileRegistry
 from .director import StudioCastingDirector
 from .calibrator import SceneAcousticCalibrator
 from .adapters import BaseVoiceAdapter, GeminiVoiceAdapter, QwenVoiceAdapter
-from audiobook_factory.gates.gate28_distinction import AuditoryDistinctionGate, AuditoryDistinctionVerdict
 
 __all__ = [
     "CharacterCastingProfile",
@@ -52,7 +51,5 @@ __all__ = [
     "BaseVoiceAdapter",
     "GeminiVoiceAdapter",
     "QwenVoiceAdapter",
-    "AuditoryDistinctionGate",
-    "AuditoryDistinctionVerdict",
 ]
 

@@ -114,6 +114,8 @@ class AuditoryDistinctionGate:
 
                     if locked_chars and spk.lower() not in locked_chars:
                         warnings.append(f"Scene '{sc_id}': Speaker '{spk}' is not formally locked in cast_lock.json.")
+                    elif not locked_chars and strict:
+                        warnings.append(f"Scene '{sc_id}': cast_lock.json is empty or missing; speaker '{spk}' has no persistent lock.")
 
                     # Check voice_id validity
                     v_cfg = voice_map.get(spk) or {}

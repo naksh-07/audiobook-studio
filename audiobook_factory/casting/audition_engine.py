@@ -154,14 +154,23 @@ class VoiceAuditionEngine:
                         )
                         synthesized = True
                     elif hasattr(dispatcher, "synthesize_segment"):
-                        from audiobook_factory.contracts import ScreenplaySegment
-                        seg = ScreenplaySegment(
-                            index=1,
-                            speaker=candidate_voice_id,
-                            text=scene.line_text,
-                            emotion=scene.target_emotion,
-                        )
-                        dispatcher.synthesize_segment(seg, dest_file, voice_override=candidate_voice_id)
+                        # Use duck typing or dynamic dict representation to avoid hard dependency on ScreenplaySegment
+                        seg_payload = {
+                            "index": 1,
+                            "speaker": candidate_voice_id,
+                            "text": scene.line_text,
+                            "emotion": scene.target_emotion,
+                        }
+                        try:
+                            import sys
+                            c_mod = sys.modules.get("audiobook_factory.contracts")
+                            if c_mod and hasattr(c_mod, "ScreenplaySegment"):
+                                seg_obj = c_mod.ScreenplaySegment.model_validate(seg_payload)
+                            else:
+                                seg_obj = seg_payload
+                        except Exception:
+                            seg_obj = seg_payload
+                        dispatcher.synthesize_segment(seg_obj, dest_file, voice_override=candidate_voice_id)
                         synthesized = True
                     elif hasattr(dispatcher, "synthesize_gemini_tts"):
                         dispatcher.synthesize_gemini_tts(
@@ -172,14 +181,19 @@ class VoiceAuditionEngine:
                         )
                         synthesized = True
                     else:
-                        from audiobook_factory.tts_dispatcher import synthesize_gemini_tts
-                        synthesize_gemini_tts(
-                            text=scene.line_text,
-                            output_file=dest_file,
-                            voice=candidate_voice_id,
-                            emotion=scene.target_emotion,
-                        )
-                        synthesized = True
+                        # Lazy optional lookup without hard top-level import coupling
+                        import sys
+                        td_mod = sys.modules.get("audiobook_factory.tts_dispatcher")
+                        if td_mod and hasattr(td_mod, "synthesize_gemini_tts"):
+                            td_mod.synthesize_gemini_tts(
+                                text=scene.line_text,
+                                output_file=dest_file,
+                                voice=candidate_voice_id,
+                                emotion=scene.target_emotion,
+                            )
+                            synthesized = True
+                        else:
+                            synthesized = False
                 except Exception as e:
                     logger.warning(f"  [AUDITION SYNTHESIS ERROR] {scene.scene_id} on {candidate_voice_id}: {e}")
                     synthesized = False

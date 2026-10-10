@@ -30,5 +30,5 @@
   - Subsystems: `StudioCastingDirector` (ModelGateway 123+ key pool, Anime Seiyū child rule, dialect matching) + `SceneAcousticCalibrator` (pairwise distance >= 0.65, non-destructive EQ formants, phase-safe).
   - Adapters: `GeminiVoiceAdapter` & `QwenVoiceAdapter`. Gate 2.8: `AuditoryDistinctionGate`.
   - Audited by triad (`architect-planner`, `debugger-detective`, `tech-writer`); docs in `STUDIO_VOICE_CASTING_AND_CALIBRATION.md`.
-  - Remediation: Fixed P0 sledgehammer DSP bug in `TTSDispatcher` line 778. 99/99 test suite green.
+  - Remediation: Fixed circular import, audition_engine isolation, and wired Gates 2.8 & 2.9 into TTSDispatcher. 115/115 tests green.
 - **Next Milestone**: Phase 5 Studio TTS Platform Core (`origin/tts-system`). 4-Tier TTS Engine, TakeBank & Net-Silence.
