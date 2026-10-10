@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
 from pydantic import BaseModel, Field, ConfigDict
 
-from audiobook_factory.llm_client import call_gemini as default_call_gemini
+from audiobook_factory.preproduction.gateway_bridge import execute_preproduction_llm
 from audiobook_factory.model_manager import get_model_manager, TaskType
 
 logger = logging.getLogger("AudiobookFactory")
@@ -264,18 +264,17 @@ Output JSON Schema:
                 elif isinstance(raw_res, dict):
                     dossier_data = raw_res
             else:
-                # Active Google Search Grounding with Gemini
-                dossier_data = default_call_gemini(
+                # Active Google Search Grounding with Gemini via ModelGateway
+                dossier_data = execute_preproduction_llm(
                     prompt=prompt,
                     system_instruction=sys_prompt,
-                    task_type=TaskType.DIRECTING,
-                    tools=[{"googleSearch": {}}],
-                    response_mime_type="application/json",
+                    task="directing",
+                    model=model,
+                    json_mode=True,
                     temperature=0.2,
                     max_output_tokens=8192,
                     thinking_budget=1024,
-                    model=model,
-                    max_retries=6,
+                    tools=[{"googleSearch": {}}],
                 )
         except Exception as e:
             logger.warning(f"  [!] NovelDeepSearch search call encountered notice: {e}. Synthesizing heuristic profile.")

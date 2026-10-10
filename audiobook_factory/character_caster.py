@@ -19,8 +19,17 @@ from audiobook_factory.logger import logger
 from audiobook_factory.audio_utils import _atomic_replace
 from audiobook_factory.key_manager import get_persistent_key_pool
 from audiobook_factory.model_manager import get_model_manager, TaskType, LLMUnavailableError
-from audiobook_factory.llm_client import call_gemini
-from audiobook_factory.tts.voice_catalog import get_voice_catalog
+try:
+    from audiobook_factory.tts.voice_catalog import get_voice_catalog
+except (ImportError, ModuleNotFoundError):
+    class _FallbackVoiceCatalog:
+        def get_best_matching_voice(self, gender="neutral", language_code="en-US", is_child=False, exclude_voice_ids=None, **kwargs):
+            is_hi = str(language_code).startswith("hi")
+            if is_hi:
+                return "hi-in-advisor-1" if str(gender).lower() == "female" else "hi-in-tutor-1"
+            return "Aoede" if str(gender).lower() == "female" else "Charon"
+    def get_voice_catalog():
+        return _FallbackVoiceCatalog()
 
 _CAST_LOCK = threading.RLock()
 

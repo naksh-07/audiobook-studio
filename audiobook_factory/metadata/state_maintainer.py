@@ -35,16 +35,21 @@ _STATE_LOCK = threading.RLock()
 
 
 def _atomic_replace(src: Path, dst: Path) -> None:
-    """Atomic replacement with Windows / POSIX fallback."""
-    try:
-        os.replace(src, dst)
-    except OSError:
-        if dst.exists():
-            try:
-                dst.unlink()
-            except OSError:
-                pass
-        shutil.move(str(src), str(dst))
+    """
+    Strictly atomic file replacement with transient lock retries for Windows & POSIX.
+    Guarantees NR-GATE-06 multi-file state immutability without non-atomic shutil.move fallback.
+    """
+    last_err: Optional[OSError] = None
+    for attempt in range(5):
+        try:
+            os.replace(src, dst)
+            return
+        except OSError as e:
+            last_err = e
+            time.sleep(0.015 * (2 ** attempt))
+
+    if last_err is not None:
+        raise OSError(f"Atomic replacement of {dst} failed after 5 retries: {last_err}") from last_err
 
 
 class MasterPreProductionState(BaseModel):

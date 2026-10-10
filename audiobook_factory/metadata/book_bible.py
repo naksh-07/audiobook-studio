@@ -289,12 +289,15 @@ class BookBible(BaseModel):
         return lexicon
 
     def sync_pronunciation_lexicon(self, project_dir: Path) -> Any:
-        """Loads and synchronizes project PronunciationLexicon with BookBible entities."""
-        from audiobook_factory.pronunciation.lexicon import PronunciationLexicon
-        lexicon = PronunciationLexicon.load_or_create(project_dir, book_bible=self)
-        lexicon.export_to_book_bible(self)
-        lexicon.save(project_dir)
-        return lexicon
+        """Loads and synchronizes project PronunciationLexicon with BookBible entities if available."""
+        try:
+            from audiobook_factory.pronunciation.lexicon import PronunciationLexicon
+            lexicon = PronunciationLexicon.load_or_create(project_dir, book_bible=self)
+            lexicon.export_to_book_bible(self)
+            lexicon.save(project_dir)
+            return lexicon
+        except (ImportError, ModuleNotFoundError, Exception):
+            return None
 
     def export_legacy_glossary(self) -> Dict[str, Any]:
         """

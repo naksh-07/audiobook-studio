@@ -105,15 +105,13 @@ class EntityDiscoveryEngine:
                 if call_llm_fn:
                     llm_results = call_llm_fn(prompt, sys_prompt)
                 else:
-                    from audiobook_factory.llm_client import call_gemini
-                    from audiobook_factory.model_manager import TaskType
-                    llm_results = call_gemini(
+                    from audiobook_factory.preproduction.gateway_bridge import execute_preproduction_llm
+                    llm_results = execute_preproduction_llm(
                         prompt=prompt,
                         system_instruction=sys_prompt,
-                        task_type=TaskType.TRANSLATION,
-                        response_mime_type="application/json",
+                        task="translation",
+                        json_mode=True,
                         temperature=0.1,
-                        max_retries=3,
                     )
 
                 if isinstance(llm_results, dict):

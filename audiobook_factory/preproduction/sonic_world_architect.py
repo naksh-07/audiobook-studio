@@ -11,7 +11,7 @@ import json
 import logging
 from typing import Dict, Any, Optional, Callable
 
-from audiobook_factory.llm_client import call_gemini as default_call_gemini
+from audiobook_factory.preproduction.gateway_bridge import execute_preproduction_llm
 from audiobook_factory.model_manager import get_model_manager, TaskType
 from audiobook_factory.safety import get_dramatic_fiction_framing
 
@@ -102,15 +102,14 @@ Output JSON: An object representing sonic_bible.json:
                     import json_repair
                     res = json_repair.loads(res)
             else:
-                res = default_call_gemini(
+                res = execute_preproduction_llm(
                     prompt=prompt,
                     system_instruction=sys_prompt,
-                    task_type=TaskType.DIRECTING,
-                    response_mime_type="application/json",
+                    task="directing",
+                    model=model,
+                    json_mode=True,
                     max_output_tokens=16384,
                     thinking_budget=1024,
-                    max_retries=6,
-                    model=model,
                 )
         except Exception as e:
             logger.warning(f"  [!] SonicWorldArchitect error: {e}. Falling back to default universal acoustic bible.")

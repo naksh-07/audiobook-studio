@@ -15,7 +15,7 @@ from typing import Dict, List, Any, Optional, Callable, Literal
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 
-from audiobook_factory.llm_client import call_gemini as default_call_gemini
+from audiobook_factory.preproduction.gateway_bridge import execute_preproduction_llm
 from audiobook_factory.model_manager import get_model_manager, TaskType
 from audiobook_factory.safety import get_dramatic_fiction_framing
 
@@ -186,15 +186,14 @@ Output JSON: An authoritative vocal spaces manifest:
                 elif isinstance(res, dict):
                     raw_data = res
             else:
-                raw_data = default_call_gemini(
+                raw_data = execute_preproduction_llm(
                     prompt=prompt,
                     system_instruction=sys_prompt,
-                    task_type=TaskType.DIRECTING,
-                    response_mime_type="application/json",
+                    task="directing",
+                    model=model,
+                    json_mode=True,
                     max_output_tokens=8192,
                     thinking_budget=1024,
-                    max_retries=6,
-                    model=model,
                 )
         except Exception as e:
             logger.warning(f"  [!] VocalAcousticDirector error: {e}. Falling back to default universal vocal spaces.")

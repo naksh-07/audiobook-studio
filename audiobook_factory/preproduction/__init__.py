@@ -15,6 +15,7 @@ from .phonetic_lexicon_dramaturge import PhoneticLexiconDramaturge
 from .novel_deepsearch import NovelDeepSearchEngine, DeepSearchNovelDossier
 from .lexical_scanner import LexicalCorpusScanner, LexicalCorpusIndex
 from .preproduction_supervisor import PreProductionSupervisor, run_preproduction
+from .gateway_bridge import execute_preproduction_llm
 
 __all__ = [
     "NovelDeepSearchEngine",
@@ -30,6 +31,7 @@ __all__ = [
     "PhoneticLexiconDramaturge",
     "PreProductionSupervisor",
     "run_preproduction",
+    "execute_preproduction_llm",
 ]
 
 
