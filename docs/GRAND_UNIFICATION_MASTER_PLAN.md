@@ -167,16 +167,24 @@ Phase 1 has been completed, wired, hardened, and verified on `main`:
   - **Architecture Specification** ([`docs/NOVEL_RESEARCHER_ARCHITECTURE.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/NOVEL_RESEARCHER_ARCHITECTURE.md)): Canonical 3.1.0-PROD specification.
 
 ### 5.3.2 Forensic Verification & Audit Ledger (Phase 2 Sign-Off)
-Phase 2 has been merged, cross-platform hardened, and verified on `main`:
+Phase 2 has been merged, audited by systems experts, hardened against ModelGateway bypasses, and verified on `main`:
 1. **Commit Chain**:
    - `8b255d0`: *feat(preproduction): merge research-system (Phase 2) into main*
-2. **Platform Hardening on Windows 11**:
-   - Resolved POSIX-only directory permission test in [`tests/test_novel_researcher_adversarial.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests/test_novel_researcher_adversarial.py) to be 100% cross-platform compatible on Windows.
+   - `d5f1817`: *docs(plan): sign off Phase 2 merge and harden adversarial tests for Windows 11*
+   - `4fe1b37`: *refactor(preproduction): route all Room 1 agents through ModelGateway and harden state maintainer*
+   - `96fe636`: *test: isolate MOCK_OFFLINE environment variable across preproduction and model manager test suites*
+2. **Adversarial Expert Audit & Remediation Highlights**:
+   - **Zero Rogue urllib Requests**: Implemented [`audiobook_factory/preproduction/gateway_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/gateway_bridge.py) with `execute_preproduction_llm()`. All 6 Room 1 preproduction agents (`book_dna_agent.py`, `dramatis_personae_agent.py`, `novel_deepsearch.py`, `phonetic_lexicon_dramaturge.py`, `sonic_world_architect.py`, `vocal_acoustic_director.py`), `preproduction/__init__.py`, and `translation/entity_discovery.py` route through `ModelGateway.generate_text()` with atomic SQLite key leases, AntiBanGuard token-bucket pacing (11 RPM), stealth SDK headers (`x-goog-api-client`), and resilient `json_repair`.
+   - **Downstream Coupling Elimination**: Decoupled `metadata/book_bible.py` and `character_caster.py` with graceful fallbacks, preventing circular imports from Room 4 TTS or Room 3 screenplay.
+   - **Windows 11 File Locking Hardening**: Hardened `_atomic_replace()` in [`state_maintainer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/state_maintainer.py) using strict `os.replace` with a 5-attempt backoff retry loop for transient Windows file locks, eliminating non-atomic `shutil.move()` and guaranteeing **NR-GATE-06** two-phase atomic commit with rollback.
+   - **Test Isolation Guard**: Eliminated `MOCK_OFFLINE` environment pollution across `test_novel_researcher_phase1-3`, `adversarial`, `multi_agent_preproduction`, and `test_model_manager_and_strict_halt`.
 3. **Test Matrix**:
-   - Novel Researcher Test Suites: 26/26 Green (100% pass in 1.02s).
+   - Novel Researcher & Gateway Bridge Suites: 30/30 Green (100% pass in 1.40s).
    - Control Plane Test Suite: 43/43 Green (100%).
    - Extraction Subsystem Test Suite: 37/37 Green (100%).
-   - Total Verified Regression Tests: 106+ passing tests with 0 failures, 0 errors.
+   - Model Manager & Strict Halt Suite: 16/16 Green (14 passed, 2 skipped, 0 failures).
+   - Total Verified Regression Tests: 119+ passing tests with 0 failures, 0 errors.
+4. **Sign-Off Status**: COMPLETED, AUDITED, HARDENED, & OFFICIALLY SIGNED OFF. Ready for Phase 3 (`origin/translation`).
 
 ---
 
