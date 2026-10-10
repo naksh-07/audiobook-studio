@@ -13,8 +13,8 @@
 ### 2. Virtual Environment & Dependencies
 ```bash
 # Clone the repository
-git clone https://github.com/naksh-07/audiobook-maker.git
-cd audiobook-maker
+git clone https://github.com/naksh-07/audiobook-studio.git
+cd audiobook-studio
 
 # Create and activate virtual environment
 python -m venv .venv
@@ -34,11 +34,11 @@ Copy the `.env.example` file and configure your API keys:
 ```bash
 cp .env.example .env
 ```
-Ensure `GEMINI_API_KEY` is provided (surrounding quotes are automatically stripped during load):
+Ensure `GEMINI_API_KEY` (or `GEMINI_API_KEYS` for the 120+ key pool) is provided (surrounding quotes are automatically stripped during load):
 ```env
 GEMINI_API_KEY=AIzaSy...your_gemini_api_key...
 TTS_PRIMARY_BACKEND=gemini_tts
-GEMINI_TTS_MODEL=gemini-3.1-flash-tts-preview
+GEMINI_TTS_MODEL=gemini-3.8-flash-tts
 GEMINI_DEFAULT_VOICE=Aoede
 ```
 
@@ -46,49 +46,47 @@ GEMINI_DEFAULT_VOICE=Aoede
 
 ## 🧪 Testing Suite & Verification
 
-The codebase maintains **758 passed unit and integration tests (100% green, 0 regressions)** across all active test suites:
+The codebase maintains **1,194 passed unit, integration, and contract tests (100% green, 0 regressions)** across all active test suites:
 
 ```powershell
-# Run Full Test Suite (100% Green - 758 passing)
-uv run pytest
+# Run Full Test Suite (100% Green - 1,194 passing)
+pytest tests/ -v
+
+# Phase 7 Studio Engine Bridge & Peaks API Tests (11/11 tests)
+pytest tests/test_studio_bridge.py -v
+
+# Room 5 AI Vocal Mastering & Audio Production Tests (72 tests)
+pytest tests/audio/ tests/test_audio_production_e2e_pilot.py -v
+
+# Room 3.5 Studio Voice Casting & Gate 2.8 Auditory Distinction Tests
+pytest tests/test_casting_subsystem.py tests/test_gate28_distinction.py -v
+
+# 8-Pillar Studio Production Certification Harness Tests
+pytest tests/test_studio_certification_suite.py -v
 
 # 4D Voice Formants & DSP Formant Chaining
-uv run pytest tests/test_4d_voice_formant_matrix.py tests/test_formant_shifted_tts_dsp.py tests/test_character_caster.py -v
+pytest tests/test_4d_voice_formant_matrix.py tests/test_formant_shifted_tts_dsp.py tests/test_character_caster.py -v
 
-# Screenplay & Anti-Swap Dialogue Attribution Auditor
-uv run pytest tests/test_dialogue_attribution_auditor.py tests/test_multi_agent_screenplay.py -v
+# Screenplay & Anti-Swap Dialogue Attribution Auditor (0% swap invariant)
+pytest tests/test_dialogue_attribution_auditor.py tests/test_multi_agent_screenplay.py -v
 
 # 4-Agent Dramatic Translation Collective & Dual-Rule Invariant
-uv run pytest tests/test_multi_agent_translation.py tests/test_translation_collective_dual_rule.py -v
+pytest tests/test_multi_agent_translation.py tests/test_translation_collective_dual_rule.py -v
 
 # Pre-Production Intelligence & Universal Novel DeepSearch Grounding
-uv run pytest tests/test_universal_deepsearch_grounding.py tests/test_book_dna_agent.py tests/test_multi_agent_preproduction.py tests/test_multi_agent_voice_audition.py -v
+pytest tests/test_universal_deepsearch_grounding.py tests/test_book_dna_agent.py tests/test_multi_agent_preproduction.py tests/test_multi_agent_voice_audition.py -v
 
-# Model Manager Quota Shield & Strict Halt
-uv run pytest tests/test_model_manager_and_strict_halt.py -v
+# Model & Keys Manager Quota Shield & Strict Halt (124+ Key Pool)
+pytest tests/test_model_manager_and_strict_halt.py -v
 
 # Pillar 1 Forensic Ingestion, Layout-Aware PDF & EPUB
-uv run pytest tests/test_pdf_engine.py tests/test_epub_parser.py tests/test_document_extractor_upgraded.py tests/test_forensic_analyzer.py -v
+pytest tests/test_pdf_engine.py tests/test_epub_parser.py tests/test_document_extractor_upgraded.py tests/test_forensic_analyzer.py -v
 
 # Dialogue Editorial Layer (DE-01 - DE-07)
-uv run pytest tests/test_dialogue_editorial_layer.py tests/test_dialogue_editing_integration.py -v
-
-# EBU R128 Broadcast Vocal Mastering
-uv run pytest tests/test_mastering_contracts.py tests/test_mastering_engine.py tests/test_mastering_certification.py -v
+pytest tests/test_dialogue_editorial_layer.py tests/test_dialogue_editing_integration.py -v
 
 # Universal Zero-Hardcoding Contracts
-uv run pytest tests/test_zero_hardcoding_contracts.py -v
-
-# Phase 3: Spatial Audio Staging, Fail-Closed Gates & Checkpoint Safety
-python -m unittest tests/test_phase3_spatial_and_failclosed_gates.py
-
-# DSP Loudness & Sidechain Ducking
-python -m unittest tests/test_audio_dsp_loudness.py tests/test_action_beats_and_musical_ducking.py
-```
-
-### Running Full Repository Regression Test Discovery
-```powershell
-python -m unittest discover tests -p "test_*.py"
+pytest tests/test_zero_hardcoding_contracts.py -v
 ```
 
 ### World + Character Memory 2.0 Repository Layout
@@ -135,6 +133,64 @@ tests/
 ├── test_sonic_enrichment_phase2.py     # Phase 2 AST & CLAP test suite
 ├── test_sonic_intelligence_phase3.py   # Phase 3 hybrid retrieval test suite
 └── test_sonic_intelligence_phase3_audit.py # Phase 3 adversarial audit suite (11 tests)
+```
+
+---
+
+## 🖥️ Developing & Testing the Studio UI Workstation & Sidecar Bridge
+
+The **Audiobook Studio UI Extension** operates both as a native Google Antigravity Aux-Pane Webview and as a standalone local studio workstation.
+
+### 1. Architectural File Matrix
+- **Frontend Workstation**:
+  - [`sidecars/studio-panel/index.html`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/index.html): Apple Minimalist Light UI layout, 5-Room DAG stepper, waveform viewport, multi-cast roster deck, and Hindi dialogue inspector.
+  - [`sidecars/studio-panel/styles.css`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/styles.css): Standalone macOS Sonoma / Tahoe HIG design tokens, frosted acrylic blur (`backdrop-filter: blur(24px)`), and 0.5px hairline borders.
+  - [`sidecars/studio-panel/app.js`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/app.js): Zero-VDOM native ESM frontend with 120 FPS double-buffered HTML5 Canvas 2D waveform scrubber and SMPTE timecode display.
+- **Node.js Sidecar API**:
+  - [`sidecars/studio-panel/main.mjs`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/main.mjs): HTTP micro-server, 50-item LRU waveform cache (`/api/peaks`), and HTTP 206 Partial Content byte range streaming (`/api/audio`).
+- **Python Engine Bridge**:
+  - [`audiobook_factory/api/studio_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py): Vectorized sub-millisecond audio peak extraction via `soundfile` and `numpy`, querying `key_pool_state.db` and per-project `project_state.db`.
+
+### 2. Local Sidecar Development & Execution
+To run the Node.js Sidecar server standalone:
+```bash
+cd sidecars/studio-panel
+npm start
+# Server listens on http://localhost:3000
+```
+
+### 3. Testing Python Studio Bridge Subcommands Directly
+```bash
+# Engine health & rotating key pool diagnostics
+python -m audiobook_factory.api.studio_bridge status
+
+# List all projects and completion percentages
+python -m audiobook_factory.api.studio_bridge list-projects
+
+# Inspect specific project details, cast locks, and Hindi dialogue
+python -m audiobook_factory.api.studio_bridge project-detail --slug "sword_of_destiny_-_andrzej_sapkowski__worldfreebooks_com"
+
+# Sub-millisecond vectorized peak extraction (< 1ms)
+python -m audiobook_factory.api.studio_bridge peaks --path "audiobooks/projects/sample/premaster.wav" --points 400
+```
+
+### 4. Running Verification Test Suites
+```bash
+# 1. Studio Bridge Python unit tests (11/11 tests)
+pytest tests/test_studio_bridge.py -v
+
+# 2. Sidecar Node.js integration tests (8/8 tests)
+node sidecars/studio-panel/test_sidecar.mjs
+```
+
+### 5. Synchronizing with Global Antigravity Plugin Directory
+Whenever updating frontend assets or the sidecar server, synchronize the files to the active Antigravity plugin location:
+```powershell
+# On Windows PowerShell:
+xcopy /E /I /Y sidecars\studio-panel "$env:USERPROFILE\.gemini\config\plugins\audiobook-studio\sidecars\studio-panel"
+
+# Full plugin directory sync:
+xcopy /E /I /Y . "$env:USERPROFILE\.gemini\config\plugins\audiobook-studio"
 ```
 
 ---

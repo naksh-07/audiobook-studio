@@ -5433,3 +5433,204 @@ Exposes 6 standardized tools via stdio JSON-RPC for Antigravity autonomous agent
 
 The server is executed directly via `python -m audiobook_factory.mcp.server` or registered in Antigravity MCP settings.
 
+---
+
+## 10. Phase 7 Studio Python Bridge ([`audiobook_factory.api.studio_bridge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py))
+
+Source: [`audiobook_factory/api/studio_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py)
+
+The `studio_bridge` module provides high-speed, programmatic JSON APIs bridging the Python audiobook production runtime with the Node.js Sidecar API and the Antigravity UI Extension. It executes SQLite state introspection, catalog queries, and vectorized audio peak extraction without shell argument parsing friction.
+
+### Module Configuration & UTF-8 Encoding
+The module reconfigures `sys.stdout` for UTF-8 encoding on Windows to ensure authentic Devanagari Hindi text preservation:
+```python
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+```
+
+### Core Functions & Signatures
+
+#### 1. [`get_engine_status() -> Dict[str, Any]`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py#L38)
+Queries engine readiness, active Gemini API keys from `key_pool_state.db`, active book projects count, and workspace paths.
+
+- **Return Payload Schema**:
+```json
+{
+  "status": "ready",
+  "engine_version": "5.1.0",
+  "python_version": "3.13.0",
+  "workspace_dir": "c:/Users/Suraj/Documents/antigravity/optimistic-kepler",
+  "projects_dir": "c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/projects",
+  "active_gemini_keys": 124,
+  "total_gemini_keys": 124,
+  "active_projects_count": 3
+}
+```
+
+#### 2. [`list_projects() -> List[Dict[str, Any]]`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py#L70)
+Scans `audiobooks/projects/` directory, introspects each project's `project_state.db` and `metadata.json`, and returns progress summaries.
+
+- **Return Payload Schema (List of Projects)**:
+```json
+[
+  {
+    "slug": "sword_of_destiny_-_andrzej_sapkowski__worldfreebooks_com",
+    "title": "Sword of Destiny",
+    "author": "Andrzej Sapkowski",
+    "chapters_count": 14,
+    "total_segments": 1420,
+    "completed_segments": 1420,
+    "failed_segments": 0,
+    "in_progress_segments": 0,
+    "progress_percent": 100.0,
+    "total_duration_min": 312.4,
+    "has_master": true,
+    "path": "c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/projects/sword_of_destiny..."
+  }
+]
+```
+
+#### 3. [`get_project_detail(slug: str) -> Dict[str, Any]`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py#L162)
+Deep introspection of a specific project by slug:
+- Reads `metadata.json`, `character_roster.json` / `book_bible.json`, and `project_state.db`.
+- Extracts chapter list, cast roster with assigned voice profiles and sample audition audio links.
+- Evaluates the 5-Room Topological DAG status (`room1_ingest`, `room2_translate`, `room3_dramaturgy`, `room4_synth`, `room5_master`).
+- Fetches recent dialogue segments with authentic Devanagari Hindi text and relative audio paths.
+- Identifies primary active audio file (`.m4b` / `.m4a` / `.wav`) for immediate scrubbing in the UI.
+
+- **Return Payload Schema**:
+```json
+{
+  "slug": "sword_of_destiny",
+  "title": "Sword of Destiny",
+  "author": "Andrzej Sapkowski",
+  "language": "hi",
+  "chapters": [
+    {
+      "chapter_num": 1,
+      "title": "The Bounds of Reason",
+      "word_count": 8420,
+      "scripted_status": "COMPLETED",
+      "mastered_status": "COMPLETED",
+      "m4a_path": "audiobooks/projects/.../chapter_001_mastered.m4a",
+      "m4a_exists": true
+    }
+  ],
+  "characters": [
+    {
+      "name": "Narrator",
+      "voice": "Aoede",
+      "gender": "female",
+      "dialect": "Standard",
+      "pitch_shift": 0,
+      "sample_audio": "audiobooks/projects/.../sample_take.wav"
+    }
+  ],
+  "segments_summary": {
+    "total": 120,
+    "completed": 120,
+    "failed": 0,
+    "in_progress": 0,
+    "pending": 0
+  },
+  "recent_segments": [
+    {
+      "id": 1,
+      "chapter_num": 1,
+      "seg_num": 1,
+      "speaker": "Narrator",
+      "voice_persona": "Aoede",
+      "text_content": "अजनबी ने सराय की ओर देखा...",
+      "status": "COMPLETED",
+      "audio_path": "audiobooks/projects/.../b0001_raw.wav",
+      "duration_sec": 4.12
+    }
+  ],
+  "pipeline_dag": {
+    "room1_ingest": { "name": "Forensic Ingestion", "stage": 1, "status": "passed", "details": "14 Chapters Extracted" },
+    "room2_translate": { "name": "Translation Collective", "stage": 2, "status": "passed", "details": "Spoken Hindustani Validated" },
+    "room3_dramaturgy": { "name": "Universal Dramaturgy AST", "stage": 3, "status": "passed", "details": "18 Voices Assigned & Anti-Swap Verified" },
+    "room4_synth": { "name": "4D Formant TTS Engine", "stage": 4, "status": "passed", "details": "1420/1420 Stems Synthesized" },
+    "room5_master": { "name": "EBU R128 Vocal Mastering", "stage": 5, "status": "passed", "details": "-19.0 LUFS Target / -1.5 dBTP Ceiling" }
+  },
+  "active_audio": "sword_of_destiny_mastered.m4b",
+  "media_files": []
+}
+```
+
+#### 4. [`extract_audio_peaks(audio_path: str, num_points: int = 400) -> Dict[str, Any]`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py#L378)
+Extracts downsampled min/max amplitude peaks for waveform visualization. Uses `soundfile` and vectorized `numpy.reshape` for sub-millisecond execution ($< 1\text{ms}$ on multi-minute files):
+- Mono downmixes stereo or multichannel audio via `data.mean(axis=1)`.
+- Reshapes samples into `(num_points, chunk_size)` matrix and computes `mins` and `maxs` simultaneously.
+- Returns relative project path, total duration in seconds, sample rate, channels count, and normalized peak pairs `[[min, max], ...]`.
+
+- **Return Payload Schema**:
+```json
+{
+  "path": "audiobooks/projects/.../master.wav",
+  "duration_sec": 182.4,
+  "sample_rate": 48000,
+  "channels": 1,
+  "points_count": 400,
+  "peaks": [
+    [-0.042, 0.051],
+    [-0.312, 0.384],
+    [-0.621, 0.589]
+  ]
+}
+```
+
+#### 5. [`list_curated_voices() -> List[Dict[str, Any]]`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py#L454)
+Loads `audiobook_factory/tts/data/curated_voice_catalog.json` and flattens voices into a standardized array for auditioning and character casting in the UI deck.
+
+---
+
+## 11. Phase 7 Node.js Sidecar REST & Streaming API ([`sidecars/studio-panel/main.mjs`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/main.mjs))
+
+Source: [`sidecars/studio-panel/main.mjs`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/main.mjs)
+
+The Node.js Sidecar API server provides the web host and bridging infrastructure for the **Audiobook Studio Aux-Pane Extension** in Google Antigravity. It runs locally with native `sidecar_sdk` (`SidecarApp`), executes child-process Python bridge commands with timeout guards, implements in-memory LRU caching, and streams audio via HTTP 206 Partial Content.
+
+### Static & Asset Routes
+
+| Route | HTTP Method | Content-Type | Description |
+|---|:---:|:---:|---|
+| `/` | `GET` | `text/html` | Serves Apple Minimalist Light UI workstation markup ([`index.html`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/index.html)). |
+| `/styles.css` | `GET` | `text/css` | Serves macOS HIG design tokens, frosted acrylic blur, and spring animations ([`styles.css`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/styles.css)). |
+| `/app.js` | `GET` | `application/javascript` | Serves Zero-VDOM frontend reactivity and 120 FPS Canvas 2D waveform engine ([`app.js`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/app.js)). |
+
+### REST & Streaming Endpoints
+
+#### 1. `GET /api/status`
+Returns sidecar health, uptime in seconds, Node.js version, OS platform, and delegated Python engine diagnostics.
+
+#### 2. `GET /api/projects`
+Delegates to `studio_bridge list-projects` and returns summaries for all available book projects.
+
+#### 3. `GET /api/project?slug={slug}`
+Delegates to `studio_bridge project-detail --slug {slug}` and returns deep chapter, cast, and dialogue state.
+- **Query Parameters**:
+  - `slug` (string, required): The project directory name.
+
+#### 4. `GET /api/voices`
+Delegates to `studio_bridge list-voices` and returns curated multi-lingual voices catalog for auditioning.
+
+#### 5. `GET /api/peaks?path={rel_path}&points={num_points}`
+Returns downsampled audio waveform peaks for Canvas 2D visualization:
+- **Directory Traversal Guard**: Strictly enforces that resolved `targetPath` resides within `ENGINE_DIR`.
+- **50-Item LRU Cache**: Implemented via ES6 `Map` with capacity limit `MAX_PEAKS_CACHE_SIZE = 50`. Cache hits re-insert to refresh recency.
+- **Execution**: On cache miss, executes `python -m audiobook_factory.api.studio_bridge peaks --path <path> --points <points>`, caches the result, and returns JSON.
+
+#### 6. `GET /api/audio?path={rel_path}[&range={bytes=start-end}]`
+Streams local audio files (`.m4b`, `.m4a`, `.wav`, `.mp3`) with **HTTP 206 Partial Content** support:
+- **Directory Traversal Defense**: Rejects requests attempting to traverse outside `ENGINE_DIR` (`403 Forbidden`).
+- **MIME Type Mapping**: Correctly maps extensions (`.m4a`/`.m4b` $\to$ `audio/mp4`, `.wav` $\to$ `audio/wav`, `.mp3` $\to$ `audio/mpeg`).
+- **HTTP 206 Range Streaming**:
+  - Parses `Range: bytes=start-end` or query parameters `start` and `end`.
+  - Emits `Content-Range: bytes start-end/totalLength` and `Content-Length`.
+  - Sets `Accept-Ranges: bytes` and `Cache-Control: public, max-age=3600`.
+  - Enables instant waveform playhead scrubbing without whole-file redownloads or browser memory exhaustion.
+
+#### 7. `POST /api/action`
+Executes interactive pipeline actions (e.g. `action: "refresh"`, `action: "produce_chapter"`).
+

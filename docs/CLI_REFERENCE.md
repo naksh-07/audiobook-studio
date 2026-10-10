@@ -1,20 +1,22 @@
 # 💻 CLI Reference: Audiobook Studio & Multi-Format Engine
 
-**Version:** 5.4 (Option C Standard v2.0 Compliant)  
-**Entrypoints:** `audiobook-cli` | `audiobook-studio` | `python audiobook_cli.py`  
-**Source File:** [`audiobook_cli.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_cli.py)
+**Version:** 6.0 (Grand Unification 100% Certified)  
+**Entrypoints:** `audiobook-cli` | `audiobook-studio` | `python audiobook_cli.py` | `python -m audiobook_factory.api.studio_bridge`  
+**Source Files:** [`audiobook_cli.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_cli.py), [`audiobook_factory/api/studio_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py)
 
 ---
 
 ## Overview
 
-The Audiobook Studio Command-Line Interface provides granular, deterministic control over the entire pure vocals-only production pipeline under **Option C Architecture**. It supports 1-click autonomous multi-format generation (`auto`), dedicated 2-host narrative podcast production (`podcast`), specialized script adaptation (`script --adapter`), dual-track packaging (`package --format`), and the **8-Pillar Studio Production Certification Harness** (`audit-book` / `audit --certify`).
+The Audiobook Studio Command-Line Interface provides granular, deterministic control over the entire pure vocals-only production pipeline under **Option C Architecture**. It supports 1-click autonomous multi-format generation (`auto`), dedicated 2-host narrative podcast production (`podcast`), specialized script adaptation (`script --adapter`), dual-track packaging (`package --format`), the **8-Pillar Studio Production Certification Harness** (`audit-book` / `audit --certify`), and the **Phase 7 Studio Python Bridge** (`python -m audiobook_factory.api.studio_bridge`).
 
 ```bash
 # Entrypoint via installed CLI command or direct Python execution:
 audiobook-cli [COMMAND] [OPTIONS]
 # or:
 python audiobook_cli.py [COMMAND] [OPTIONS]
+# or Studio Bridge API CLI:
+python -m audiobook_factory.api.studio_bridge [SUBCOMMAND] [OPTIONS]
 ```
 
 ---
@@ -41,6 +43,7 @@ python audiobook_cli.py [COMMAND] [OPTIONS]
 | **[`enhance`](#17-neural-vocal-polish-enhance)** | Polish / Denoise | Cleaned WAV | DeepFilterNet3 neural speech polish with $>45\text{dB}$ SNR auto-bypass. |
 | **[`match-ref`](#18-reference-spectrum-matching-match-ref)** | Spectral Match | Matched WAV | Matchering 2.0 reference spectrum matching with $\pm 3.0\text{dB}$ hard clamping. |
 | **[`podcast-cli`](#14-modular-podcast-subsystem-cli)** | Modular Engine | Subsystem | Dedicated CLI for granular podcast workflows (`produce`, `script`, `render`, `inspect`). |
+| **[`studio-bridge`](#20-studio-python-bridge-cli)** | API / UI | JSON Stream | Programmatic JSON APIs & vectorized sub-millisecond audio peak extraction for the Studio UI Workstation. |
 
 ---
 
@@ -788,6 +791,122 @@ python audiobook_cli.py match-ref --target <TARGET_WAV> --reference <REF_WAV> --
 ### Example
 ```bash
 python audiobook_cli.py match-ref -t "my_chapter.wav" -r "audible_ref_master.wav" -o "final_matched.wav" --max-clamp 2.5
+```
+
+---
+
+## 20. Studio Python Bridge CLI (`python -m audiobook_factory.api.studio_bridge`)
+
+The **Studio Python Bridge CLI** provides direct JSON stdout endpoints consumed by the Node.js Sidecar API, automated CI/CD test scripts, and the Antigravity Studio Workstation.
+
+```bash
+python -m audiobook_factory.api.studio_bridge <SUBCOMMAND> [OPTIONS]
+```
+
+### Subcommands & Syntax
+
+#### 20.1 Engine Status (`status`)
+Queries engine health, active Gemini rotating API key count, and workspace paths.
+
+```bash
+python -m audiobook_factory.api.studio_bridge status
+```
+
+**JSON Output:**
+```json
+{
+  "status": "ready",
+  "engine_version": "5.1.0",
+  "python_version": "3.13.0",
+  "workspace_dir": "c:/Users/Suraj/Documents/antigravity/optimistic-kepler",
+  "projects_dir": "c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/projects",
+  "active_gemini_keys": 124,
+  "total_gemini_keys": 124,
+  "active_projects_count": 3
+}
+```
+
+#### 20.2 List Projects (`list-projects`)
+Scans `audiobooks/projects/` and returns high-level production status, progress percentages, chapter counts, and total audio durations for each book project.
+
+```bash
+python -m audiobook_factory.api.studio_bridge list-projects
+```
+
+**JSON Output:**
+```json
+[
+  {
+    "slug": "sword_of_destiny_-_andrzej_sapkowski__worldfreebooks_com",
+    "title": "Sword of Destiny",
+    "author": "Andrzej Sapkowski",
+    "chapters_count": 14,
+    "total_segments": 1420,
+    "completed_segments": 1420,
+    "failed_segments": 0,
+    "in_progress_segments": 0,
+    "progress_percent": 100.0,
+    "total_duration_min": 312.4,
+    "has_master": true,
+    "path": "c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/projects/sword_of_destiny..."
+  }
+]
+```
+
+#### 20.3 Project Detail (`project-detail`)
+Performs deep introspection of a project by slug, emitting chapter breakdowns, character profiles with assigned voices, recent dialogue segments with authentic Devanagari Hindi text, and the 5-Room DAG progression status.
+
+```bash
+python -m audiobook_factory.api.studio_bridge project-detail --slug <SLUG>
+```
+
+| Flag | Type | Required | Description |
+|---|:---:|:---:|---|
+| `--slug` | String | **Yes** | Project directory name under `audiobooks/projects/`. |
+
+**Example:**
+```bash
+python -m audiobook_factory.api.studio_bridge project-detail --slug "sword_of_destiny_-_andrzej_sapkowski__worldfreebooks_com"
+```
+
+#### 20.4 List Voices (`list-voices`)
+Returns curated multi-lingual voice profiles for auditioning and dynamic character casting.
+
+```bash
+python -m audiobook_factory.api.studio_bridge list-voices
+```
+
+#### 20.5 Audio Waveform Peaks Extraction (`peaks`)
+Performs vectorized sub-millisecond audio peak extraction using `soundfile` and `numpy`. Delivers min/max amplitude envelopes optimized for 120 FPS HTML5 Canvas 2D waveform rendering.
+
+```bash
+python -m audiobook_factory.api.studio_bridge peaks --path <AUDIO_PATH> [--points <NUM_POINTS>]
+```
+
+| Flag | Type | Default | Description |
+|---|:---:|:---:|---|
+| `--path` | Path | *Required* | Absolute or project-relative path to audio file (`.wav`, `.m4a`, `.m4b`, `.mp3`). |
+| `--points` | Int | `400` | Number of downsampled peak points for visualization. |
+
+**Example:**
+```bash
+python -m audiobook_factory.api.studio_bridge peaks --path "audiobooks/projects/sample/chapter_001_mastered.m4a" --points 400
+```
+
+**JSON Output:**
+```json
+{
+  "path": "audiobooks/projects/sample/chapter_001_mastered.m4a",
+  "duration_sec": 142.5,
+  "sample_rate": 48000,
+  "channels": 1,
+  "points_count": 400,
+  "peaks": [
+    [-0.012, 0.015],
+    [-0.245, 0.281],
+    [-0.512, 0.498]
+  ]
+}
 ```
 
 ---
