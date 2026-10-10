@@ -304,3 +304,105 @@ class CastLockManifest(BaseModel):
             if cid.lower().replace("_", " ") == clean_norm or lock.character_name.lower().replace("_", " ") == clean_norm:
                 return lock
         return None
+
+
+class ProviderCapabilities(BaseModel):
+    """Supported TTS delivery controls and audio constraints per provider."""
+    model_config = ConfigDict(extra="ignore")
+
+    provider_name: Literal["gemini_tts", "qwen3_tts", "local_winrt"] = "gemini_tts"
+    supports_reference_audio: bool = False
+    supports_style_prompt: bool = True
+    supports_native_speed: bool = False
+    native_sample_rate_hz: int = 24000
+    supported_controls: List[str] = Field(
+        default_factory=lambda: ["speechMetadata.style", "temperature", "parametric_eq"]
+    )
+
+
+class CanonicalVoiceProfile(BaseModel):
+    """
+    Immutable voice asset entry in the unified voice catalog.
+    Represents a single available voice across 2,089 catalog entries.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    voice_id: str = Field(..., description="Unique voice identifier e.g. 'hi-in-advisor-10' or 'Aoede'")
+    display_name: str
+    language_code: str = "hi-IN"
+    region_code: str = "IN"
+    gender: CastingGender = "neutral"
+    perceived_age: Optional[int] = None
+    dialect: str = "Standard"
+    pitch_tier: PitchBand = "medium"
+    timbre: str = ""
+    role: str = ""
+    persona: str = ""
+    archetypes: List[str] = Field(default_factory=list)
+    description: str = ""
+    default_provider: Literal["gemini_tts", "qwen3_tts"] = "gemini_tts"
+    reference_audio_path: Optional[str] = None
+    capabilities: ProviderCapabilities = Field(default_factory=ProviderCapabilities)
+
+
+class SpectralFormantProfile(BaseModel):
+    """
+    Phase-Safe 4D Parametric EQ Formant Profile.
+    Applies surgical analog-style EQ offsets (+/- 2-3 dB) to separate co-speakers
+    without destructive digital pitch-shifting (asetrate) or WSOLA time-stretching.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    chest_resonance_150hz_db: float = Field(default=0.0, ge=-4.0, le=4.0)
+    nasal_presence_2800hz_db: float = Field(default=0.0, ge=-3.0, le=4.0)
+    throat_clarity_3200hz_db: float = Field(default=0.0, ge=-3.0, le=3.0)
+    air_shelf_8000hz_db: float = Field(default=0.0, ge=-4.0, le=4.0)
+    target_tempo_multiplier: float = Field(default=1.0, ge=0.85, le=1.15)
+
+    def to_ffmpeg_filters(self) -> List[str]:
+        """Generates phase-safe FFmpeg audio filter clauses."""
+        filters = []
+        if abs(self.chest_resonance_150hz_db) >= 0.2:
+            filters.append(f"equalizer=f=150:t=q:w=1.2:g={self.chest_resonance_150hz_db:+.1f}")
+        if abs(self.nasal_presence_2800hz_db) >= 0.2:
+            filters.append(f"equalizer=f=2800:t=q:w=1.4:g={self.nasal_presence_2800hz_db:+.1f}")
+        if abs(self.throat_clarity_3200hz_db) >= 0.2:
+            filters.append(f"equalizer=f=3200:t=q:w=1.4:g={self.throat_clarity_3200hz_db:+.1f}")
+        if abs(self.air_shelf_8000hz_db) >= 0.2:
+            filters.append(f"equalizer=f=8000:t=q:w=1.0:g={self.air_shelf_8000hz_db:+.1f}")
+        return filters
+
+
+class SceneContrastMatrix(BaseModel):
+    """
+    Scene-level acoustic contrast evaluation between active speaking characters.
+    Enforces minimum separation distance (>= 0.65) to guarantee distinct listener perception.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    scene_id: str
+    active_speakers: List[str] = Field(default_factory=list)
+    pairwise_distances: Dict[str, float] = Field(default_factory=dict)
+    min_distance: float = 1.0
+    is_contrast_sufficient: bool = True
+    calibration_adjustments: Dict[str, SpectralFormantProfile] = Field(default_factory=dict)
+
+
+class CharacterCastAssignment(BaseModel):
+    """
+    Authoritative character-to-voice assignment binding.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    character_id: str
+    canonical_name: str
+    voice_id: str
+    assigned_provider: Literal["gemini_tts", "qwen3_tts"] = "gemini_tts"
+    gender: CastingGender = "neutral"
+    dialect: str = "Standard"
+    casting_rationale: str = ""
+    baseline_formants: SpectralFormantProfile = Field(default_factory=SpectralFormantProfile)
+    pronunciation_overrides: Dict[str, str] = Field(default_factory=dict)
+    locked: bool = True
+    version: str = "1.0.0"
+

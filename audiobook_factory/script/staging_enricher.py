@@ -185,6 +185,7 @@ def _parse_dramatized_chunk_llm(
         preceding_context=preceding_context,
         is_hindi=is_hindi,
         character_roster=character_roster,
+        max_retries=max_retries,
     )
     if not pass1_turns:
         if chunk_text.strip():

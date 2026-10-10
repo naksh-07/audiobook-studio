@@ -415,20 +415,24 @@ class TTSDispatcher:
 
         if self.strict_speakers:
             if self.allow_dynamic_cast:
-                # Dynamic on-the-fly casting with persistent lock (Production Auto-Casting)
                 try:
-                    from audiobook_factory.character_caster import CharacterCaster
+                    from audiobook_factory.casting.director import StudioCastingDirector
                     p_dir = getattr(self, "project_dir", None) or Path.cwd()
-                    dynamic_cfg = CharacterCaster.cast_single_speaker(
-                        speaker_name=sp_clean,
-                        project_dir=p_dir,
+                    director = StudioCastingDirector(project_dir=p_dir)
+                    lock = director.cast_character(
+                        character_name=sp_clean,
                         gender=self.gender_map.get(sp_clean),
-                        default_backend=self.default_backend,
                     )
+                    dynamic_cfg = {
+                        "backend": self.default_backend,
+                        "voice": lock.voice_id,
+                        "pitch": lock.calibration_overrides.get("pitch", 1.0),
+                        "speed": lock.calibration_overrides.get("speed", 1.0),
+                    }
                     self.voice_map[sp_clean] = dynamic_cfg
                     logger.info(
                         f"[+] Dynamic Cast: Auto-registered '{sp_clean}' -> {dynamic_cfg.get('voice')} "
-                        f"to avoid halting production."
+                        f"via StudioCastingDirector."
                     )
                     return dict(dynamic_cfg)
                 except Exception as e:
@@ -779,16 +783,32 @@ class TTSDispatcher:
         post_filters = []
 
         if audible_clean_dsp:
-            # Audible Clean Neural DSP:
+            # Audible Clean Phase-Safe Neural DSP:
             # 1. Zero digital pitch-shifting (asetrate) or WSOLA time-stretching (atempo): pure neural vocal texture
-            # 2. Zero telephone lowpass cuts or harsh parametric EQs
-            # 3. Transparent studio chain: 60Hz subsonic rumble highpass + transparent limiter
+            # 2. Transparent studio chain: 60Hz subsonic rumble highpass + gentle softclip
+            # 3. Surgical non-destructive parametric EQ formant bands to maintain multi-character distinction
             post_filters.append("highpass=f=60:poles=2")
             if softclip_tanh:
                 post_filters.append("asoftclip=type=tanh:param=1.2")
             if abs(volume_gain_db) > 0.1:
                 post_filters.append(f"volume={volume_gain_db:+.1f}dB")
-            # WSOLA atempo is strictly disabled for neural speech to prevent metallic phasing/flange
+
+            # Preserved surgical parametric EQ formants (zero phase warping)
+            if bass_boost_db > 0.1:
+                post_filters.append(f"equalizer=f=150:t=q:w=1.2:g={min(3.0, bass_boost_db):+.1f}")
+            elif bass_boost_db < -0.1:
+                post_filters.append(f"equalizer=f=150:t=q:w=1.2:g={max(-3.0, bass_boost_db):+.1f}")
+
+            if presence_boost_db > 0.1:
+                post_filters.append(f"equalizer=f=2800:t=q:w=1.4:g={min(3.5, presence_boost_db):+.1f}")
+            elif presence_boost_db < -0.1:
+                post_filters.append(f"equalizer=f=2800:t=q:w=1.4:g={max(-3.0, presence_boost_db):+.1f}")
+
+            if eq_formant_profile:
+                for eq_filter in eq_formant_profile.split(","):
+                    eq_clean = eq_filter.strip()
+                    if eq_clean and eq_clean not in post_filters:
+                        post_filters.append(eq_clean)
         else:
             if highpass_hz > 20:
                 post_filters.append(f"highpass=f={highpass_hz}")
@@ -828,6 +848,7 @@ class TTSDispatcher:
                     eq_clean = eq_filter.strip()
                     if eq_clean and eq_clean not in post_filters:
                         post_filters.append(eq_clean)
+
 
         if post_filters:
             post_filters.append("alimiter=limit=-1.2dB:attack=5:release=50:asc=true")

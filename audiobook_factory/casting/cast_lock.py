@@ -97,7 +97,10 @@ class CastLockManager:
             calibration_overrides=calib,
         )
 
-        self.manifest.locks[character_id] = lock
+        if character_id:
+            self.manifest.locks[character_id] = lock
+        if character_name and character_name != character_id:
+            self.manifest.locks[character_name] = lock
         self.save()
         logger.info(f"  [CAST LOCK] Locked character '{character_name}' ({character_id}) -> Voice '{voice_id}'.")
         return lock

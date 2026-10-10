@@ -18,6 +18,7 @@ def _parse_dialogue_turns_llm(
     preceding_context: str = "",
     is_hindi: bool = False,
     character_roster: Optional[Dict[str, Any]] = None,
+    max_retries: int = 3,
 ) -> List[Dict[str, Any]]:
     """
     Pass 1: Pure Dialogue Isolation & Speaker Attribution.
@@ -122,7 +123,7 @@ Output JSON: A list of objects where each object has:
         response_mime_type="application/json",
         max_output_tokens=65536,
         thinking_budget=1024,
-        max_retries=8,
+        max_retries=max_retries,
     )
     if isinstance(res, list):
         return res

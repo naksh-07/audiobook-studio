@@ -25,4 +25,10 @@
   - Gate 2.9: Dual-Tier Pre-TTS Sanity Gate (`audiobook_factory/gates/pre_synthesis.py`): Tier 1 structural fast-checks + Tier 2 Adversarial LLM Attribution Judge (`LLMPreSynthesisJudge` via 123+ key pool) enforcing 0% speaker swap, anti-swallow dialogue, and acoustic parameter clamping fail-closed across both pipelines.
   - 8-Pillar Harness: `StudioCertificationRunner` (P1 Ingestion to P8 Packaging, Gate 6 fail-closed compliance).
   - Multi-format packaging: `.m4b` audiobook (-19 LUFS) & `.m4a` podcast (-16 LUFS with stereo pan -0.25/+0.25).
+- **Room 3.5: Studio Voice Casting & Calibration Engine (SVCCS - COMPLETED & CERTIFIED)**:
+  - Option C architecture: `VoiceProfileRegistry` (2,089 curated voices, 114 native Hindi).
+  - Subsystems: `StudioCastingDirector` (ModelGateway 123+ key pool, Anime Seiyū child rule, dialect matching) + `SceneAcousticCalibrator` (pairwise distance >= 0.65, non-destructive EQ formants, phase-safe).
+  - Dual adapters: `GeminiVoiceAdapter` & `QwenVoiceAdapter`.
+  - Gate 2.8: `AuditoryDistinctionGate` (fail-closed boundary before Gate 2.9).
+  - Remediation: Fixed P0 sledgehammer DSP bug in `TTSDispatcher` line 778.
 - **Next Milestone**: Phase 5 Studio TTS Platform Core (`origin/tts-system`). 4-Tier TTS Engine, TakeBank & Net-Silence.

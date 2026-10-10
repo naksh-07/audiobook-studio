@@ -63,11 +63,9 @@ flowchart TD
         Projections --> Collective["4-Agent Translation Collective<br/>• LiteraryDraftTranslator (70/30 Canon Sacredness)<br/>• HindustaniCadenceSpecialist (Spoken Flow & Pauses)<br/>• SubtextAndIdiomDramaturge (Earthy Desi Grit & 19-to-21)<br/>• TranslationQualityCritic (Anti-Omission & Terminology)"]
         Collective --> DualRule["Dual-Rule Invariant ('Nothing Above Source')<br/>Classic Reverent Pathos vs Raw Unrated Realism"]
     end
-        Collective --> DualRule["Dual-Rule Invariant ('Nothing Above Source')<br/>Classic Reverent Pathos vs Raw Unrated Realism"]
-    end
 
     subgraph Room3["🎭 Room 3: Universal Dramaturgy Core (dramaturgy/)"]
-        DualRule & Memory --> SceneAn["SceneAnalyzer (Organic Scene Boundary Discovery)"]
+        DualRule --> SceneAn["SceneAnalyzer (Organic Scene Boundary Discovery)"]
         SceneAn --> BeatPl["BeatPlanner (Stanislavski Actioning, SPU Slicing & Tension Curves)"]
         BeatPl --> PBible["PerformanceBible (Vocal Profiles & Restraint Clamping)"]
         PBible --> DramAST["Immutable Chapter Dramatic AST (dramatic_plan.json)"]
@@ -76,6 +74,18 @@ flowchart TD
     subgraph Adapters["🎙️ Room 3 Adapters: Specialized Scripting Adapters (adapters/)"]
         DramAST -->|Audible Flow Standard| AudiobookAd["AudiobookAdapter (adapters/audiobook.py)<br/>• Prose-Lead Framing ('वक्ता ने पूछा—')<br/>• Unbroken Character Dialogue Turns<br/>• Transparent Measured Narration (0.32 temp)<br/>• Anti-Swap Dialogue Attribution (0% Inversion)"]
         DramAST -->|Conversational Spoken-First| PodcastAd["PodcastAdapter (adapters/podcast.py)<br/>• 2-Host Dynamic (Sameer/Priya & Alex/Maya)<br/>• SpokenBreathabilityTransformer (<= 22 words)<br/>• 5-Part Retention Arc (Cold Open to Outro)<br/>• Stereo Spatial Staging (-0.25 Left / +0.25 Right)"]
+    end
+
+    subgraph Room3_5["🎙️ Room 3.5: Studio Voice Casting & Calibration Engine (Option C)"]
+        direction TB
+        Registry["VoiceProfileRegistry (Shared Core)<br/>• 2,089 Curated Voices (114 Native Hindi)<br/>• Sub-Millisecond Archetype & Dialect Query"]
+        Director["StudioCastingDirector (Subsystem 1)<br/>• ModelGateway Control Plane (123+ Key Pool)<br/>• Anime Seiyū Child Rule Guard<br/>• Regional Hindustani Dialect Matching<br/>• CastLockManager (Permanent Project Locks)"]
+        Calibrator["SceneAcousticCalibrator (Subsystem 2)<br/>• Pairwise Euclidean Contrast Matrix (>= 0.65)<br/>• Surgical Non-Destructive Parametric EQ Formants<br/>• Phase-Safe: Zero asetrate/atempo DSP"]
+        Registry --> Director --> Calibrator
+    end
+
+    subgraph Gate28["🛡️ Gate 2.8: Auditory Distinction Gate (gate28_distinction.py)"]
+        G28["AuditoryDistinctionGate<br/>• Speaker Whitelist & Cast Lock Check<br/>• Co-Speaker Acoustic Distance >= 0.65<br/>• Phase-Safe Audio Invariant"]
     end
 
     subgraph Gate29["🛡️ Gate 2.9: Pre-TTS Sanity Gate (Fail-Closed Boundary)"]
@@ -102,11 +112,13 @@ flowchart TD
     Room1 --> Room1_5
     Room1_5 --> Room2
     Room1_5 -.->|"Roster & Aliases"| Room3
-    Room1_5 -.->|"Dynamic Voice Lock"| Room4
+    Room1_5 -.->|"Dynamic Voice Lock"| Room3_5
     Room2 --> Room3
     Room3 --> Adapters
-    Adapters --> Gate29
-    Gate29 -->|"Audited Script (0% Swap / 0% Swallow)"| Room4
+    Adapters --> Room3_5
+    Room3_5 --> Gate28
+    Gate28 --> Gate29
+    Gate29 -->|"Audited Script (0% Swap / Distance >= 0.65)"| Room4
     Room4 --> Room5
     Room5 --> CertHarness
 ```

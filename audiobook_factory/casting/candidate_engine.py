@@ -35,11 +35,39 @@ class VoiceCandidateEngine:
             cand = Path(__file__).resolve().parent.parent.parent / path
             if cand.exists():
                 path = cand
+
+        raw_catalog: Dict[str, Any] = {"voices": {}}
         if path.exists():
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        logger.warning(f"  [CANDIDATE ENGINE] Catalog not found at {path}. Using empty voice catalog.")
-        return {"voices": {}}
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    raw_catalog = json.load(f)
+            except Exception as e:
+                logger.warning(f"  [CANDIDATE ENGINE] Failed to load {path}: {e}")
+
+        # Seamlessly merge unified VoiceProfileRegistry voices (including 114 Hindi voices)
+        try:
+            from audiobook_factory.casting.registry import VoiceProfileRegistry
+            reg = VoiceProfileRegistry.get_instance()
+            for vid, prof in reg._profiles_by_id.items():
+                if vid not in raw_catalog.get("voices", {}):
+                    age_cat = "mature_adult" if prof.perceived_age and prof.perceived_age >= 45 else ("prime_adult" if prof.perceived_age and prof.perceived_age >= 25 else "youth")
+                    raw_catalog.setdefault("voices", {})[vid] = {
+                        "id": prof.voice_id,
+                        "display_name": prof.display_name,
+                        "sex": prof.gender,
+                        "perceived_age": age_cat,
+                        "pitch_category": prof.pitch_tier,
+                        "invariant_timbre": prof.timbre,
+                        "archetypes": prof.archetypes,
+                        "elasticity": {
+                            "styles_supported": ["natural dialogue", "measured delivery", "grounded"],
+                            "forbidden_styles": ["cartoon panic", "slurred monotone"],
+                        }
+                    }
+        except Exception as e:
+            logger.debug(f"[CANDIDATE ENGINE] Notice during registry catalog merge: {e}")
+
+        return raw_catalog
 
     def rank_candidates(
         self,

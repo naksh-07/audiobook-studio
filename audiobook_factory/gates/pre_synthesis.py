@@ -59,8 +59,8 @@ class LLMPreSynthesisJudge:
         "Your mission is an adversarial pre-synthesis audit of screenplay/podcast segments before sending them to neural TTS voice actors.\n\n"
         "Your Primary Mandates:\n"
         "1. ZERO SPEAKER TURN INVERSIONS (ANTI-SWAP): Verify that every dialogue line is assigned to the TRUE character who spoke it in context. "
-        "Detect any speaker swap where Character A's line is attributed to Character B (e.g. Male Witcher speaking Female Sorceress's line, or Host A asking questions meant for Host B).\n"
-        "2. ANTI-SWALLOW DIALOGUE GUARD: Check whether narrator lines contain direct character dialogue quotes (e.g. Geralt said: '...') that should have been separated into a dedicated character segment.\n"
+        "Detect any speaker swap where Character A's line is attributed to Character B (e.g. Male protagonist speaking Female companion's line, or Host A asking questions meant for Host B).\n"
+        "2. ANTI-SWALLOW DIALOGUE GUARD: Check whether narrator lines contain direct character dialogue quotes (e.g. Speaker said: '...') that should have been separated into a dedicated character segment.\n"
         "3. CHARACTER PERSONA & REGISTER FIT: Verify that dialogue phrasing matches the character's gender, social status, and archetype in the character roster.\n"
         "4. PODCAST DUAL-HOST BALANCE (for podcast format): Assert that Host A and Host B maintain their distinct perspectives, vocal staging, and conversational banter.\n\n"
         "You must output strict JSON conforming to PreSynthesisLLMVerdict."
@@ -186,11 +186,11 @@ Audit every dialogue line and verify:
                     attribution_accuracy=0.40,
                     speaker_swaps=[{
                         "index": 2,
-                        "assigned_speaker": "Geralt",
-                        "actual_speaker": "Renfri",
+                        "assigned_speaker": "Character_A",
+                        "actual_speaker": "Character_B",
                         "reason": "Simulated speaker swap detected in test",
                     }],
-                    reason="Speaker swap detected between Geralt and Renfri",
+                    reason="Speaker swap detected between Character_A and Character_B",
                 )
             if "simulated_swallowed_dialogue" in p_lower:
                 return PreSynthesisLLMVerdict(
@@ -200,7 +200,7 @@ Audit every dialogue line and verify:
                     swallowed_dialogue=[{
                         "index": 1,
                         "text_excerpt": "Stay back or die!",
-                        "intended_speaker": "Geralt",
+                        "intended_speaker": "Character_A",
                     }],
                     reason="Narrator segment contains swallowed dialogue",
                 )

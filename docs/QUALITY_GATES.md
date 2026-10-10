@@ -15,9 +15,9 @@ flowchart LR
     G1A --> G1["Gate 1:<br/>Voice Roster & Cast Lock"]
     G1 --> G2["Gate 2:<br/>LLM Screenplay Auditor"]
     G2 --> G25["Gate 2.5:<br/>LLM Dramatic Critic"]
-    G25 --> G29["Gate 2.9:<br/>Pre-TTS Sanity Gate"]
-    G29 --> G28["Gate 2.8:<br/>LLM Vocal Acting Judge"]
-    G28 --> G3["Gate 3 / 3.5:<br/>Manifest Feasibility"]
+    G25 --> G28["Gate 2.8:<br/>Auditory Distinction Gate"]
+    G28 --> G29["Gate 2.9:<br/>Pre-TTS Sanity Gate"]
+    G29 --> G3["Gate 3 / 3.5:<br/>Manifest Feasibility"]
     G3 --> G38["Gate 3.8:<br/>Audio Reality Auditor"]
     G38 --> GSB1["Gate SB-1:<br/>Sound Bank Audio Verification"]
     GSB1 --> G45["Gate 4.5:<br/>Timeline Ledger"]
@@ -360,28 +360,30 @@ class StudioCertificationReport(BaseModel):
 
 ---
 
-### Gate 2.8: Dramatic Performance Fidelity Pre-Mix Gate (ADR-032 / Performance QC 2.0)
-*(See full architectural manual: [`docs/PERFORMANCE_REALIZATION_AND_ACTOR_DIRECTION.md`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/docs/PERFORMANCE_REALIZATION_AND_ACTOR_DIRECTION.md))*
-- **Function**: `audit_gate2_8_performance_fidelity(chapter_id: str, directions: List[Any], selected_takes: List[Any], allow_warnings: bool = True) -> Dict[str, Any]`
-- **Modules**: [`audiobook_factory/gate_auditor.py`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/gate_auditor.py), [`audiobook_factory/performance/gate.py`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/performance/gate.py)
-- **Data Models**: [`PerformanceDirection`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/performance/contracts.py#L59-L154), [`TakeVariant`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/performance/contracts.py#L175-L194), [`PerformanceEvaluationResult`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/performance/contracts.py#L156-L173), [`PerformanceFidelityReport`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/performance/contracts.py#L196-L212), [`TakeSelectionResult`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/performance/contracts.py#L496-L516)
-- **Pipeline Stage**: Executed immediately following multi-take speech synthesis, 8-layer hierarchical evidence fusion, and intelligent take selection, prior to locking dialogue stems into `CinemaAudioEngine` and timeline ledger mastering.
-- **Audit Rules & Evaluators**:
-  - **Minimum Composite Overall Quality Floor**: The chapter average composite evaluation score across all selected takes must meet or exceed $0.70$ ($\text{avg\_score} \ge 0.70$).
-  - **Acoustic Naturalness Floor**: Every candidate take must satisfy a minimum naturalness threshold of $0.65$ ($\text{naturalness\_score} \ge 0.65$) without hard clipping ($\ge 12$ consecutive rail samples), DC offset bias ($> 1500$), dead air ($> 2.0\text{s}$), or elevated vocoder static. Fade envelope clipping is strictly promoted to fatal errors.
-  - **Fail-Closed Empty Evaluation Guard**: If evaluation results are empty or missing, Gate 2.8 strictly fails closed (`is_valid = False`, `status = "FAIL"`), permanently barring un-evaluated audio from bypassing quality verification.
-  - **Authoritative Selection & Status Certification (Performance QC 2.0)**:
-    - Verifies that every segment has a valid winner. If any take's `selection_result.status == "NO_ACCEPTABLE_TAKE"` or if all candidates were disqualified, Gate 2.8 **fails closed** immediately.
-    - Inspects `selection_result.review_required` and `status in ("REGENERATE", "REVIEW")`. Unresolved regeneration recommendations halt the gate.
-    - Asserts that winning takes have `is_selected=True`. Degraded fallbacks marked with `is_selected=False` are flagged for human audio engineer review.
-    - **Pydantic Serialization Decoupling**: Recursive loops are broken via `exclude=True` on `TakeVariant.alignment_result` and `TakeVariant.selection_result`, guaranteeing safe, cyclic-free JSON manifest export.
-  - **Zero Emotional Teleportation**: Zero tolerance for ungrounded volatile emotional transitions across consecutive lines by the same character without explicit causal triggers (e.g. `calm` $\rightarrow$ `bellowing_rage`, `peaceful` $\rightarrow$ `explosive`, `whispering` $\rightarrow$ `bellowing_rage`, `joyous` $\rightarrow$ `despair`, `calm` $\rightarrow$ `rage`). Any violation increments `teleportation_violations` and immediately fails the gate.
-  - **Sacred Spoken Text Immutability Guarantee**: Dialogue text passed to speech synthesis must remain 100% sacred and unmutated (`payload["part_payload"]["text"] == original_text`). The gate asserts that no parenthetical stage directions or acting adjectives have bled into the spoken dialogue buffer.
-  - **Take Coverage & Registry Integrity**: At least $90\%$ of all screenplay directions must have a validated, winning take variant registered in the take bank ($\frac{\text{selected\_takes}}{\text{directions}} \ge 0.90$). Pre-existing audio takes on disk are registered atomically into the take bank with `is_selected = True`, `selection_reason = "cached_on_disk"`, and a default `PerformanceEvaluationResult(overall_score=0.95, passed=True)` to ensure coverage integrity and evaluation validity across pipeline resumes without redundant API calls. Takes below the $0.65$ critical threshold or lacking explainable selection rationale strings (`selection_reason`) are flagged as critical defects.
-- **Fail Condition**: Fails closed and raises [`GateAuditError`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/gate_auditor.py#L38-L46) if `teleportation_violations > 0`, take coverage is below $90\%$, `NO_ACCEPTABLE_TAKE` status is encountered, evaluations are empty, or critical unresolved issues persist. Halts dialogue mastering before unverified audio enters the 5-stem broadcast master.
-- **CLI & API Integration**:
-  - API: `audit_gate2_8_performance_fidelity(chapter_id, directions=..., selected_takes=..., allow_warnings=...)`
-  - CLI: Audited during `python audiobook_cli.py produce <project> --chapter <N>` and validated in end-to-end performance test suite ([`tests/test_performance_realization.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests/test_performance_realization.py), [`tests/test_golden_performance_qc_2.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests/test_golden_performance_qc_2.py)).
+### Gate 2.8: Auditory Distinction & Acoustic Calibration Gate (Fail-Closed Boundary)
+*(Authoritative implementation: [`audiobook_factory/gates/gate28_distinction.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/gate28_distinction.py))*
+
+- **Function**: `AuditoryDistinctionGate.audit_chapter_script(segments: List[Dict[str, Any]], project_dir: Path | str, strict: bool = True) -> AuditoryDistinctionVerdict`
+- **Modules**: [`audiobook_factory/gates/gate28_distinction.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/gate28_distinction.py), [`audiobook_factory/casting/calibrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/calibrator.py), [`audiobook_factory/casting/registry.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/registry.py)
+- **Data Models**: [`AuditoryDistinctionVerdict`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/gate28_distinction.py#L30-L41), [`SceneContrastMatrix`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/contracts.py#L90-L101), [`GateAuditError`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L22)
+- **Pipeline Stage**: Positioned directly before Gate 2.9 (Pre-TTS Sanity Gate) and Room 4 Speech Synthesis.
+
+#### Core Verification Pillars:
+1. **Dialogue Speaker Whitelist & Cast Lock Verification**:
+   - Asserts that every non-narrator dialogue speaker has a non-null, valid voice assigned in `voice_registry.json`.
+   - Verifies character lock status against `cast_lock.json`. Zero silent fallback to Narrator for dialogue turns.
+2. **Scene Pairwise Auditory Separation Distance ($\ge 0.65$)**:
+   - Computes pairwise Euclidean acoustic distances across all co-speakers sharing any dramatic scene using [`SceneAcousticCalibrator`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/calibrator.py).
+   - If co-speaker acoustic distance falls below $0.65$, raises a critical violation: listeners cannot distinguish the characters by ear.
+3. **Phase-Safe Audio Invariant (Ban on Destructive DSP)**:
+   - Scans segment `eq_filters` for banned audio manipulation:
+     - Digital pitch-shifting via resampling (`asetrate`) is strictly prohibited due to formant shifting ($F_0$ distortion).
+     - WSOLA time-stretching (`atempo`) is strictly prohibited due to metallic flanging.
+   - Any occurrence immediately fails closed with `GateAuditError`.
+4. **Remediation of the Sledgehammer DSP Bug**:
+   - Verifies that surgical, non-destructive parametric EQ curves (150 Hz chest resonance and 2.8 kHz presence) generated by [`SceneAcousticCalibrator`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/calibrator.py) are preserved without phase corruption.
+
+- **Fail Condition**: Fails closed and raises `GateAuditError` if any speaker lacks a voice assignment, if pairwise scene contrast is below $0.65$, or if banned `asetrate`/`atempo` filters are detected.
 
 ---
 

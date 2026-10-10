@@ -47,6 +47,19 @@ flowchart TD
         DramAST -->|Conversational Spoken-First| PodcastAd["PodcastAdapter (adapters/podcast.py)<br/>• 2-Host Dynamic (Inquisitive Driver <-> Domain Expert)<br/>• SpokenBreathabilityTransformer (<= 22 words, 140ms breath)<br/>• 5-Part Retention Arc (Cold Open to Show Outro)<br/>• Stereo Spatial Staging (-0.25 Left / +0.25 Right)"]
     end
 
+    subgraph Room3_5["🎙️ Room 3.5: Studio Voice Casting & Acoustic Calibration Engine (Option C)"]
+        direction TB
+        Registry["VoiceProfileRegistry (Shared Core)<br/>• 2,089 Curated Voices (114 Native Hindi)<br/>• Sub-Millisecond Archetype & Dialect Query<br/>• Provider Capabilities (Gemini & Qwen)"]
+        Director["StudioCastingDirector (Subsystem 1)<br/>• ModelGateway Control Plane (123+ Key Pool)<br/>• Anime Seiyū Child Rule Guard<br/>• Regional Hindustani Dialect Matching<br/>• CastLockManager (Immutable Project Persistence)"]
+        Calibrator["SceneAcousticCalibrator (Subsystem 2)<br/>• Pairwise Euclidean Contrast Matrix (>= 0.65)<br/>• Surgical Non-Destructive Parametric EQ Formants<br/>• 150 Hz Chest Resonance vs 2.8 kHz Presence Boost<br/>• Phase-Safe: Zero asetrate/atempo Digital Resampling"]
+        Adapters["Provider Voice Adapters<br/>• GeminiVoiceAdapter (REST payload + EQ formants)<br/>• QwenVoiceAdapter (Native speed + Prompt Audio WAV)"]
+        Registry --> Director --> Calibrator --> Adapters
+    end
+
+    subgraph Gate28["🛡️ Gate 2.8: Auditory Distinction Gate (gate28_distinction.py)"]
+        G28["AuditoryDistinctionGate<br/>• Speaker Whitelist & Cast Lock Verification<br/>• Zero Silent Fallback to Narrator<br/>• Scene Pairwise Auditory Separation Distance >= 0.65<br/>• Phase-Safe Invariant: Banned asetrate / atempo"]
+    end
+
     subgraph Gate29["🛡️ Gate 2.9: Pre-TTS Config & Attribution Sanity Gate (Fail-Closed Boundary)"]
         G29["PreSynthesisGate & LLMPreSynthesisJudge<br/>• Tier 1: Deterministic Fast-Path (Whitelist, Hindi Gender Inflection, Acoustic Bounds)<br/>• Tier 2: Adversarial LLM Attribution Judge (123+ Gemini Key Pool, BLOCK_NONE)<br/>• Fail-Closed: Raises GateAuditError to prevent API quota burn"]
     end
@@ -72,11 +85,13 @@ flowchart TD
     Room1 --> Room1_5
     Room1_5 --> Room2
     Room1_5 -.->|"Roster & Aliases"| Room3
-    Room1_5 -.->|"Dynamic Voice Lock"| Room4
+    Room1_5 -.->|"Dynamic Voice Lock"| Room3_5
     Room2 --> Room3
     Room3 --> Room3Adapters
-    Room3Adapters --> Gate29
-    Gate29 -->|"Audited Script (0% Swap / 0% Swallow)"| Room4
+    Room3Adapters --> Room3_5
+    Room3_5 --> Gate28
+    Gate28 --> Gate29
+    Gate29 -->|"Audited Script (0% Swap / 0% Swallow / Distance >= 0.65)"| Room4
     Room4 --> Room5
     Room5 --> CertHarness
 ```
@@ -194,6 +209,43 @@ Room 1.5 is the decoupled, single-pass per-chapter lexical analysis, entity disc
    - `SpokenBreathabilityTransformer`: Splits sentences to $\le 22$ words per breath with 140ms pre-roll breath pauses.
    - 5-part retention arc: `cold_open_hook` $\to$ `show_intro` $\to$ `scene_deepdive` $\to$ `cognitive_reset_banter` $\to$ `show_outro`.
    - Stereo spatial staging: Host A at $-0.25$ (Left-Mid) and Host B at $+0.25$ (Right-Mid).
+
+---
+
+### Room 3.5: Studio Voice Casting & Acoustic Calibration Engine (SVCCS)
+*Modules:* [`audiobook_factory/casting/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/), [`audiobook_factory/casting/contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/contracts.py), [`audiobook_factory/casting/registry.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/registry.py), [`audiobook_factory/casting/director.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/director.py), [`audiobook_factory/casting/calibrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/calibrator.py), [`audiobook_factory/casting/adapters/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/)
+
+Room 3.5 implements **Option C: Shared Understanding & Voice Registry Core with Specialized Decoupled Subsystems**, resolving the prior schism between disparate voice catalogs and uniting 2,089 curated studio voices (including 114 native Hindi voices) under a single canonical architecture:
+
+1. **Shared Core: Canonical Voice Profile Registry & Provider Adapters**:
+   - **`VoiceProfileRegistry`** ([`registry.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/registry.py)): Singleton registry indexing all available voices from curated studio catalogs. Exposes sub-millisecond querying (`query_profiles()`) filtering by language code (`hi-IN`, `en-US`), gender, dialect, perceived age, pitch tier (`low`, `medium`, `high`), and dramatic archetype.
+   - **`ProviderCapabilities` & Adapters** ([`adapters/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/)):
+     - [`GeminiVoiceAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/gemini_adapter.py): Translates canonical profiles into Gemini REST payloads (`speechMetadata.style`, temperature, and FFmpeg parametric EQ filter strings).
+     - [`QwenVoiceAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/adapters/qwen_adapter.py): Generates native speed float multipliers and provisions prompt reference audio WAV stems for zero-shot neural voice cloning.
+
+2. **Subsystem 1: Studio Casting Director (`StudioCastingDirector`)**:
+   - **Hollywood Ensemble Prompting**: Enforces lead narrator transparency (`0.32` temperature), strict gender matching, dramatic vocal contrast across co-speakers, and regional Hindustani dialect matching (Haryanvi warriors/guards, Bhojpuri commoners/butchers, Awadhi healers/aristocracy, Bundeli foresters, Urdu courtly scholars).
+   - **Anime Seiyū Child Rule Guard**: Strictly prohibits adult male baritones from voicing pre-pubescent children (age $< 13$). Automatically casts youthful female voices with bright upper harmonics (`hi-in-tutor-7`, `hi-in-tutor-9`, `Leda`).
+   - **Control Plane Gateway Routing**: Routes requests via [`execute_casting_llm()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/gateway_bridge.py) through [`ModelGateway.generate_text()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py) with AntiBanGuard 11.0 RPM pacing and session affinity across the 123+ API key inventory.
+   - **Immutable Project Persistence**: Anchors all decisions in `cast_lock.json` via [`CastLockManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/cast_lock.py), dual-indexing by `character_id` and `character_name` to prevent character voice drift across chapters.
+
+3. **Subsystem 2: Scene Acoustic Calibrator (`SceneAcousticCalibrator`)**:
+   - **Pairwise Scene Contrast Matrix**: Analyzes all active co-speakers in each scene to compute Euclidean separation distance across acoustic vectors (pitch, perceived age, timbre brightness, formant profile).
+   - **Surgical Non-Destructive Parametric EQ Formants**: If co-speaker acoustic distance is $< 0.65$, generates complementary parametric EQ curves:
+     - Speaker 1: Low-end warmth boost (+2.0 dB at 150 Hz chest resonance) and gentle presence dip (-1.5 dB at 2.8 kHz).
+     - Speaker 2: Presence and clarity boost (+2.0 dB at 2.8 kHz, +1.0 dB at 8 kHz air shelf) with slight low-end reduction (-1.5 dB at 150 Hz).
+   - **Phase-Safe Audio Invariant**: Strictly bans destructive digital resampling (`asetrate`) and WSOLA time-stretching (`atempo`) during playback, preserving authentic speech formants and eliminating metallic flanging.
+   - **Remediation of the Sledgehammer DSP Bug**: Fixed line 778 of `TTSDispatcher`, ensuring that `AUDIBLE_CLEAN_DSP=true` preserves surgical parametric EQ curves without wiping upstream acoustic contrast.
+
+---
+
+### Room 3.5 $\rightarrow$ Room 4 Boundary: Gate 2.8 Auditory Distinction Gate
+*Module:* [`audiobook_factory/gates/gate28_distinction.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/gate28_distinction.py)
+
+Gate 2.8 operates as an authoritative pre-synthesis gatekeeper positioned immediately prior to Gate 2.9:
+1. **Speaker Whitelist & Cast Lock Verification**: Asserts that every dialogue speaker has a non-null voice assignment in `voice_registry.json` and a permanent lock in `cast_lock.json`. Zero silent fallback to Narrator for dialogue turns.
+2. **Scene Pairwise Auditory Separation Distance ($\ge 0.65$)**: Enforces that co-speakers conversing in any scene maintain an acoustic Euclidean distance $\ge 0.65$, guaranteeing that listeners can effortlessly distinguish characters by ear.
+3. **Phase-Safe DSP Audit**: Scans segment `eq_filters` and raises a fatal `GateAuditError` if `asetrate` or `atempo` are present.
 
 ---
 

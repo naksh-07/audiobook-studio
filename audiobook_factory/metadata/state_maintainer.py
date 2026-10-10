@@ -256,15 +256,21 @@ class NovelStateMaintainer:
             return {}
 
         with _STATE_LOCK:
-            from audiobook_factory.character_caster import CharacterCaster
+            from audiobook_factory.casting.director import StudioCastingDirector
 
             p_dir = Path(project_dir).resolve()
-            cast_cfg = CharacterCaster.cast_single_speaker(
-                speaker_name=speaker_name.strip(),
-                project_dir=p_dir,
+            director = StudioCastingDirector(project_dir=p_dir)
+            lock = director.cast_character(
+                character_name=speaker_name.strip(),
                 gender=gender,
-                use_hindi=use_hindi,
+                use_hindi=bool(use_hindi) if use_hindi is not None else True,
             )
+            cast_cfg = {
+                "backend": "gemini_tts",
+                "voice": lock.voice_id,
+                "pitch": lock.calibration_overrides.get("pitch", 1.0),
+                "speed": lock.calibration_overrides.get("speed", 1.0),
+            }
 
             # Load or use existing BookBible
             bible_path = p_dir / "book_bible.json"
