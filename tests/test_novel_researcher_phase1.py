@@ -43,9 +43,14 @@ from audiobook_factory.translation.entity_discovery import ChapterEntityHarveste
 class TestNovelResearcherPhase1(unittest.TestCase):
     def setUp(self):
         self.temp_dir = Path(tempfile.mkdtemp(prefix="test_novel_researcher_"))
+        self._prev_mock_offline = os.environ.get("MOCK_OFFLINE")
         os.environ["MOCK_OFFLINE"] = "1"
 
     def tearDown(self):
+        if self._prev_mock_offline is not None:
+            os.environ["MOCK_OFFLINE"] = self._prev_mock_offline
+        else:
+            os.environ.pop("MOCK_OFFLINE", None)
         if self.temp_dir.exists():
             shutil.rmtree(self.temp_dir, ignore_errors=True)
 

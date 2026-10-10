@@ -17,6 +17,7 @@ Validates:
    pronunciation/contracts.py, pronunciation/provenance.py).
 """
 
+import os
 import ast
 import json
 import re
@@ -40,7 +41,14 @@ FACTORY_DIR = WORKSPACE_DIR / "audiobook_factory"
 class TestModelManagerAndStrictHalt(unittest.TestCase):
 
     def setUp(self):
+        self._prev_mock = os.environ.pop("MOCK_OFFLINE", None)
         self.manager = ModelManager(cache_ttl_sec=3600.0, ping_cache_ttl_sec=300.0)
+
+    def tearDown(self):
+        if self._prev_mock is not None:
+            os.environ["MOCK_OFFLINE"] = self._prev_mock
+        else:
+            os.environ.pop("MOCK_OFFLINE", None)
 
     # =========================================================================
     # 1. Dynamic Discovery & Semantic Capability Tiering

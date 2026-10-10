@@ -29,6 +29,7 @@ class TestMultiAgentPreproduction(unittest.TestCase):
 
     def setUp(self):
         import os
+        self._prev_mock_offline = os.environ.get("MOCK_OFFLINE")
         os.environ["MOCK_OFFLINE"] = "1"
         self.temp_dir = tempfile.TemporaryDirectory()
         self.project_dir = Path(self.temp_dir.name)
@@ -49,6 +50,11 @@ class TestMultiAgentPreproduction(unittest.TestCase):
             f.write("Geralt of Rivia entered the dark tavern of Blaviken. The innkeeper stared in silence.")
 
     def tearDown(self):
+        import os
+        if self._prev_mock_offline is not None:
+            os.environ["MOCK_OFFLINE"] = self._prev_mock_offline
+        else:
+            os.environ.pop("MOCK_OFFLINE", None)
         self.temp_dir.cleanup()
 
     def test_dramatis_personae_agent(self):
