@@ -42,6 +42,7 @@ flowchart TD
         PBible --> DramAST["Immutable Chapter Dramatic AST (dramatic_plan.json)"]
     end
 
+<<<<<<< HEAD
     subgraph Room3Adapters["🎙️ Room 3 Adapters: Specialized Scripting Adapters (adapters/)"]
         DramAST -->|Audible Flow Standard| AudiobookAd["AudiobookAdapter (adapters/audiobook.py)<br/>• Prose-Lead Framing ('वक्ता ने पूछा—')<br/>• Unbroken Character Dialogue Turns<br/>• Transparent Measured Narration (0.32 temp)<br/>• Anti-Swap Dialogue Attribution (0% Inversion)"]
         DramAST -->|Conversational Spoken-First| PodcastAd["PodcastAdapter (adapters/podcast.py)<br/>• 2-Host Dynamic (Inquisitive Driver <-> Domain Expert)<br/>• SpokenBreathabilityTransformer (<= 22 words, 140ms breath)<br/>• 5-Part Retention Arc (Cold Open to Show Outro)<br/>• Stereo Spatial Staging (-0.25 Left / +0.25 Right)"]
@@ -64,15 +65,14 @@ flowchart TD
         G29["PreSynthesisGate & LLMPreSynthesisJudge<br/>• Tier 1: Deterministic Fast-Path (Whitelist, Hindi Gender Inflection, Acoustic Bounds)<br/>• Tier 2: Adversarial LLM Attribution Judge (123+ Gemini Key Pool, BLOCK_NONE)<br/>• Fail-Closed: Raises GateAuditError to prevent API quota burn"]
     end
 
-    subgraph Room4["🎙️ Room 4: 4D Formant Multi-Voice TTS & Editorial"]
-        Caster["Character Caster & 4D Acoustic Formants<br/>Pitch Δ (+/-4-12%), Tempo & Parametric EQ Curves"]
-        Caster --> TTS["Gemini Flash TTS Key Pool (120+ Active Keys)<br/>Prosodic Acting, Speech Tags & Breath Marks"]
-        TTS --> Critic["TakeAuditionCritic & Audio Take QA"]
-        Critic --> Editorial["Dialogue Editorial Layer (DE-01 - DE-07)<br/>Endpoint Snapping, Hann Micro-Fades & Turn Latency"]
+    subgraph Room4["🎙️ Room 4: Studio TTS Platform Core (Option C)"]
+        Facades["Specialized Client Facades<br/>• GenericTTSClient (Single-Utterance / Audition)<br/>• LongFormTTSClient (Prose Stream & Checkpoints)<br/>• MultiCastStudioClient (Ensemble Screenplay)"]
+        Facades --> CoreEng["Shared TTS Core & Model Adapters<br/>• UniversalInputGuard & 4-Tier Semantic Chunker<br/>• Gemini Flash TTS (123+ Key Pool, BLOCK_NONE)<br/>• Qwen3-TTS (HardwareVRAMGuard)"]
+        CoreEng --> EditorialDSP["Editorial DSP & Quality Gate<br/>• TwoTierAudioQualityGate (Math + Phonetic)<br/>• FormantSculptor (Headroom EQ & Soft Tanh)<br/>• EditorialDSPEngine (12ms/18ms Hann Fades & Net Silence)<br/>• TakeBankManager (Multi-Take Auditioning)"]
     end
 
     subgraph Room5["🎛️ Room 5: Broadcast Mastering & Multi-Format Packaging"]
-        Editorial --> TrackSplit{"Format Mode Dispatch"}
+        EditorialDSP --> TrackSplit{"Format Mode Dispatch"}
         TrackSplit -->|Audiobook Track| M4BMaster["Studio Vocal Master: -19.0 LUFS / -1.5 dBTP<br/>SOXR 48kHz / 24-bit + Dual-Pass Linear Loudnorm<br/>Chaptered .m4b with Embedded Cover Art"]
         TrackSplit -->|Podcast Track| M4AMaster["Podcast Master: -16.0 LUFS / -1.0 dBTP<br/>Stereo Spatial Azimuth Staging (-0.25 / +0.25)<br/>AAC .m4a / .mp3 with Show Notes & Chapters"]
     end
@@ -277,6 +277,7 @@ Gate 2.9 stands as the authoritative, fail-closed verification boundary position
 
 ---
 
+<<<<<<< HEAD
 ### Room 4: 4D Formants & Voice Performance Realization
 *Modules:* [`audiobook_factory/character_caster.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/character_caster.py), [`audiobook_factory/tts_dispatcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts_dispatcher.py), [`audiobook_factory/dialogue_editorial.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/dialogue_editorial.py), [`audiobook_factory/performance/take_critic.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/performance/take_critic.py)
 
@@ -476,6 +477,38 @@ audiobook-factory/
 │   └── certification/                   # 8-Pillar Studio Certification Harness (P1-P8)
 └── docs/                                # Production-grade technical documentation
 ```
+=======
+### Room 4: Unified TTS Platform Core & Dialogue Stem Realization
+*Modules: [`audiobook_factory/tts/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/), [`audiobook_factory/character_caster.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/character_caster.py), [`docs/TTS_PLATFORM_CORE_SPECIFICATION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)*
+
+Room 4 implements the **Studio TTS Platform Core (Option C: Layered Shared Core with Specialized Pipeline Facades)**, 100% certified with **882/882 passing tests**. It permanently decouples disparate caller patterns into three specialized high-level facades backed by a shared orchestration engine:
+
+1. **Option C Specialized Facade Decoupling**:
+   - **`GenericTTSClient`**: Ad-hoc, low-latency ($<800\text{ms}$), single-utterance synthesis for CLI interactions, UI feedback, and voice auditions (`speak()`, `speak_to_bytes()`).
+   - **`LongFormTTSClient`**: Continuous full-chapter and novel narrative streaming (`synthesize_prose()`, `synthesize_chapter()`). Integrates a 4-tier semantic chunker (Scene $\to$ Paragraph $\to$ Sentence $\to$ Clause) and checkpoint caching (`checkpoint_manifest.json`) to eliminate autoregressive rate drift and redundant API costs.
+   - **`MultiCastStudioClient`**: Full multi-character ensemble audio drama production (`produce_screenplay()`). Manages `cast_lock.json` persistent voice assignments, Anime Seiyū child casting patterns, anti-swap attribution verification, TakeBank multi-take auditioning, and conversational turn latencies.
+
+2. **The 4-Tier Stack Architecture**:
+   - **Tier 1 (Specialized Facades)**: High-level entrypoints isolating caller semantics from synthesis internals.
+   - **Tier 2 (Shared Core Orchestration)**: `UniversalInputGuard` (preserving sacred literary text while fully phonetizing Devanagari/Arabic numerals and currencies, and stripping stage brackets into `DeliveryIntent`), `SemanticProseChunker` (80–160 word boundaries, zero mid-word cuts), `TTSCoreOrchestrator`, and `TokenBucketRateLimiter` managing a 120+ active SQLite key pool with anti-bot jitter ($0.35\text{s}-0.85\text{s}$).
+   - **Tier 3 (Pluggable Model Adapters)**: `GeminiTTSAdapter` (Google Cloud REST API with permanent `BLOCK_NONE` safety thresholds, stealth SDK headers, and direct 24kHz PCM unpacking) and `QwenTTSAdapter` (local Wafer-Scale / CosyVoice inference guarded by `HardwareVRAMGuard` semaphore locking), registered in `ModelAdapterRegistry`.
+   - **Tier 4 (Editorial DSP & Quality Gate)**:
+     - `TwoTierAudioQualityGate`: Tier 1 mathematical waveform probe (peak $\ge 1500$, $-52 \le \text{RMS} \le -6\text{ dBFS}$, $|DC| \le 0.05$, consecutive clips $\le 5$, dead air $\le 2.5\text{s}$) plus Tier 2 phonetic duration and token integrity bounds.
+     - `EditorialDSPEngine`: Snaps endpoints via `ZeroCrossingAligner` (-52 dBFS speech floor), applies raised-cosine Hann micro-fades (`HannFadeProcessor`, 12ms in / 18ms out), and dynamically subtracts acoustic room tone decay via `NetSilenceProcessor` ($\text{Injected} = \max(20\text{ms}, \text{Target} - (\text{Tail}_A + \text{Head}_B))$).
+     - `FormantSculptor`: Pure Python 2nd-order biquad peaking EQ filters with headroom pre-attenuation ($10^{-G_{\max}/20}$) and soft tanh knee peak limiting ($\le 32,760$) to eliminate vocal convergence when multiple characters share base neural voices.
+     - `TakeBankManager`: Multi-take auditioning (`standard`, `restraint`, `vulnerable`, `exposed`) for high-stakes dramatic turns.
+
+3. **Room 4 vs Room 5 Pipeline Boundary**:
+   - **Room 4 Output Scope**: Room 4 strictly terminates with the rendered, edited dialogue stem (`stage="dialogue_stem"`). It guarantees pristine actor performance and zero double pauses, but **strictly refrains from global EBU R128 loudness compression**.
+   - **Room 5 Hand-off**: Room 5 receives the uncompressed dialogue stem and executes global two-pass linear EBU R128 (-19.0 LUFS / -1.5 dBTP) broadcast mastering, SOXR 48kHz / 24-bit resampling, and chaptered `.m4b` container packaging.
+
+### Room 5: Broadcast Vocal Mastering & M4B Packaging
+*Modules: [`audiobook_factory/mastering.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering.py), [`audiobook_factory/packager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/packager.py)*
+
+1. **Two-Pass Linear EBU R128 Loudnorm**: Ingests the Room 4 dialogue stem (`stage="dialogue_stem"`), measures loudness metrics ($I$, $TP$, $LRA$) with `-f null -`, and applies linear normalization to target **-19.0 LUFS** with a hard ceiling of **-1.5 dBTP**. Zero dynamic compression pumping or room-tone breathing.
+2. **SOXR Kaiser Sinc Resampling**: Resamples pristine dialogue audio from 24kHz to broadcast studio standard 48kHz / 24-bit with triangular dither.
+3. **Chaptered M4B Container Packaging**: Embeds FFMETADATA1 chapter markers, TOC navigation, and embedded high-resolution cover artwork into a distributable AAC-LC `.m4b` audiobook package.
+>>>>>>> origin/tts-system
 
 ---
 

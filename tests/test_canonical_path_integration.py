@@ -195,8 +195,8 @@ def test_p1_1_calibrated_temperature_preservation():
 
                 if captured_payload:
                     temp = captured_payload["generationConfig"]["temperature"]
-                    # Restraint base is calibrated -> clamped within [0.30, 0.55] according to AGENTS.md domain rules
-                    assert 0.30 <= temp <= 0.55, f"Calibrated restraint temperature {temp} must be within clamped domain range [0.30, 0.55]."
+                    # Restraint base is calibrated -> with studio temperature clamping, must be within [0.30, 0.52]
+                    assert 0.30 <= temp <= 0.52, f"Calibrated restraint temperature {temp} must adhere to Studio clamping rules [0.30, 0.52]."
 
 
 def test_p1_3_dialogue_editorial_qc_acoustic_fatal_halt():

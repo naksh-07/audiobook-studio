@@ -14,7 +14,7 @@ from audiobook_factory.key_manager import get_persistent_key_pool
 DEFAULT_BACKEND = os.environ.get("TTS_PRIMARY_BACKEND", "gemini_tts")
 DEFAULT_VOICE = os.environ.get("GEMINI_DEFAULT_VOICE", "Aoede")
 DEFAULT_MODEL = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
-DEFAULT_BATCHING_ENABLED = os.environ.get("TTS_BATCHING_ENABLED", "false").lower() in ("true", "1", "yes")
+DEFAULT_BATCHING_ENABLED = False
 DEFAULT_FORCED_ALIGNMENT_ENABLED = os.environ.get("TTS_FORCED_ALIGNMENT_ENABLED", "true").lower() in ("true", "1", "yes")
 DEFAULT_DECLICK_FADE_MS = float(os.environ.get("TTS_DECLICK_FADE_MS", "5.0"))
 ENABLE_EMERGENCY_FALLBACK = os.environ.get("ENABLE_EMERGENCY_FALLBACK", "false").lower() in ("true", "1", "yes")

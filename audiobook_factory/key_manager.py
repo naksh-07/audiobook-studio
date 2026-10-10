@@ -683,6 +683,7 @@ from audiobook_factory.core.models.lease_manager import (
 __all__ = [
     "PersistentKeyPool",
     "get_persistent_key_pool",
+    "global_key_pool",
     "AllKeysExhaustedTodayError",
     "classify_gemini_error",
     "DEFAULT_DB_PATH",
@@ -691,4 +692,10 @@ __all__ = [
     "CallerIdentity",
     "get_key_lease_manager",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name == "global_key_pool":
+        return get_persistent_key_pool()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
