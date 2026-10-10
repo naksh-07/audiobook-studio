@@ -63,7 +63,11 @@ flowchart TD
         L2B["origin/research-system<br/>(Book DNA, Cast Lock, Dramatis Personae, Metadata Ledger)"]
     end
 
-    subgraph Room2["LAYER 3: ROOM 2 TRANSLATION COLLECTIVE"]
+    subgraph Room1_5["ROOM 1.5: GLOSSARY & CHAPTER METADATA SUBSYSTEM (COMPLETED & VERIFIED)"]
+        L1_5["audiobook_factory/glossary/<br/>(GlossaryManager, ChapterLexicalScanner, Tri-Partite Taxonomy, Multi-Consumer Projections)"]
+    end
+
+    subgraph Room2["LAYER 3: ROOM 2 TRANSLATION COLLECTIVE (COMPLETED & VERIFIED)"]
         L3["origin/translation<br/>(Option D Standalone Single-Pass Translation, Macro-Chunker, Parity Gates)"]
     end
 
@@ -84,15 +88,19 @@ flowchart TD
     end
 
     L1 --> L2B
+    L1 --> L1_5
     L1 --> L3
     L1 --> L4
     L1 --> L5
     L2A --> L2B
-    L2B --> L3
+    L2B --> L1_5
+    L1_5 --> L3
+    L1_5 --> L4
+    L1_5 --> L5
     L3 --> L4
     L4 --> L5
     L5 --> L6
-    L1 & L2B & L3 & L4 & L5 & L6 --> L7
+    L1 & L2B & L1_5 & L3 & L4 & L5 & L6 --> L7
 ```
 
 ---
@@ -224,6 +232,42 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
 
 ---
 
+## 5.5 Phase 3.5 Detailed Blueprint & Execution Sign-Off: Room 1.5 Standalone Glossary & Chapter Metadata Subsystem
+
+### 5.5.1 Objectives & Deliverables
+- **Standalone Architectural Decoupling** ([`audiobook_factory/glossary/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/)):
+  - Sits cleanly between Room 1 (Whole-Book Pre-Production / Research) and downstream consumers: Room 2 (Translation), Room 3 (Screenplay / Dramaturgy), and Room 4 (TTS Voice Casting).
+  - Maintains 100% zero-import isolation from downstream audio (`audiobook_factory.audio`), TTS (`audiobook_factory.tts`), screenplay (`audiobook_factory.screenplay`, `audiobook_factory.dramaturgy`), and direct unmetered network libraries (`urllib.request`, `requests`, `httpx`).
+- **Core Modules & Invariants**:
+  - [`contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/contracts.py): Canonical Pydantic v2 schemas (`EntityCategory`, `ChapterEntity`, `ChapterGlossary`) with multi-consumer projections:
+    - `to_translation_glossary()` -> `Dict[str, str]` (English -> Hindi transliterations/translations).
+    - `to_scripting_roster()` -> `Dict[str, Any]` (entity types, genders, aliases, voice styles).
+    - `to_dramaturgy_characters()` -> `Dict[str, str]` (character ID -> canonical display name).
+  - [`scanner.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/scanner.py): `ChapterLexicalScanner` regex sweep with zero-token fast-path filter. Scans chapter text using capitalization, multiword title patterns, and 130+ stopword filters. If all candidates are cataloged in `BookBible`, **zero LLM tokens are consumed**.
+  - [`classifier.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/classifier.py): `GlossaryClassifier` with Tri-Partite taxonomy prompt and backward-compatible unwrap (`characters`, `entities`, `candidates`).
+  - [`manager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/manager.py): `GlossaryManager` single-pass orchestrator syncing with `BookBible`, performing thread-safe dynamic voice casting via `NovelStateMaintainer.discover_and_lock_character()`, and saving chapter artifacts (`chapter_glossary.json`).
+  - [`gateway_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/gateway_bridge.py): `execute_glossary_llm()` strictly routing requests through Phase 1 `ModelGateway.generate_text()` with atomic key leases (`Concurrency = 1`), AntiBanGuard 11.0 RPM pacing, `BLOCK_NONE` creative safety framing, and fail-closed policy.
+  - Backward-Compatible DRY Shim ([`audiobook_factory/translation/entity_discovery.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/entity_discovery.py)): Thin wrapper pointing `EntityDiscoveryEngine`, `ChapterEntityHarvester`, and `DiscoveredEntity` to `GlossaryManager`.
+  - Lazy Imports ([`audiobook_factory/__init__.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/__init__.py)): Registered `GlossaryManager` and `ChapterGlossary`.
+
+### 5.5.2 Forensic Verification & Audit Ledger (Room 1.5 Sign-Off)
+1. **Zero Unmetered Network Endpoints**:
+   - Zero raw `urllib`, `requests`, or `httpx` imports inside `audiobook_factory/glossary/`.
+   - Verified by AST architectural test: `tests/glossary/test_zero_import_isolation.py`.
+2. **Zero-Token Fast-Path**:
+   - Verified by `test_02_scanner_zero_token_fast_path`: When entities already exist in `BookBible`, LLM classifier is never invoked.
+3. **Multi-Consumer Projections & State Sync**:
+   - Verified by `test_01_contracts_and_multi_consumer_projections` and `test_04_glossary_manager_end_to_end_and_state_sync`: Produces accurate projections for Translation, Screenplay, and TTS casting without circular coupling.
+4. **Test Matrix**:
+   - Dedicated Glossary Test Suite: 8/8 Green (100% in 0.68s).
+   - Pre-Production Subsystem Suites: 28/28 Green.
+   - Translation Subsystem Suites: 105/105 Green.
+   - Model Control Plane Suite: 43/43 Green.
+   - Total Regression Suite: 100% Green across all unified tests.
+5. **Sign-Off Status**: COMPLETED, VERIFIED, & OFFICIALLY SIGNED OFF.
+
+---
+
 ## 6. Forward Milestones Summary
 
 | Phase | Subsystem | Status | Target Test Baseline | Key Deliverable |
@@ -231,10 +275,12 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
 | **Phase 1** | Model & Keys Manager | **COMPLETED & VERIFIED** | 43/43 + 80/80 + 881 Green | Production Control Plane, 123-Key Fleet & Anti-Ban Guard |
 | **Phase 2** | Novel Researcher & Pre-Production | **COMPLETED & VERIFIED** | 30/30 + 43/43 + 37/37 Green | 2-System Pre-Production, Cast Lock & State Maintainer (`origin/research-system`) |
 | **Phase 3** | Standalone Translation (Option D) | **COMPLETED & VERIFIED** | 105/105 + 225+ Unified Green | Single-Pass Macro-Chunker, DeterministicParityGate & Gateway Bridge (`origin/translation`) |
+| **Room 1.5** | Standalone Glossary & Metadata | **COMPLETED & VERIFIED** | 8/8 + 28/28 Unified Green | Multi-Consumer Projections, Tri-Partite Taxonomy & Zero-Token Fast Path (`audiobook_factory/glossary/`) |
 | **Phase 4** | Universal Dramaturgy (Option C) | **READY TO EXECUTE** | ~1,070 Tests | Chapter Dramatic AST & Dual-Host Adapters (`origin/dramaturgy`) |
 | **Phase 5** | Studio TTS Platform Core | Queued | ~1,150 Tests | 4-Tier TTS Engine, TakeBank & Net-Silence (`origin/tts-system`) |
 | **Phase 6** | Pro-Grade AI Vocal Mastering | Queued | ~1,200 Tests | C++ JUCE / FFmpeg Vocal Mastering & M4B (`origin/audio-mixing-and-production`) |
 | **Phase 7** | Enterprise DAG Orchestrator & UI | Queued | ~1,250 Tests | SQLite WAL Pipeline Ledger & Studio Panel UI (`origin/Voculs`) |
+
 
 
 

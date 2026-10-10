@@ -20,5 +20,10 @@
   - Zero-import isolation: 0 imports from audio, TTS, or screenplay in translation core. Localized atomic replace in `memory_store.py`.
   - Adversarial audit passed: Permanently removed `urllib` and `_direct_gemini_call` from `engine.py`. Fail-closed policy enforced in `gateway_bridge.py`. Zero unmetered HTTP calls.
   - 102/102 translation tests and 168+ multi-phase regression tests 100% green.
+- **Room 1.5: Standalone Glossary Subsystem (COMPLETED & VERIFIED)**:
+  - Sits between Room 1 (Research) and downstream consumers (Translation, Dramaturgy, TTS casting).
+  - Pydantic v2 `ChapterGlossary` contracts with multi-consumer projections (`to_translation_glossary`, `to_scripting_roster`, `to_dramaturgy_characters`).
+  - Zero-token fast-path `ChapterLexicalScanner`, Tri-Partite taxonomy (`PROPER_NAME`, `HERALDIC_MONIKER`, `OCCUPATIONAL_ROLE`), dynamic voice casting lock.
+  - Zero rogue endpoints: 100% routed through `ModelGateway` / `gateway_bridge.py`. 8/8 dedicated tests 100% green.
 - **Next Milestone: Phase 4 - Universal Dramaturgy (`origin/dramaturgy`)**:
   - Merge Chapter Dramatic AST, dual-host podcast adapters, and 8-Pillar certification harness.

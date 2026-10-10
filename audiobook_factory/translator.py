@@ -525,19 +525,29 @@ def translate_chapter(
                     book_dna = json.load(f)
             except Exception:
                 pass
-        # Step 0: Room 1.5 - Autonomous Chapter Entity & Moniker Harvester
+        # Step 0: Room 1.5 - Standalone Chapter Glossary & Metadata Manager
         try:
-            from audiobook_factory.translation.entity_discovery import ChapterEntityHarvester
+            from audiobook_factory.glossary import GlossaryManager
             m_ch = re.search(r"(\d+)", block_label or "")
             ch_num = int(m_ch.group(1)) if m_ch else 1
-            glossary = ChapterEntityHarvester.harvest_and_sync(
+            GlossaryManager.scan_and_sync_chapter(
                 chapter_text=chapter_text,
                 project_dir=Path(project_dir),
                 chapter_num=ch_num,
-                global_glossary=glossary,
             )
+            # Retrieve consolidated translation glossary
+            g_exported = GlossaryManager.export_for_translation(
+                chapter_num=ch_num,
+                project_dir=Path(project_dir),
+                chapter_text=chapter_text,
+            )
+            if g_exported:
+                if isinstance(glossary, dict):
+                    glossary.update(g_exported)
+                else:
+                    glossary = g_exported
         except Exception as e:
-            logger.warning(f"  [!] ChapterEntityHarvester pre-translation sync notice: {e}")
+            logger.warning(f"  [!] GlossaryManager pre-translation sync notice: {e}")
 
         # Step 1: READ ONLY before translation
         mem_block = _retrieve_chapter_memory_in_translator(

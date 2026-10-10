@@ -73,6 +73,13 @@ _LAZY_IMPORTS: Dict[str, Tuple[str, str]] = {
     "ExtractionQualityReport": (".book_model", "ExtractionQualityReport"),
     "ExtractionGateAuditError": (".book_model", "ExtractionGateAuditError"),
     
+    # Room 1.5: Standalone Glossary & Chapter Metadata
+    "GlossaryManager": (".glossary", "GlossaryManager"),
+    "ChapterGlossary": (".glossary", "ChapterGlossary"),
+    "ChapterEntity": (".glossary", "ChapterEntity"),
+    "ChapterLexicalScanner": (".glossary", "ChapterLexicalScanner"),
+    "GlossaryClassifier": (".glossary", "GlossaryClassifier"),
+
     # Translation
     "translate_book_project": (".translator", "translate_book_project"),
     "normalize_translated_lexicon": (".translator", "normalize_translated_lexicon"),
