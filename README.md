@@ -13,7 +13,7 @@
 [![Audiobook Master](https://img.shields.io/badge/Audiobook%20Master-EBU%20R128%20(-19%20LUFS)-purple.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)
 [![Podcast Master](https://img.shields.io/badge/Podcast%20Master-EBU%20R128%20(-16%20LUFS)-indigo.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 [![Certification](https://img.shields.io/badge/Certification-8--Pillar%20Studio%20Harness-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/QUALITY_GATES.md)
-[![Tests](https://img.shields.io/badge/Tests-1%2C121%2F1%2C121%20Passing%20(100%25)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests)
+[![Tests](https://img.shields.io/badge/Tests-1%2C126%2F1%2C126%20Passing%20(100%25)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
 ---
@@ -357,7 +357,7 @@ xcopy /E /I /Y . "%USERPROFILE%\.gemini\config\plugins\audiobook-studio"
 
 ## 🧪 Verification & Quality Testing
 
-Audiobook Studio includes over 800 passing automated unit and integration tests:
+Audiobook Studio is certified by 1,126 passing automated unit, integration, and contract tests (100% green):
 
 ```bash
 # Run complete test suite

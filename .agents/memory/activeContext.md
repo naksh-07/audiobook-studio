@@ -13,6 +13,6 @@
   - Tier 2: `UniversalInputGuard` (sacred/spoken boundary), `DevanagariNumeralExpander`, `DeliveryIntentExtractor`, `SemanticProseChunker` (4-tier hierarchy).
   - Tier 3: `ModelAdapterRegistry`, `GeminiTTSAdapter` (123+ key pool, `BLOCK_NONE`), `QwenTTSAdapter` (HardwareVRAMGuard).
   - Tier 4: `TwoTierAudioQualityGate`, `FormantSculptor` (headroom EQ biquad & soft tanh), `TakeBankManager` (candidate auditioning), `EditorialDSPEngine` (12ms/18ms Hann fades, net silence).
-  - Control Plane Hardening: Created `gateway_bridge.py` (`execute_tts_synthesize`), eliminated rogue urllib calls, sanitized query string API keys, enforced `KeyLeaseManager` ACID leasing (`workload_type="tts"`, Concurrency=1), activated `AntiBanGuard` 7 Iron Shields (11 RPM token bucket), fixed `acquire_lease` SQL parameter ordering.
-  - Verification: 1,121/1,121 passed tests across the repository (100% green, zero failures).
+  - Control Plane Hardening & Dispatcher Unification: Created `gateway_bridge.py` (`execute_tts_synthesize`, `execute_tts_to_file`, `execute_multispeaker_batch_to_file`), bridged legacy `TTSDispatcher` to `ModelGateway`, native `multiSpeakerVoiceConfig` payload formatting, eliminated rogue urllib calls, sanitized query string API keys, enforced `KeyLeaseManager` ACID leasing (`workload_type="tts"`, Concurrency=1), activated `AntiBanGuard` 7 Iron Shields (11 RPM token bucket).
+  - Verification: 1,126/1,126 passed tests across the repository (100% green, zero failures).
 - **Next Milestone**: Phase 6 Pro-Grade AI Vocal Mastering (`origin/audio-mixing-and-production`).

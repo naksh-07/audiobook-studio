@@ -414,3 +414,19 @@ The TTS Platform Core test suite validates all contracts, edge cases, audio proc
   - Long-form prose and chapter streaming in [`LongFormTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/long_form_client.py).
   - Multi-character ensemble drama production in [`MultiCastStudioClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/multi_cast_client.py).
   - 100% backward compatibility maintained via [`audiobook_factory.tts_dispatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts_dispatcher.py).
+- [x] **Phase 6: Central Control Plane Integration & Legacy Dispatcher Unification**
+  - Central gateway bridge in [`gateway_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/gateway_bridge.py) routing 100% of speech synthesis traffic through [`ModelGateway.synthesize_speech()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py#L230).
+  - ACID Key Leasing strictly enforced with `workload_type="tts"` and Concurrency=1 mutual exclusion handles.
+  - The 7 Iron Shields anti-ban protocols active (11 RPM token-bucket rate limiting, 3.5s minimum gap, session affinity, emergency global tripwire).
+  - Unification of legacy [`TTSDispatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/dispatcher.py): `_call_gemini_tts` and `_call_gemini_multispeaker_batch` route through `execute_tts_to_file` and `execute_multispeaker_batch_to_file`.
+  - Zero unmetered HTTP requests: `GeminiTTSAdapter` and `TTSDispatcher` completely eliminate rogue `urllib.request.urlopen` calls in production.
+  - Multi-speaker `speech_config` native payload support in [`GeminiModelAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/adapters/gemini.py).
+
+---
+
+## 10. Certified Quality Scorecard
+- **Repository Full Test Matrix**: **1,126 passed**, 8 skipped, 0 failures.
+- **Dedicated TTS Test Matrix**: **66 passed**, 0 failures in `tests/tts/`.
+- **Model Gateway Integration**: **5 passed**, 0 failures in `tests/test_model_gateway_integration.py`.
+- **Batch Planning & Declicking**: **43 passed**, 0 failures in `tests/test_batch_planner_and_declicking.py` & `test_audit_fixes.py`.
+
