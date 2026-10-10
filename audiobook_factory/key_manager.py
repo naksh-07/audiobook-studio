@@ -433,7 +433,18 @@ class PersistentKeyPool:
 
     @contextlib.contextmanager
     def lease_key(self, service: str = "text", provider: str = "gemini", model: Optional[str] = None):
-        """Context manager leasing a key with active in-flight concurrency tracking."""
+        """Context manager leasing a key with active in-flight concurrency tracking.
+        Delegates transparently to KeyLeaseManager control plane when available."""
+        try:
+            from audiobook_factory.core.models.lease_manager import get_key_lease_manager
+            klm = get_key_lease_manager()
+            with klm.lease_key(workload_type=service, provider=provider, model=model, allow_multi_lease=True) as lease:
+                yield lease.api_key
+                return
+        except Exception:
+            # Fallback to local table tracking
+            pass
+
         key = self.get_key(service=service, provider=provider, model=model)
         kh = self._hash_key(key)
         with self.lock, self._connection() as conn:
@@ -448,6 +459,12 @@ class PersistentKeyPool:
 
     def record_success(self, api_key: str, model: Optional[str] = None, provider: str = "gemini", tokens_used: int = 0):
         """Records a successful synthesis or generation call."""
+        try:
+            from audiobook_factory.core.models.lease_manager import get_key_lease_manager
+            get_key_lease_manager().record_success(api_key, model=model, provider=provider, tokens_used=tokens_used)
+        except Exception:
+            pass
+
         kh = self._hash_key(api_key)
         with self.lock, self._connection() as conn:
             conn.execute("""
@@ -479,6 +496,12 @@ class PersistentKeyPool:
         Marks key as exhausted for today (e.g. 10 RPD reached on TTS).
         If model is specified and not TTS, only marks model_quota_ledger exhausted today!
         """
+        try:
+            from audiobook_factory.core.models.lease_manager import get_key_lease_manager
+            get_key_lease_manager().mark_daily_quota_exhausted(api_key, error_msg=error_msg, model=model, provider=provider)
+        except Exception:
+            pass
+
         from audiobook_factory.logger import logger
         today = self._today_str(provider)
         kh = self._hash_key(api_key)
@@ -523,6 +546,12 @@ class PersistentKeyPool:
 
     def mark_temporary_backoff(self, api_key: str, backoff_seconds: float, error_msg: str = "", model: Optional[str] = None, provider: str = "gemini"):
         """Marks key for temporary backoff without burning it for the whole day."""
+        try:
+            from audiobook_factory.core.models.lease_manager import get_key_lease_manager
+            get_key_lease_manager().mark_temporary_backoff(api_key, backoff_seconds=backoff_seconds, error_msg=error_msg, model=model, provider=provider)
+        except Exception:
+            pass
+
         from audiobook_factory.logger import logger
         kh = self._hash_key(api_key)
         kp = self._preview_key(api_key)

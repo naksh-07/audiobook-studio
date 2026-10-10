@@ -54,10 +54,14 @@ class GeminiProviderAdapter(BaseProviderAdapter):
         **kwargs,
     ) -> Dict[str, Any]:
         """Constructs Google Gemini v1beta JSON request payload."""
+        parts = kwargs.get("parts")
+        if not parts:
+            parts = [{"text": prompt}]
+
         payload: Dict[str, Any] = {
             "contents": [
                 {
-                    "parts": [{"text": prompt}]
+                    "parts": parts
                 }
             ]
         }

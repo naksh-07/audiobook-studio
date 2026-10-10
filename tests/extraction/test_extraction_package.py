@@ -346,7 +346,58 @@ class TestExtractionPackage(unittest.TestCase):
         self.assertEqual(tbl_block.semantic_metadata.get("format"), "markdown")
         self.assertGreaterEqual(tbl_block.semantic_metadata.get("table_rows", 0), 4)
 
+    def test_12_vision_pdf_extractor_routes_through_model_gateway(self):
+        """Verifies GeminiVisionPDFExtractor routes via ModelGateway control plane."""
+        from unittest.mock import MagicMock, patch
+        from audiobook_factory.extraction.parsers.pdf.vision_extractor import GeminiVisionPDFExtractor
+        from audiobook_factory.core.models.adapters.base import GenerationResult
+
+        extractor = GeminiVisionPDFExtractor(api_key="mock_key")
+
+        # Create a dummy single-page PDF
+        pdf_file = self.base_path / "dummy.pdf"
+        import pypdf
+        writer = pypdf.PdfWriter()
+        writer.add_blank_page(width=100, height=100)
+        with open(pdf_file, "wb") as f:
+            writer.write(f)
+
+        mock_response = GenerationResult(
+            text="```markdown\n# Chapter One\nThis is extracted text from page 1.\n```",
+            finish_reason="STOP",
+            tokens_used=120,
+            model_id="gemini-2.5-flash",
+            provider="gemini",
+        )
+
+        with patch("audiobook_factory.core.models.gateway.get_model_gateway") as mock_get_gw:
+            mock_gw = MagicMock()
+            mock_gw.generate_text.return_value = mock_response
+            mock_get_gw.return_value = mock_gw
+
+            result = extractor.escalate_page(pdf_file, page_num=1)
+            self.assertEqual(result, "# Chapter One\nThis is extracted text from page 1.")
+            mock_gw.generate_text.assert_called_once()
+            call_kwargs = mock_gw.generate_text.call_args[1]
+            self.assertEqual(call_kwargs.get("task"), "extraction")
+            self.assertIn("parts", call_kwargs)
+            self.assertEqual(len(call_kwargs["parts"]), 2)
+
+    def test_13_legacy_vision_extractor_compat(self):
+        """Verifies legacy audiobook_factory.pdf.vision_extractor re-exports properly."""
+        from audiobook_factory.pdf.vision_extractor import (
+            GeminiVisionPDFExtractor as LegacyExtractor,
+            PDFEscalationEngine as LegacyEngine,
+        )
+        from audiobook_factory.extraction.parsers.pdf.vision_extractor import (
+            GeminiVisionPDFExtractor,
+            PDFEscalationEngine,
+        )
+        self.assertIs(LegacyExtractor, GeminiVisionPDFExtractor)
+        self.assertIs(LegacyEngine, PDFEscalationEngine)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
