@@ -18,9 +18,10 @@
 - **Phase 3: Standalone Translation Engine (COMPLETED, AUDITED & HARDENED)**:
   - Option D decoupled core (`TranslationEngine`, `BilingualMacroChunker`, `DeterministicParityGate`).
   - Zero-import isolation, fail-closed `gateway_bridge.py`, zero unmetered HTTP calls. 102/102 tests green.
-- **Phase 4: Universal Dramaturgy, Format Adapters & 8-Pillar Certification (MERGED)**:
+- **Phase 4: Universal Dramaturgy, Format Adapters & 8-Pillar Certification (COMPLETED & VERIFIED)**:
   - Core: Universal Dramatic AST (`dramaturgy/contracts.py`, `SceneAnalyzer`, `BeatPlanner`, `PerformanceBible`).
+  - Control Plane: `gateway_bridge.py` wired to `ModelGateway.generate_text()` (zero raw HTTP calls).
   - Adapters: `AudiobookAdapter` (Gate 2.5) & `PodcastAdapter` (Sameer/Priya, Alex/Maya, breathability <=22 words).
-  - 8-Pillar Harness: `StudioCertificationRunner` (P1 Ingestion to P8 Packaging, Gate 6 compliance).
+  - 8-Pillar Harness: `StudioCertificationRunner` (P1 Ingestion to P8 Packaging, Gate 6 fail-closed compliance).
   - Multi-format packaging: `.m4b` audiobook (-19 LUFS) & `.m4a` podcast (-16 LUFS with stereo pan -0.25/+0.25).
-- **Next Milestone**: Run Phase 4 test matrix & invoke auditors (`debugger-detective` & `architect-planner`) for Phase 4 sign-off.
+- **Next Milestone**: Phase 5 Studio TTS Platform Core (`origin/tts-system`). 4-Tier TTS Engine, TakeBank & Net-Silence.
