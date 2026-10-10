@@ -5,10 +5,12 @@
 [![Antigravity Plugin](https://img.shields.io/badge/Antigravity-Plugin%20v1.0.0-blueviolet.svg)](plugin.json)
 [![Python](https://img.shields.io/badge/Python-3.10%2B%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-6.0%2B%20%7C%208.0-red.svg)](https://ffmpeg.org/)
-[![TTS Engine](https://img.shields.io/badge/TTS-Google%20Gemini%20Flash%20TTS-green.svg)](docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
-[![Voice Casting](https://img.shields.io/badge/Voice%20Casting-4D%20Acoustic%20Formant%20Matrix-blue.svg)](docs/VOICE_CASTING_DIRECTOR_GUIDE.md)
-[![Broadcast Standard](https://img.shields.io/badge/Broadcast-Two--Pass%20Linear%20EBU%20R128%20(-19%20LUFS)-purple.svg)](docs/AUDIO_ENGINEERING.md)
-[![Tests](https://img.shields.io/badge/Tests-100%25%20Passing-brightgreen.svg)](tests/)
+[![Control Plane](https://img.shields.io/badge/Control%20Plane-ModelGateway%20%26%20KeyLease-blueviolet.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models)
+[![Fleet Health](https://img.shields.io/badge/Active%20Fleet-123%20Keys%20(Zero--Secret)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/CLI_REFERENCE.md#12-key-inventory--fleet-monitor-keys)
+[![TTS Engine](https://img.shields.io/badge/TTS-Google%20Gemini%20Flash%20TTS-green.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
+[![Voice Casting](https://img.shields.io/badge/Voice%20Casting-4D%20Acoustic%20Formant%20Matrix-blue.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/VOICE_CASTING_DIRECTOR_GUIDE.md)
+[![Broadcast Standard](https://img.shields.io/badge/Broadcast-Two--Pass%20Linear%20EBU%20R128%20(-19%20LUFS)-purple.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)
+[![Tests](https://img.shields.io/badge/Tests-880%2B%20100%25%20Passing-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
 ---
@@ -31,7 +33,7 @@ Audiobook Studio operates both as:
 Background music (BGM), sound effects (SFX), 5-track stem mixdowns, and external sound scraping are **permanently decoupled and archived** in `archive/cinematic_audio/`.
 
 Rather than masking spoken dialogue with noisy background beds or suffering from broken external sound downloaders, this engine channels 100% of its compute into:
-- **Model & Keys Manager Control Plane** ([`KeyLeaseManager`](docs/ARCHITECTURE.md#1-keyleasemanager-acid-inventory--atomic-leases), [`AntiBanGuard`](docs/ARCHITECTURE.md#2-antibanguard-the-7-iron-shields)): ACID SQLite key inventory, atomic single-request mutual exclusion, dead PID crash recovery, and The 7 Iron Shields anti-ban protection (11.0 RPM token bucket, session affinity, 18-32s anti-correlation key-switch delay, stealth SDK headers, emergency global tripwire).
+- **Model & Keys Manager Control Plane** ([`KeyLeaseManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md#1-keyleasemanager-acid-inventory--atomic-leases), [`AntiBanGuard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md#2-antibanguard-the-7-iron-shields)): ACID SQLite key inventory (123+ active healthy keys verified), atomic single-request mutual exclusion (`Concurrency = 1`), Win32 `kernel32.OpenProcess` dead-PID crash recovery, zero-secret salted public aliases (`key_XXXX`), and The 7 Iron Shields anti-ban protection (11.0 RPM token bucket, session affinity, 18-32s anti-correlation key-switch delay, stealth SDK headers, emergency global tripwire).
 - **Google Gemini Flash TTS** with token-bucket rotating key pools and daily quota tracking (10 RPD per key on `gemini-3.8-flash-tts`).
 - **4D Acoustic Formant Modulation** (Pitch $\pm 4-12\%$, tempo, and 4D parametric EQ curves) eliminating vocal convergence.
 - **Stanislavski Directing Anchors** and temperature clamping (`0.30 - 0.52`) to prevent histrionic screeching.
@@ -80,11 +82,12 @@ flowchart TD
 ```
 
 ### 🎛️ Underlying Control Plane: Model & Keys Manager (Option C Architecture)
-All 5 production rooms interface with LLMs and speech models exclusively through [`ModelGateway`](docs/ARCHITECTURE.md#5-modelgateway-unified-production-facade), backed by:
-- **[`KeyLeaseManager`](docs/ARCHITECTURE.md#1-keyleasemanager-acid-inventory--atomic-leases)**: ACID SQLite inventory (`audiobooks/keys_inventory.db`), atomic leases, dead PID crash recovery, and "one user = one key per workload" concurrency limits.
-- **[`AntiBanGuard`](docs/ARCHITECTURE.md#2-antibanguard-the-7-iron-shields)** (The 7 Iron Shields): 11.0 RPM token bucket rate limiting, session affinity sticky binding, 18–32s random anti-correlation key-switch delay, human cadence pacing, stealth SDK headers, and emergency global tripwire.
-- **[`ModelRegistry`](docs/ARCHITECTURE.md#3-modelregistry-canonical-model-catalog)**: Canonical catalog of 50+ models, context budgets, rate limits, quality tiers (`flagship`, `balanced`, `utility`, `audio`, `local`), and modality profiles.
-- **[`RequestRouter`](docs/ARCHITECTURE.md#4-requestrouter-intelligent-router--fallback)**: Task- and capability-based matching, per-model circuit breakers (`CLOSED` / `OPEN` / `HALF_OPEN`), and automated fallback ladders.
+All 5 production rooms interface with LLMs and speech models exclusively through [`ModelGateway`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md#5-modelgateway-unified-production-facade), backed by:
+- **[`KeyLeaseManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md#1-keyleasemanager-acid-inventory--atomic-leases)**: ACID SQLite inventory (`audiobooks/keys_inventory.db`), 123+ active healthy keys, atomic leases (`Concurrency = 1`), Win32 `kernel32.OpenProcess` dead-PID crash recovery, and "one user = one key per workload" concurrency limits.
+- **[`AntiBanGuard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md#2-antibanguard-the-7-iron-shields)** (The 7 Iron Shields): 11.0 RPM token bucket rate limiting, session affinity sticky binding, 18–32s random anti-correlation key-switch delay, human cadence pacing, stealth SDK headers (`x-goog-api-client`), and emergency global tripwire.
+- **[`ModelRegistry`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md#3-modelregistry-canonical-model-catalog)**: Canonical catalog of 50+ models, context budgets, rate limits, quality tiers (`flagship`, `balanced`, `utility`, `audio`, `local`), and modality profiles.
+- **[`RequestRouter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md#4-requestrouter-intelligent-router--fallback)**: Task- and capability-based matching, per-model circuit breakers (`CLOSED` / `OPEN` / `HALF_OPEN`), and automated fallback ladders.
+- **Room 1 Forensic Ingestion Wiring**: Multimodal page escalations in [`GeminiVisionPDFExtractor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf/vision_extractor.py) route directly through `ModelGateway.generate_text()` with inline base64 `parts` payloads, session affinity, and transparent `PersistentKeyPool` $\leftrightarrow$ `KeyLeaseManager` synchronization.
 
 ---
 
@@ -211,6 +214,10 @@ python audiobook_cli.py podcast "paper.pdf" --mock
 
 # Inspect fleet key inventory and active leases:
 audiobook-studio keys status
+# Sweep stale / dead-PID leases (Win32 & POSIX):
+audiobook-studio keys sweep
+# Probe fleet health and active traffic capacity:
+audiobook-studio keys test
 
 # Or step-by-step modular pipeline:
 audiobook-studio extract "path/to/novel.epub"

@@ -100,16 +100,16 @@ flowchart TD
 
 ## 🎛️ Pillar 3: Model & Keys Manager Control Plane (Option C Architecture)
 
-The **Model & Keys Manager Control Plane** ([`audiobook_factory.core.models`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/)) implements **Option C: Shared Core with Specialized Modules + Unified Gateway Facade**. It eliminates direct API key handling, quota race conditions, and Google Cloud edge mass-bans across all 5 production rooms.
+The **Model & Keys Manager Control Plane** ([`audiobook_factory.core.models`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/)) implements **Option C: Shared Core with Specialized Modules + Unified Gateway Facade**. It eliminates direct API key handling, quota race conditions, and Google Cloud edge mass-bans across all 5 production rooms.
 
 ```mermaid
 flowchart TD
     subgraph Rooms["🎬 Downstream Production Rooms"]
-        R1["Room 1: Extraction & Ingestion"]
-        R2["Room 2: Translation Collective"]
-        R3["Room 3: Screenplay & Anti-Swap"]
-        R4["Room 4: Multi-Voice TTS Performance"]
-        R5["Room 5: Vocal Mastering & Telemetry"]
+        R1["Room 1: Extraction & Ingestion<br/>(Vision PDF Escalation via ModelGateway)"]
+        R2["Room 2: Translation Collective<br/>(Single-Pass Deliberative Prose)"]
+        R3["Room 3: Screenplay & Anti-Swap<br/>(Sticky Session Affinity)"]
+        R4["Room 4: Multi-Voice TTS Performance<br/>(4D Acoustic Formants)"]
+        R5["Room 5: Vocal Mastering & Telemetry<br/>(Two-Pass Linear Loudnorm)"]
     end
 
     subgraph Facade["🚪 Unified Production Facade"]
@@ -120,22 +120,22 @@ flowchart TD
         Router["RequestRouter<br/>(Task Matching & Fallback Ladder)"]
         Registry["ModelRegistry<br/>(50+ Canonical Models & Capabilities)"]
         AntiBan["AntiBanGuard<br/>(The 7 Iron Shields Protection Engine)"]
-        LeaseMgr["KeyLeaseManager<br/>(ACID SQLite Mutex & Crash Recovery)"]
+        LeaseMgr["KeyLeaseManager<br/>(ACID SQLite Mutex & Win32 Crash Recovery)"]
         Breaker["CircuitBreaker<br/>(CLOSED / OPEN / HALF_OPEN States)"]
         PolicyEngine["Universal Policy Engine<br/>(Error Normalizer & Quota Rollover)"]
     end
 
     subgraph Persistence["💾 ACID Persistence"]
-        SQLite[("audiobooks/keys_inventory.db<br/>• key_inventory<br/>• key_leases<br/>• model_quota_ledger<br/>• key_audit_log")]
+        SQLite[("audiobooks/keys_inventory.db<br/>• key_inventory (123+ Fleet)<br/>• key_leases (Mutual Exclusion)<br/>• model_quota_ledger<br/>• key_audit_log")]
     end
 
     subgraph Adapters["🔌 Polymorphic Provider Adapters"]
-        AdGemini["GeminiProviderAdapter<br/>(Official GenAI SDK / REST v1beta)"]
+        AdGemini["GeminiProviderAdapter<br/>(Inline Multimodal parts, REST v1beta & SDK)"]
         AdOpenAI["OpenAICompatibleAdapter<br/>(Cerebras / Groq / OpenAI / OpenRouter)"]
         AdLocal["LocalGpuAdapter<br/>(RTX 4050 6GB PyTorch / Transformers)"]
     end
 
-    R1 -->|"generate_text(task='extraction')"| Gateway
+    R1 -->|"generate_text(task='extraction', parts=[...])"| Gateway
     R2 -->|"generate_text(task='translation')"| Gateway
     R3 -->|"lease_session() & generate_text()"| Gateway
     R4 -->|"synthesize_speech(task='tts')"| Gateway
@@ -158,51 +158,56 @@ flowchart TD
 
 ### The 5 Core Modules
 
-#### 1. [`KeyLeaseManager`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py) (ACID Inventory & Atomic Leases)
-- **ACID SQLite Inventory**: Manages API key inventory, lease reservations, per-model daily quota ledgers, and tamper-evident audit logs via atomic `BEGIN IMMEDIATE` transactions in SQLite (`audiobooks/keys_inventory.db`).
-- **0% Concurrent Double-Leasing**: Enforces strict mutual exclusion (Concurrency = 1 per free API key). A key can only be leased to a single active worker thread or process at any instant.
-- **Autonomous Dead PID Crash Recovery**: Uses a dual liveness sweep. In addition to rolling lease TTL (default 60s), it probes the OS process table via POSIX signal 0 ([`is_pid_alive`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L64)) to immediately reclaim orphaned leases if a worker crashes.
-- **One User = One Active Key per Workload**: Strict per-user quota enforcement ([`CallerIdentity`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/lease_manager.py#L106)) prevents single-user resource monopolization across text and TTS workloads.
+#### 1. [`KeyLeaseManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py) (ACID Inventory & Atomic Leases)
+- **ACID SQLite Inventory**: Manages API key inventory (123+ active healthy Gemini keys verified on `main`), lease reservations, per-model daily quota ledgers, and tamper-evident audit logs via atomic `BEGIN IMMEDIATE` transactions in SQLite (`audiobooks/keys_inventory.db`).
+- **0% Concurrent Double-Leasing**: Enforces strict mutual exclusion (`Concurrency = 1` per free API key). A key can only be leased to a single active worker thread or process at any instant.
+- **Autonomous Dead PID Crash Recovery**: Uses a dual liveness sweep. In addition to rolling lease TTL (default 60s), it probes the operating system process table via [`is_pid_alive`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py#L64):
+  - On Windows 11, leverages Win32 `ctypes.windll.kernel32.OpenProcess(SYNCHRONIZE, False, pid)` to test process existence and immediately reclaims orphaned leases upon worker crashes.
+  - On POSIX platforms, falls back to `os.kill(pid, 0)`.
+- **One User = One Active Key per Workload**: Strict per-user quota enforcement ([`CallerIdentity`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py#L77)) prevents single-user resource monopolization across text and TTS workloads.
 - **Zero-Secret Public Aliases**: Plaintext keys are never logged or exposed in telemetry. Keys are identified via deterministic salted public aliases (`key_a8f2`) and SHA-256 hashes.
 - **Dual Timezone Quota Rollovers**: Automatically handles midnight quota resets according to provider policies: Midnight US Pacific Time (`America/Los_Angeles`) for Google AI Studio quotas, and UTC Midnight for other providers.
+- **Transparent Key Pool Synchronization**: [`PersistentKeyPool`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/key_manager.py#L664) transparently synchronizes with `KeyLeaseManager` across `lease_key()`, `record_success()`, `mark_daily_quota_exhausted()`, and `mark_temporary_backoff()`.
 
-#### 2. [`AntiBanGuard`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py) (The 7 Iron Shields)
-Protects large pools of free API keys (100+ keys) against edge mass-bans and bot-detection heuristics:
+#### 2. [`AntiBanGuard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/anti_ban_guard.py) (The 7 Iron Shields)
+Protects large pools of free API keys (120+ keys) against edge mass-bans and bot-detection heuristics:
 - **Shield 1: Strict Request Mutual Exclusion**: Guarantees zero overlapping requests per key via atomic leasing in `KeyLeaseManager`.
-- **Shield 2: Session Affinity Sticky Binding** ([`SessionAffinityTracker`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L320)): Binds a production session or scene to the same key for 8–15 sequential segments, eliminating suspicious key-hopping patterns at provider edge routers.
+- **Shield 2: Session Affinity Sticky Binding** ([`SessionAffinityTracker`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/anti_ban_guard.py#L320)): Binds a production session or scene to the same key for 8–15 sequential segments, eliminating suspicious key-hopping patterns at provider edge routers.
 - **Shield 3: Anti-Correlation Key-Switch Pause**: Enforces a randomized 18.0s – 32.0s delay whenever a worker must switch keys on the same IP address, breaking TCP/TLS and request-frequency correlation across distinct accounts.
-- **Shield 4: Content-Aware Human Cadence & Director Breaks** ([`HumanCadenceController`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L80)): Shapes inter-request latency modeled on a human director review workflow:
+- **Shield 4: Content-Aware Human Cadence & Director Breaks** ([`HumanCadenceController`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/anti_ban_guard.py#L80)): Shapes inter-request latency modeled on a human director review workflow:
   $$\Delta t_{\text{wait}} = t_{\text{read}}(\text{words}) + t_{\text{review}}(\text{audio}) + t_{\text{jitter}} + t_{\text{director\_break}}$$
   Applies log-normal human pause distributions (1.5s – 7.0s) and injects 15–30s director breaks every 14 segments.
-- **Shield 5: Conservative 75% Rate Limiting** ([`TokenBucketRateLimiter`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L179)): Clamps requests to a conservative 11.0 RPM per key (73% of Google's 15 RPM free ceiling) with an absolute minimum burst separation of 3.5 seconds.
-- **Shield 6: Official Stealth SDK Headers** (`get_stealth_sdk_headers`): Injects stealth HTTP headers identical to official provider SDKs (`google-genai-sdk-python/0.8.3` with Python and platform tags), eliminating custom bot user agents.
-- **Shield 7: Emergency Global Tripwire** ([`EmergencyTripwire`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/anti_ban_guard.py#L248)): Monitors fleet health across all keys. If 5 consecutive 429 (Resource Exhausted) or 503 (Unavailable) errors occur within a 60-second sliding window, activates emergency pool quarantine for 45.0s to halt requests before accounts are suspended.
+- **Shield 5: Conservative 75% Rate Limiting** ([`TokenBucketRateLimiter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/anti_ban_guard.py#L179)): Clamps requests to a conservative 11.0 RPM per key (73% of Google's 15 RPM free ceiling) with an absolute minimum burst separation of 3.5 seconds.
+- **Shield 6: Official Stealth SDK Headers** (`get_stealth_sdk_headers`): Injects stealth HTTP headers identical to official provider SDKs (`x-goog-api-client`, `google-genai-sdk-python/0.8.3` with Python and platform tags), eliminating custom bot user agents.
+- **Shield 7: Emergency Global Tripwire** ([`EmergencyTripwire`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/anti_ban_guard.py#L248)): Monitors fleet health across all keys. If 5 consecutive 429 (Resource Exhausted) or 503 (Unavailable) errors occur within a 60-second sliding window, activates emergency pool quarantine for 45.0s to halt requests before accounts are suspended.
 
-#### 3. [`ModelRegistry`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py) (Canonical Model Catalog)
+#### 3. [`ModelRegistry`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/registry.py) (Canonical Model Catalog)
 - **Comprehensive Registry (50+ Models)**: Canonical catalog spanning Google Gemini (`gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.8-flash-tts`), Cerebras (Llama 3.3 70B, Llama 3.1 8B), Groq, OpenAI, Anthropic, and Local GPU (RTX 4050 6GB).
-- **Capability Profiles** ([`ModelCapability`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L48)): Explicit context windows (up to 1M tokens), max output limits, rate ceilings (RPM, TPM, RPD), thinking budget support, structured output flags, and timezone reset schedules.
-- **Quality Tiers** ([`ModelTier`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/registry.py#L20)): Hierarchical taxonomy categorizing models into `TIER_1_FLAGSHIP`, `TIER_2_BALANCED`, `TIER_3_UTILITY`, `TIER_AUDIO`, and `TIER_LOCAL`.
+- **Capability Profiles** ([`ModelCapability`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/registry.py#L48)): Explicit context windows (up to 1M tokens), max output limits, rate ceilings (RPM, TPM, RPD), thinking budget support, structured output flags, and timezone reset schedules.
+- **Quality Tiers** ([`ModelTier`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/registry.py#L20)): Hierarchical taxonomy categorizing models into `TIER_1_FLAGSHIP`, `TIER_2_BALANCED`, `TIER_3_UTILITY`, `TIER_AUDIO`, and `TIER_LOCAL`.
 - **Task-Based Resolution**: Maps pipeline requirements (`translation`, `screenplay`, `dramaturgy`, `extraction`, `tts`) to optimal verified models.
 
-#### 4. [`RequestRouter`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/router.py) (Intelligent Router & Fallback)
-- **Capability Matching**: Resolves requests into concrete [`ExecutionPlan`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/router.py#L40) blueprints containing model capabilities, leased keys, and matched provider adapters.
-- **Circuit Breaker Integration** ([`CircuitBreaker`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/policy_engine.py#L242)): Maintains per-(provider, model) circuit breakers with `CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN` state transitions, automatically bypassing models undergoing provider outages.
+#### 4. [`RequestRouter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/router.py) (Intelligent Router & Fallback)
+- **Capability Matching**: Resolves requests into concrete [`ExecutionPlan`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/router.py#L40) blueprints containing model capabilities, leased keys, and matched provider adapters.
+- **Circuit Breaker Integration** ([`CircuitBreaker`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/policy_engine.py#L242)): Maintains per-(provider, model) circuit breakers with `CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN` state transitions, automatically bypassing models undergoing provider outages.
 - **Dynamic Fallback Ladder**: Automatically escalates to secondary models within the eligible tier if primary candidate models encounter outages or key exhaustion.
 
-#### 5. [`ModelGateway`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/gateway.py) (Unified Production Facade)
+#### 5. [`ModelGateway`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py) (Unified Production Facade)
 - **Single Public Entry Point**: Exposes high-level operations: `generate_text()`, `synthesize_speech()`, `lease_session()`, and `get_fleet_status()`.
-- **Automatic Failover & Retry Loop**: Intercepts HTTP errors, classifies root causes via [`NormalizedApiError`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/policy_engine.py#L43), marks exhausted keys/models in SQLite, applies anti-correlation pauses, and retries seamlessly on alternative keys.
+- **Multimodal Payload Routing**: [`GeminiProviderAdapter._build_gemini_payload()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/adapters/gemini.py#L57) supports inline base64 multimodal `parts` kwargs, allowing Room 1 to dispatch single-page PDF memory buffers for OCR transcription directly through `ModelGateway.generate_text(task="extraction", parts=parts)`.
+- **Automatic Failover & Retry Loop**: Intercepts HTTP errors, classifies root causes via [`NormalizedApiError`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/policy_engine.py#L43), marks exhausted keys/models in SQLite, applies anti-correlation pauses, and retries seamlessly on alternative keys.
 - **Guaranteed Lease Release**: All operations employ `try ... finally` release blocks, ensuring 0% lease leaks under normal completion, rate limit backoff, or unexpected exceptions.
 
 ---
 
 ### Downstream Pipeline Room Integration (Zero Boundary Leakage)
 
-All 5 production rooms interface strictly with [`ModelGateway`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/core/models/gateway.py), maintaining clean boundary isolation:
+All 5 production rooms interface strictly with [`ModelGateway`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py), maintaining clean boundary isolation:
 
 1. **Room 1 (Pre-Production & Extraction)**:
-   - Requests `gateway.generate_text(task="extraction", min_tier=ModelTier.TIER_2_BALANCED)` for geometric PDF XY-cut layout reconstruction and OCR validation.
-   - Requires zero knowledge of underlying Gemini or fallback provider keys.
+   - Suspicious PDF pages route through [`GeminiVisionPDFExtractor.escalate_page()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf/vision_extractor.py#L35) $\rightarrow$ `gateway.generate_text(task="extraction", parts=parts, session_id=f"pdf_page_{page_num}")`.
+   - Employs atomic key leasing, session affinity, stealth SDK headers, and preamble stripping.
+   - Backward-compatible legacy imports re-exported via [`audiobook_factory/pdf/vision_extractor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/pdf/vision_extractor.py).
 2. **Room 2 (Translation Collective)**:
    - Dispatches translation prompts through `gateway.generate_text(task="translation", min_tier=ModelTier.TIER_1_FLAGSHIP)`.
    - The 4 translation agents (`LiteraryDraftTranslator`, `HindustaniCadenceSpecialist`, etc.) receive raw text output without managing rate-limiting delays or rotating key pools.

@@ -382,7 +382,7 @@ Multi-column layouts cause naive extractors to interleave text horizontally acro
 - Joins cross-page mid-sentence blocks with multi-page bounds (`page_number`, `page_end`, `line_start`, `line_end`).
 - Preserves full provenance through chapter segmentation and meso-tier splitting.
 
-### 3. Multi-Signal Quality Gate & Scanned PDF Escalation ([`PDFQualityAnalyzer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/pdf/quality_analyzer.py))
+### 3. Multi-Signal Quality Gate & Scanned PDF Escalation ([`PDFQualityAnalyzer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf/quality_analyzer.py))
 - **Scanned PDF 0-Word Escalation:**
   In legacy pipelines, `0 < word_count < 15` missed 100% scanned PDF pages (`word_count == 0`), silently passing them as empty. The hardened analyzer explicitly flags `word_count == 0`:
   ```python
@@ -393,11 +393,28 @@ Multi-column layouts cause naive extractors to interleave text horizontally acro
       warnings.append(f"Low text density ({word_count} words on page).")
       is_suspicious = True
   ```
-  Suspicious pages are routed to [`GeminiVisionPDFExtractor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/pdf/vision_extractor.py) for visual OCR escalation.
+  Suspicious pages are routed to [`GeminiVisionPDFExtractor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf/vision_extractor.py) for visual OCR escalation.
 - **Candidate Quality Scoring:** Evaluates composite score ($0.40 \times \text{Reading Order} + 0.45 \times \text{Text Integrity} + 0.15 \times \text{Sentence Coherence}$).
 - **Escalation Disqualification Guards:** Disqualifies vision escalation output if it contains conversational refusals (`"I cannot extract"`), repetition loops ($\ge 5\times$ 4-gram), new `\ufffd` corruption, or truncates $> 45\%$ of clean local words.
 - **Running Header/Footer Elimination:** Tracks repeating lines across $\ge 3$ distinct pages. Explicitly preserves scene breaks (`* * *`, `---`) and chapter headings from accidental removal.
 - **Windows File Stream Context Managers:** Uses `with open(self.file_path, "rb") as f:` across all PDF readers and writers, preventing locked file handles (`PermissionError: [WinError 32]`).
+
+### 4. Multimodal Vision Fallback & ModelGateway Control Plane Integration
+When layout reconstruction detects severe multi-column interleaving, unmapped mathematical formulas, or scanned bitmap elements, page escalation proceeds via [`GeminiVisionPDFExtractor.escalate_page()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf/vision_extractor.py#L35):
+1. **ModelGateway Control Plane Routing**: Page escalations bypass ad-hoc API calls and dispatch directly through [`ModelGateway.generate_text()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py#L48):
+   - **Atomic Single-Request Mutual Exclusion**: Leases an eligible API key handle with zero in-flight collision (`Concurrency = 1`).
+   - **Session Affinity Sticky Binding**: Consecutive pages bind to `session_id=f"pdf_page_{page_num}"` to avoid key-hopping triggers on edge routers.
+   - **Official Stealth SDK Headers**: Injects stealth headers (`x-goog-api-client`, `google-genai-sdk-python/0.8.3`) to match official provider client profiles.
+   - **Multimodal Payload Handling**: [`GeminiProviderAdapter._build_gemini_payload()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/adapters/gemini.py#L57) natively accepts inline base64 `parts` kwargs (`{"inlineData": {"mimeType": "application/pdf", "data": ...}}`), transmitting single-page memory buffers without disk overhead.
+2. **Transparent Key Synchronization**:
+   [`PersistentKeyPool`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/key_manager.py#L664) transparently synchronizes with [`KeyLeaseManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py#L763):
+   - `lease_key()` yields through `KeyLeaseManager.lease_key(...)`.
+   - `record_success()` updates success telemetry across both key inventory and model quota ledgers.
+   - `mark_daily_quota_exhausted()` and `mark_temporary_backoff()` trigger coordinated backoff and circuit breaker protection.
+3. **DRY Compatibility Shim**:
+   The legacy path [`audiobook_factory/pdf/vision_extractor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/pdf/vision_extractor.py) acts as a backward-compatible DRY shim re-exporting `PDFEscalationEngine` and `GeminiVisionPDFExtractor` from `audiobook_factory.extraction.parsers.pdf.vision_extractor`.
+4. **Universal Safety Thresholds**:
+   All multimodal extractions operate under `BLOCK_NONE` safety settings to guarantee zero false-positive truncation of historical, gritty, or scientific texts.
 
 ---
 

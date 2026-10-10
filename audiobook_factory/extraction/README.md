@@ -176,8 +176,21 @@ Extract all text from this document page in strict, clean Markdown reading order
 - Cleanliness: Strip running headers and page numbers. Do not summarize or omit text.
 ```
 
-### 3. Universal Permissive Safety Settings
-Configured with universal `BLOCK_NONE` developer safety thresholds to prevent false-positive content moderation truncation during technical or historical literature processing.
+### 3. ModelGateway Control Plane Integration (Primary Path)
+Multimodal page escalations are routed directly through [`ModelGateway.generate_text()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py#L48):
+- **Atomic Single-Request Leasing**: Leases an eligible API key handle with zero in-flight collision (`Concurrency = 1` mutual exclusion).
+- **Session Affinity**: Binds consecutive page requests to a stable key session (`session_id=f"pdf_page_{page_num}"`), preventing suspicious edge-router key hopping.
+- **Stealth SDK Headers**: Automatically attaches official SDK headers (`x-goog-api-client`, `google-genai-sdk-python/0.8.3`) to bypass edge bot heuristic filters.
+- **Inline Multimodal `parts`**: Supported natively via [`GeminiProviderAdapter._build_gemini_payload()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/adapters/gemini.py#L57), which accepts base64-encoded `inlineData` alongside textual instructions without disk file uploads.
+- **Preamble Stripping**: Post-processes candidate markdown to cleanly remove conversational greetings (`"Sure, here is the text:"`) and triple-backtick markdown fences.
+
+### 4. Direct Fallback & Transparent Key Synchronization
+- **Standalone API Key Fallback**: If the `ModelGateway` is not initialized or operates in offline fallback mode, `GeminiVisionPDFExtractor` resolves keys via [`PersistentKeyPool.get_key()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/key_manager.py#L276) and issues direct requests with stealth headers and universal `BLOCK_NONE` safety settings.
+- **Transparent Key Pool Synchronization**: [`PersistentKeyPool`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/key_manager.py#L664) synchronizes transparently with [`KeyLeaseManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py#L763) across `lease_key()`, `record_success()`, `mark_daily_quota_exhausted()`, and `mark_temporary_backoff()`, maintaining consistent daily quota and circuit breaker state across all subsystems.
+- **Backward-Compatible DRY Shim**: The legacy path [`audiobook_factory/pdf/vision_extractor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/pdf/vision_extractor.py) acts as a clean DRY compatibility re-export of `PDFEscalationEngine` and `GeminiVisionPDFExtractor` from `audiobook_factory.extraction.parsers.pdf.vision_extractor`, preventing breaking changes in existing consumer pipelines.
+
+### 5. Universal Permissive Safety Settings
+Configured with universal `BLOCK_NONE` developer safety thresholds across harassment, hate speech, sexual content, and dangerous content categories to eliminate false-positive content moderation truncation during technical or historical literature processing.
 
 ---
 

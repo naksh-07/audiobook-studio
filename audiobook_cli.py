@@ -171,9 +171,10 @@ def main():
 
     # keys
     p_keys = subparsers.add_parser("keys", help="Inspect and audit API key inventory, leases, and quota fleet status")
-    p_keys.add_argument("keys_action", nargs="?", default="status", choices=["status", "audit", "reset"], help="Action: status, audit, reset (default: status)")
+    p_keys.add_argument("keys_action", nargs="?", default="status", choices=["status", "list", "add", "sweep", "test", "audit", "reset"], help="Action: status, list, add, sweep, test, audit, reset (default: status)")
     p_keys.add_argument("--provider", default="gemini", help="Provider filter (default: gemini)")
     p_keys.add_argument("--limit", type=int, default=25, help="Number of audit log records to display (default: 25)")
+    p_keys.add_argument("--key", default=None, help="API key to register (used with 'add')")
 
     args = parser.parse_args()
 

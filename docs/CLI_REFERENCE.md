@@ -85,10 +85,45 @@ python audiobook_cli.py produce <BOOK_SLUG> [OPTIONS]
 
 ## 3. Universal Document Extraction (`extract`)
 
-Ingests any digital book into clean, segmented Markdown chapters.
+Ingests any digital book or research paper into a structured Canonical AST ([`CanonicalBook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py#L231)), creates the sacred bit-accurate source archive (`raw/`), runs Gate 0.1 quality audit, and projects clean, segmented Markdown chapters for downstream rooms.
 
 ```bash
-python audiobook_cli.py extract <FILE> [--force-gate]
+python audiobook_cli.py extract <FILE> [OPTIONS]
+```
+
+### Positional Arguments
+- `FILE`: Path to input document (`.epub`, `.pdf`, `.txt`, `.md`).
+
+### Options
+| Flag | Type | Default | Description |
+|---|:---:|:---:|---|
+| `--force-gate` | Flag | `False` | Force bypass of Extraction Quality Gate (Gate 0.1) fail-closed `REVIEW` abort (e.g. for low-word test samples). |
+
+### Output Artifacts
+Extraction establishes the project workspace under `audiobooks/projects/<BOOK_SLUG>/`:
+```text
+audiobooks/projects/<BOOK_SLUG>/
+├── raw/                      # Sacred unmutated archive (source_original.ext, source_manifest.json)
+├── canonical/                # Strongly-typed Pydantic v2 AST (book.json, quality_report.json)
+└── extracted/                # Backward-compatible Markdown chapters (chapter_001.md, ...)
+```
+
+### Hybrid 3-Tier PDF Engine & Multimodal Escalation
+For `.pdf` files, extraction utilizes a zero-bloat 3-tier hybrid pipeline without requiring 15GB local PyTorch weights:
+1. **Tier 1 (Fast Geometric Local Analysis)**: Geometric XY-cut multi-column slicing (`PDFLayoutReconstructor`) and mathematical operator preservation (`PDFQualityAnalyzer`).
+2. **Tier 2 (Selective Multimodal Vision Escalation)**: Suspicious, scanned, or multi-column equation pages escalate via [`GeminiVisionPDFExtractor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/pdf/vision_extractor.py), routing single-page memory slices directly through [`ModelGateway.generate_text()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py#L48) with atomic key leasing, session affinity, and official stealth SDK headers.
+3. **Tier 3 (Canonical Assembly & Gate 0.1)**: Assembles the audited AST and validates word count floors, empty chapter immunity, and noise thresholds.
+
+### Examples
+```bash
+# Ingest novel EPUB into canonical AST and extracted chapters:
+python audiobook_cli.py extract "C:/Books/The_Last_Wish.epub"
+
+# Ingest scientific research paper PDF:
+python audiobook_cli.py extract "papers/attention_mechanism.pdf"
+
+# Ingest test sample with gate bypass:
+python audiobook_cli.py extract "tests/fixtures/sample_short.pdf" --force-gate
 ```
 
 ---
@@ -216,20 +251,28 @@ python audiobook_cli.py podcast "papers/rlhf_survey.pdf" --script-only
 
 ## 12. Key Inventory & Fleet Monitor (`keys`)
 
-Inspects and manages the ACID SQLite API key inventory, active multi-user concurrency leases, tamper-evident audit logs, and provider quota states.
+Inspects and manages the ACID SQLite API key inventory (`audiobooks/keys_inventory.db`), active multi-user concurrency leases (`Concurrency = 1`), tamper-evident audit logs, and provider quota states.
 
 ```bash
 python audiobook_cli.py keys [ACTION] [OPTIONS]
 ```
 
 ### Positional Action Arguments
-- `ACTION`: Optional action choice: `status`, `audit`, or `reset` (default: `status`).
+- `ACTION`: Choice of action:
+  - `status`: Displays live fleet summary, active leases, and registered keys table (default).
+  - `list`: Lists registered keys with public aliases, health status, and daily calls.
+  - `add`: Registers a new API key into the SQLite inventory ledger (requires `--key`).
+  - `sweep`: Reclaims expired TTL leases and orphaned dead-PID process locks (Win32 / POSIX).
+  - `test`: Probes key fleet health and active traffic capacity.
+  - `audit`: Displays recent tamper-evident audit log events.
+  - `reset`: Forces an administrative reset of keys and models back to `ACTIVE` state.
 
 ### Options
 | Flag | Type | Default | Description |
 |---|:---:|:---:|---|
 | `--provider` | String | `gemini` | Target provider filter (`gemini`, `cerebras`, `groq`, `openai`, `openrouter`). |
 | `--limit` | Integer | `25` | Number of recent audit log events to display (used with `audit`). |
+| `--key` | String | `None` | API key string to register (used with `add`). |
 
 ---
 
@@ -247,30 +290,94 @@ python audiobook_cli.py keys status --provider gemini
 ======================================================================
   AUDIOBOOK FACTORY - KEY INVENTORY & FLEET STATUS (GEMINI)
 ======================================================================
-  Date (Quota Period)   : 2026-10-09
-  Total Registered Keys : 124
-  Active Healthy Keys   : 118
-  Exhausted Today       : 4
-  Temporary Backoff     : 2
+  Date (Quota Period)   : 2026-10-10
+  Total Registered Keys : 123
+  Active Healthy Keys   : 123
+  Exhausted Today       : 0
+  Temporary Backoff     : 0
   In-Flight Leases      : 1
 ----------------------------------------------------------------------
 
   ACTIVE LEASES (IN-FLIGHT CONCURRENCY):
   LEASE ID             ALIAS        USER           WORKLOAD   EXPIRES
   ------------------------------------------------------------------
-  e8f20b31-4c12-...    key_a8f2     naksh-07       tts        2026-10-09T00:32:15
+  e8f20b31-4c12-...    key_a8f2     naksh-07       text       2026-10-10T00:32:15
 
   KEY INVENTORY DETAILS:
   ALIAS          STATUS           CALLS TODAY    LAST USED
   ------------------------------------------------------------------
-  key_a8f2       ACTIVE           14 ok / 0 fail 2026-10-09T00:31:15
-  key_b4c9       EXHAUSTED_TODAY  10 ok / 1 fail 2026-10-09T00:28:40
-  key_c1d7       TEMP_BACKOFF     5 ok / 1 fail  2026-10-09T00:30:02
+  key_a8f2       ACTIVE           14 ok / 0 fail 2026-10-10T00:31:15
+  key_b4c9       ACTIVE           10 ok / 0 fail 2026-10-10T00:28:40
+  key_c1d7       ACTIVE           5 ok / 0 fail  2026-10-10T00:30:02
 ======================================================================
 ```
 
-#### B. Audit Log Inspection (`keys audit`)
-Inspects recent tamper-evident lease acquisition, release, and revocation events. Plaintext keys are never logged; only deterministic aliases (`key_XXXX`) and calling PIDs are exposed.
+#### B. Key Listing (`keys list`)
+Outputs a clean inventory list of all registered keys with safe, zero-secret public aliases (`key_XXXX`), current operational status, and daily request metrics:
+
+```bash
+python audiobook_cli.py keys list --provider gemini
+```
+
+**Output:**
+```text
+======================================================================
+  AUDIOBOOK FACTORY - REGISTERED KEY INVENTORY (GEMINI)
+======================================================================
+  ALIAS          STATUS           CALLS TODAY    LAST USED
+  ------------------------------------------------------------------
+  key_a8f2       ACTIVE           14 ok / 0 fail 2026-10-10T00:31:15
+  key_b4c9       ACTIVE           10 ok / 0 fail 2026-10-10T00:28:40
+  key_c1d7       ACTIVE           5 ok / 0 fail  2026-10-10T00:30:02
+======================================================================
+```
+
+#### C. Register New Key (`keys add`)
+Registers an API key into the ACID inventory ledger without wiping existing daily quota usage:
+
+```bash
+python audiobook_cli.py keys add --provider gemini --key "AIzaSy..."
+```
+
+**Output:**
+```text
+[+] Success: Key registered in inventory ledger under provider 'gemini'.
+```
+
+#### D. Crash Recovery & Lease Reaping (`keys sweep`)
+Manually invokes the dual liveness sweep to reclaim expired TTL leases and probe the OS process table for terminated worker processes (using Win32 `kernel32.OpenProcess` on Windows 11):
+
+```bash
+python audiobook_cli.py keys sweep
+```
+
+**Output:**
+```text
+[+] Sweep complete: Reclaimed 0 stale or dead-PID lease(s).
+```
+
+#### E. Fleet Health Probe (`keys test`)
+Probes key fleet capacity and reports operational readiness:
+
+```bash
+python audiobook_cli.py keys test --provider gemini
+```
+
+**Output:**
+```text
+======================================================================
+  AUDIOBOOK FACTORY - KEY FLEET HEALTH PROBE (GEMINI)
+======================================================================
+  Total Keys   : 123
+  Active Keys  : 123
+  Exhausted    : 0
+  Backoff      : 0
+  Probe Status : HEALTHY (123/123 keys available for traffic)
+======================================================================
+```
+
+#### F. Audit Log Inspection (`keys audit`)
+Inspects recent tamper-evident lease acquisition, release, and revocation events. Plaintext keys are never logged; only deterministic aliases (`key_XXXX`) and calling PIDs are exposed:
 
 ```bash
 python audiobook_cli.py keys audit --limit 50
@@ -283,14 +390,14 @@ python audiobook_cli.py keys audit --limit 50
 ======================================================================
   TIMESTAMP           EVENT    ALIAS        USER           MODEL
   ------------------------------------------------------------------
-  2026-10-09 00:31:15 RELEASE  key_a8f2     naksh-07       gemini-3.8-flash-tts
-  2026-10-09 00:30:52 ACQUIRE  key_a8f2     naksh-07       gemini-3.8-flash-tts
-  2026-10-09 00:28:40 REVOKE   key_b4c9     naksh-07       gemini-3.8-flash-tts
+  2026-10-10 00:31:15 RELEASE  key_a8f2     naksh-07       gemini-3.8-flash
+  2026-10-10 00:30:52 ACQUIRE  key_a8f2     naksh-07       gemini-3.8-flash
+  2026-10-10 00:28:40 REVOKE   key_b4c9     naksh-07       gemini-3.8-flash-tts
 ======================================================================
 ```
 
-#### C. Emergency Pool Reset (`keys reset`)
-Performs an administrative reset of all keys and per-model quota ledgers in `audiobooks/keys_inventory.db` back to `ACTIVE` state. Use after midnight rollover, manual quota increase, or test runs.
+#### G. Administrative Reset (`keys reset`)
+Performs an administrative reset of all keys and per-model quota ledgers in `audiobooks/keys_inventory.db` back to `ACTIVE` state:
 
 ```bash
 python audiobook_cli.py keys reset
