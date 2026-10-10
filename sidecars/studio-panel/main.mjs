@@ -1,9 +1,9 @@
 // Backend for Audiobook Studio UI Extension Sidecar.
 // Hosts local HTTP server and bridges Antigravity with the Python production engine.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { platform, release } from 'node:os';
-import { dirname, join, resolve, extname } from 'node:path';
+import { dirname, join, resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawn } from 'node:child_process';
 import { Response, SidecarApp } from 'sidecar_sdk';
@@ -40,7 +40,14 @@ function runPythonBridge(subcommand, extraArgs = []) {
       timeout: 20000,
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
     });
-    return JSON.parse(stdout);
+    const outStr = stdout.trim();
+    try {
+      return JSON.parse(outStr);
+    } catch (parseErr) {
+      const match = outStr.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+      if (match) return JSON.parse(match[0]);
+      throw parseErr;
+    }
   } catch (err) {
     console.error(`Bridge error on '${subcommand}':`, err.message);
     return {
@@ -84,7 +91,9 @@ app.api('/api/projects', () => {
 // GET /api/project?slug=...: Returns detailed chapters, roster, and segment states
 app.api('/api/project', (data) => {
   const slug = data.slug;
-  if (!slug) return { error: 'Missing slug parameter' };
+  if (!slug || typeof slug !== 'string' || !/^[a-zA-Z0-9_\-\.]+$/.test(slug)) {
+    return { error: 'Invalid or missing slug parameter' };
+  }
   return runPythonBridge('project-detail', ['--slug', slug]);
 }, 'GET');
 
@@ -93,16 +102,61 @@ app.api('/api/voices', () => {
   return runPythonBridge('list-voices');
 }, 'GET');
 
-// GET /api/audio?path=...: Streams local audio files with proper MIME type
+// LRU cache for audio peaks (max 50 waveforms)
+const PEAKS_CACHE = new Map();
+const MAX_PEAKS_CACHE_SIZE = 50;
+
+// GET /api/peaks?path=...&points=400: Downsampled audio waveform peaks
+app.api('/api/peaks', (data) => {
+  const relPath = data.path;
+  if (!relPath) return { error: 'Missing path parameter' };
+  const rawPoints = parseInt(data.points || '400', 10);
+  const numPoints = Math.max(10, Math.min(2000, isNaN(rawPoints) ? 400 : rawPoints));
+
+  // Resolve safe path inside ENGINE_DIR with strict separator boundary defense
+  const safeBase = resolve(ENGINE_DIR);
+  const safePrefix = safeBase.endsWith(sep) ? safeBase : safeBase + sep;
+  const targetPath = resolve(safeBase, relPath.replace(/^[\/\\]+/, ''));
+
+  if (targetPath !== safeBase && !targetPath.startsWith(safePrefix)) {
+    return { error: 'Access denied outside engine dir' };
+  }
+
+  if (!existsSync(targetPath)) {
+    return { error: 'File not found', path: relPath };
+  }
+
+  const cacheKey = `${targetPath}:${numPoints}`;
+  if (PEAKS_CACHE.has(cacheKey)) {
+    // Refresh LRU ordering
+    const cached = PEAKS_CACHE.get(cacheKey);
+    PEAKS_CACHE.delete(cacheKey);
+    PEAKS_CACHE.set(cacheKey, cached);
+    return cached;
+  }
+
+  const result = runPythonBridge('peaks', ['--path', targetPath, '--points', String(numPoints)]);
+  if (!result.error) {
+    if (PEAKS_CACHE.size >= MAX_PEAKS_CACHE_SIZE) {
+      const oldestKey = PEAKS_CACHE.keys().next().value;
+      PEAKS_CACHE.delete(oldestKey);
+    }
+    PEAKS_CACHE.set(cacheKey, result);
+  }
+  return result;
+}, 'GET');
+
+// GET /api/audio?path=...: Streams local audio files with HTTP 206 Partial Content & memory-safe chunk reading
 app.api('/api/audio', (data) => {
   const relPath = data.path;
   if (!relPath) return { error: 'Missing path parameter' };
 
-  // Resolve safe path inside ENGINE_DIR
+  // Resolve safe path inside ENGINE_DIR with strict separator boundary defense
   const safeBase = resolve(ENGINE_DIR);
+  const safePrefix = safeBase.endsWith(sep) ? safeBase : safeBase + sep;
   const targetPath = resolve(safeBase, relPath.replace(/^[\/\\]+/, ''));
 
-  if (!targetPath.startsWith(safeBase)) {
+  if (targetPath !== safeBase && !targetPath.startsWith(safePrefix)) {
     return new Response(JSON.stringify({ error: 'Access denied outside engine dir' }), { status: 403, contentType: 'application/json' });
   }
 
@@ -117,14 +171,64 @@ app.api('/api/audio', (data) => {
   else if (ext === '.mp3') contentType = 'audio/mpeg';
 
   try {
+    const stat = statSync(targetPath);
+    const totalSize = stat.size;
+    let status = 200;
+    const headers = {
+      'Content-Length': String(totalSize),
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'public, max-age=3600',
+    };
+
+    // Range request support for fine-grained scrubbing without whole-file redownload
+    if (data.range || data.start !== undefined) {
+      let start = 0;
+      let end = totalSize - 1;
+      if (data.range) {
+        const match = /bytes=(\d+)-(\d*)/.exec(data.range);
+        if (match) {
+          start = parseInt(match[1], 10);
+          if (match[2]) end = parseInt(match[2], 10);
+        }
+      } else if (data.start !== undefined) {
+        start = parseInt(data.start, 10);
+        if (data.end !== undefined) end = parseInt(data.end, 10);
+      }
+      if (isNaN(start)) start = 0;
+      if (isNaN(end)) end = totalSize - 1;
+      
+      if (start > end || start >= totalSize || start < 0) {
+        return new Response(JSON.stringify({ error: 'Range Not Satisfiable' }), { 
+          status: 416, 
+          contentType: 'application/json',
+          headers: { 'Content-Range': `bytes */${totalSize}` } 
+        });
+      }
+
+      start = Math.max(0, Math.min(start, totalSize - 1));
+      end = Math.max(start, Math.min(end, totalSize - 1));
+      const chunkLength = end - start + 1;
+      
+      // Memory-safe streaming: allocate only the requested byte chunk
+      const chunk = Buffer.alloc(chunkLength);
+      const fd = openSync(targetPath, 'r');
+      try {
+        readSync(fd, chunk, 0, chunkLength, start);
+      } finally {
+        closeSync(fd);
+      }
+
+      status = 206;
+      headers['Content-Range'] = `bytes ${start}-${end}/${totalSize}`;
+      headers['Content-Length'] = String(chunkLength);
+      return new Response(chunk, { status, contentType, headers });
+    }
+
+    // Full file response: read safely
     const fileBuf = readFileSync(targetPath);
     return new Response(fileBuf, {
       contentType,
-      headers: {
-        'Content-Length': String(fileBuf.length),
-        'Accept-Ranges': 'bytes',
-        'Cache-Control': 'public, max-age=3600',
-      },
+      headers,
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, contentType: 'application/json' });

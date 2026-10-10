@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Audiobook Studio - Master Session</title>
+<!-- Google Fonts: Inter & JetBrains Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=Noto+Serif+Devanagari:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS with Forms and Container Queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-primary-fixed": "#2d1600",
+            "surface-dim": "#dad9df",
+            "on-secondary": "#ffffff",
+            "inverse-surface": "#2f3034",
+            "tertiary-fixed-dim": "#adc6ff",
+            "on-background": "#1a1b1f",
+            "surface-tint": "#8c5000",
+            "surface-container-low": "#f4f3f8",
+            "secondary-fixed": "#72fe88",
+            "on-secondary-fixed-variant": "#00531c",
+            "on-tertiary": "#ffffff",
+            "inverse-on-surface": "#f1f0f5",
+            "surface-bright": "#faf9fe",
+            "on-secondary-fixed": "#002107",
+            "outline": "#887361",
+            "surface-container": "#eeedf3",
+            "tertiary-fixed": "#d8e2ff",
+            "on-surface": "#1a1b1f",
+            "on-primary-container": "#643700",
+            "inverse-primary": "#ffb874",
+            "primary-fixed": "#ffdcbf",
+            "surface-container-lowest": "#ffffff",
+            "on-tertiary-fixed-variant": "#004493",
+            "secondary-fixed-dim": "#53e16f",
+            "on-secondary-container": "#00732a",
+            "secondary-container": "#6ffb85",
+            "secondary": "#006e28",
+            "surface-variant": "#e3e2e7",
+            "on-primary-fixed-variant": "#6a3b00",
+            "on-surface-variant": "#554334",
+            "background": "#f5f5f7",
+            "on-tertiary-container": "#003f8a",
+            "on-tertiary-fixed": "#001a41",
+            "error-container": "#ffdad6",
+            "tertiary": "#005bc1",
+            "on-error": "#ffffff",
+            "outline-variant": "#dbc2ad",
+            "tertiary-container": "#86aeff",
+            "on-error-container": "#93000a",
+            "primary": "#8c5000",
+            "primary-container": "#ff9500",
+            "surface-container-highest": "#e3e2e7",
+            "error": "#ba1a1a",
+            "surface": "#faf9fe",
+            "primary-fixed-dim": "#ffb874",
+            "surface-container-high": "#e9e7ed",
+            "on-primary": "#ffffff"
+          },
+          borderRadius: {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          spacing: {
+            "gutter-compact": "0.25rem",
+            "space-md": "0.75rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem",
+            "margin": "1rem",
+            "space-lg": "1.25rem",
+            "gutter": "0.75rem",
+            "space-xl": "1.75rem"
+          },
+          fontFamily: {
+            "body-md": ["Inter", "sans-serif"],
+            "headline-xl": ["Inter", "sans-serif"],
+            "headline-lg": ["Inter", "sans-serif"],
+            "body-sm": ["Inter", "sans-serif"],
+            "label-meter": ["JetBrains Mono", "monospace"],
+            "headline-md": ["Inter", "sans-serif"],
+            "label-timecode": ["JetBrains Mono", "monospace"],
+            "body-lg": ["Inter", "sans-serif"],
+            "label-control": ["Inter", "sans-serif"],
+            "hindi": ["Noto Serif Devanagari", "serif"]
+          },
+          fontSize: {
+            "body-md": ["0.875rem", { lineHeight: "1.25rem", letterSpacing: "-0.006em", fontWeight: "400" }],
+            "headline-xl": ["2rem", { lineHeight: "2.5rem", letterSpacing: "-0.025em", fontWeight: "600" }],
+            "headline-lg": ["1.5rem", { lineHeight: "2rem", letterSpacing: "-0.02em", fontWeight: "600" }],
+            "body-sm": ["0.75rem", { lineHeight: "1rem", letterSpacing: "0em", fontWeight: "400" }],
+            "label-meter": ["0.6875rem", { lineHeight: "0.875rem", letterSpacing: "-0.02em", fontWeight: "500" }],
+            "headline-md": ["1.125rem", { lineHeight: "1.5rem", letterSpacing: "-0.015em", fontWeight: "600" }],
+            "label-timecode": ["1.25rem", { lineHeight: "1.5rem", letterSpacing: "0.02em", fontWeight: "600" }],
+            "body-lg": ["1rem", { lineHeight: "1.5rem", letterSpacing: "-0.011em", fontWeight: "400" }],
+            "label-control": ["0.6875rem", { lineHeight: "0.875rem", letterSpacing: "0.04em", fontWeight: "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.70);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+    }
+    .recessed-well {
+      background: #ebebef;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08), inset 0 0 1px rgba(0, 0, 0, 0.12);
+    }
+    .fader-thumb {
+      background: linear-gradient(180deg, #FFFFFF 0%, #E8E8ED 100%);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+  </style>
+</head>
+<body class="bg-[#F5F5F7] text-on-surface h-full flex flex-col font-body-sm select-none antialiased overflow-hidden">
+<!-- ================= TOP APP BAR (from Shared Components JSON) ================= -->
+<header class="flex justify-between items-center w-full px-space-md py-space-xs border-b border-outline-variant bg-surface-bright shadow-sm z-30 shrink-0">
+<!-- Left Cluster: Logo & Navigation Links -->
+<div class="flex items-center gap-space-lg">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary-container text-xl" data-icon="graphic_eq">graphic_eq</span>
+<span class="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">Audiobook Studio</span>
+<span class="ml-space-xs px-1.5 py-0.5 rounded text-[10px] font-label-control uppercase tracking-wider bg-surface-container-high text-on-surface-variant border border-outline-variant/40">Studio Pro</span>
+</div>
+<!-- Navigation Links -->
+<nav class="hidden lg:flex items-center gap-space-md">
+<!-- Active link: Timeline -->
+<a class="text-primary font-semibold border-b-2 border-primary-container pb-1 text-body-sm" href="#">Timeline</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-high transition-colors rounded px-2 py-0.5 text-body-sm" href="#">Narrators</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-high transition-colors rounded px-2 py-0.5 text-body-sm" href="#">Chapters</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-high transition-colors rounded px-2 py-0.5 text-body-sm" href="#">QC Matrix</a>
+<a class="text-on-surface-variant font-medium hover:text-on-surface hover:bg-surface-container-high transition-colors rounded px-2 py-0.5 text-body-sm" href="#">Delivery</a>
+</nav>
+</div>
+<!-- Center Context: Project & SMPTE Clock -->
+<div class="hidden xl:flex items-center gap-space-md bg-surface-container/60 px-space-md py-1 rounded-full border border-outline-variant/30">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-medium text-body-sm text-on-surface">Ep. 07: The Silent Silk Road</span>
+</div>
+<div class="h-3.5 w-px bg-outline-variant/60"></div>
+<div class="flex items-center gap-1 font-label-timecode text-on-surface text-body-md tracking-tight">
+<span class="text-on-surface-variant font-normal">SMPTE</span>
+<span class="font-bold text-on-surface tracking-wider">01:24:18.06</span>
+</div>
+<div class="h-3.5 w-px bg-outline-variant/60"></div>
+<!-- Emerald Key Status Badge -->
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-[11px] font-label-control">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span>124 Keys Active</span>
+</div>
+</div>
+<!-- Right Cluster: Engine Specs, Actions & Profile -->
+<div class="flex items-center gap-space-sm">
+<!-- Session Specs Chip -->
+<div class="hidden md:flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container text-on-surface-variant text-label-meter font-label-meter border border-outline-variant/40">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+<span>Session Engine: 48k/32b-f</span>
+</div>
+<!-- Icon Actions -->
+<div class="flex items-center gap-1">
+<button class="p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors active:scale-[0.98]" title="Tune Settings">
+<span class="material-symbols-outlined text-[20px]" data-icon="tune">tune</span>
+</button>
+<button class="p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors active:scale-[0.98]" title="Audio Engine Status">
+<span class="material-symbols-outlined text-[20px]" data-icon="graphic_eq">graphic_eq</span>
+</button>
+<button class="p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors active:scale-[0.98]" title="Global Settings">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+</button>
+</div>
+<div class="h-4 w-px bg-outline-variant/40 mx-0.5"></div>
+<!-- Trailing Primary Action -->
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-container text-on-primary-fixed font-headline-md text-xs font-semibold shadow-sm hover:brightness-105 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[16px]" data-icon="ios_share">ios_share</span>
+<span>Export Master</span>
+</button>
+<!-- Profile Avatar -->
+<div class="w-7 h-7 rounded-full bg-surface-container-highest border border-outline-variant/60 flex items-center justify-center overflow-hidden ml-1">
+<span class="font-semibold text-xs text-on-surface">SE</span>
+</div>
+</div>
+</header>
+<!-- ================= MAIN WORKSTATION SHELL ================= -->
+<div class="flex-1 flex overflow-hidden">
+<!-- ================= SIDE NAV BAR (from Shared Components JSON) ================= -->
+<aside class="flex flex-col justify-between h-full w-64 p-space-sm border-r border-outline-variant bg-surface-container-lowest shrink-0 z-20">
+<div class="flex flex-col gap-space-sm">
+<!-- Header Profile Card -->
+<div class="p-space-sm rounded-lg bg-surface-container-low border border-outline-variant/40">
+<div class="flex items-center gap-space-xs">
+<div class="w-8 h-8 rounded-md bg-primary-fixed flex items-center justify-center text-primary font-bold text-xs border border-outline-variant/40">
+              PA
+            </div>
+<div class="overflow-hidden">
+<h3 class="text-body-sm font-semibold text-on-surface truncate">Project Alpha: Solitude</h3>
+<p class="text-[10px] text-on-surface-variant font-label-meter truncate">SMPTE 01:24:16:18 • Calibrated</p>
+</div>
+</div>
+</div>
+<!-- Primary Navigation Tabs (5 Tabs from JSON) -->
+<nav class="flex flex-col gap-1 mt-1">
+<!-- Voice Roster (Active) -->
+<a class="flex items-center gap-space-xs bg-surface-container text-primary font-semibold rounded-lg px-space-sm py-space-xs text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px] text-primary" data-icon="record_voice_over">record_voice_over</span>
+<span class="truncate">Voice Roster</span>
+<span class="ml-auto w-2 h-2 rounded-full bg-primary-container"></span>
+</a>
+<!-- Takes & Markers -->
+<a class="flex items-center gap-space-xs text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-on-surface rounded-lg px-space-sm py-space-xs text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="bookmarks">bookmarks</span>
+<span class="truncate">Takes &amp; Markers</span>
+<span class="ml-auto text-[10px] font-label-meter text-on-surface-variant/70">34</span>
+</a>
+<!-- Room Tone Bed -->
+<a class="flex items-center gap-space-xs text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-on-surface rounded-lg px-space-sm py-space-xs text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="multitrack_audio">new_window</span>
+<span class="truncate">Room Tone Bed</span>
+</a>
+<!-- Bus Routing -->
+<a class="flex items-center gap-space-xs text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-on-surface rounded-lg px-space-sm py-space-xs text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="alt_route">alt_route</span>
+<span class="truncate">Bus Routing</span>
+<span class="ml-auto text-[10px] font-label-control px-1 py-0.5 rounded bg-surface-variant text-on-surface-variant">5 Buses</span>
+</a>
+<!-- Loudness Radar -->
+<a class="flex items-center gap-space-xs text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-on-surface rounded-lg px-space-sm py-space-xs text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="speed">speed</span>
+<span class="truncate">Loudness Radar</span>
+<span class="ml-auto text-[10px] font-label-meter text-secondary font-semibold">-19.0</span>
+</a>
+</nav>
+<!-- CTA from JSON -->
+<button class="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg border border-dashed border-outline-variant hover:border-primary-container text-on-surface-variant hover:text-primary transition-all text-body-sm active:scale-[0.98]">
+<span class="material-symbols-outlined text-[16px]" data-icon="add">add</span>
+<span>New Character Voice</span>
+</button>
+</div>
+<!-- Footer Tabs from JSON -->
+<div class="flex flex-col gap-1 pt-3 border-t border-outline-variant/40">
+<a class="flex items-center gap-space-xs text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-on-surface rounded-lg px-space-sm py-space-xs text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="memory">memory</span>
+<span class="truncate">Engine Monitor</span>
+<span class="ml-auto text-[10px] text-secondary font-label-meter font-medium">1.4% CPU</span>
+</a>
+<a class="flex items-center gap-space-xs text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-on-surface rounded-lg px-space-sm py-space-xs text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="sensors">sensors</span>
+<span class="truncate">Audio I/O Setup</span>
+<span class="ml-auto text-[10px] text-on-surface-variant font-label-meter">D-Rack 1-8</span>
+</a>
+</div>
+</aside>
+<!-- ================= CENTRAL WORKSTATION CANVAS ================= -->
+<main class="flex-1 flex flex-col overflow-y-auto bg-[#F5F5F7] p-space-md gap-space-md">
+<!-- ================= SECTION 1: MASTER TRANSPORT & LOUDNESS METERING ================= -->
+<section class="glass-panel rounded-2xl p-space-md flex flex-wrap items-center justify-between gap-space-md shrink-0">
+<!-- Transport Controls Cluster -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-1 bg-surface-container/70 p-1 rounded-xl border border-outline-variant/30">
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-white active:scale-95 transition-all" title="Return to Zero">
+<span class="material-symbols-outlined text-[18px]" data-icon="first_page">first_page</span>
+</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-white active:scale-95 transition-all" title="Fast Rewind">
+<span class="material-symbols-outlined text-[18px]" data-icon="fast_rewind">fast_rewind</span>
+</button>
+<button class="w-9 h-9 rounded-lg flex items-center justify-center bg-white text-secondary shadow-sm active:scale-95 transition-all border border-black/5" title="Play">
+<span class="material-symbols-outlined text-[22px]" data-icon="play_arrow" data-weight="fill" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-white active:scale-95 transition-all" title="Fast Forward">
+<span class="material-symbols-outlined text-[18px]" data-icon="fast_forward">fast_forward</span>
+</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-white active:scale-95 transition-all" title="Record Arm">
+<span class="material-symbols-outlined text-[18px]" data-icon="radio_button_checked">radio_button_checked</span>
+</button>
+</div>
+<!-- Studio Automation Modes -->
+<div class="flex items-center gap-1.5 text-xs font-label-control">
+<button class="px-2.5 py-1.5 rounded-lg bg-surface-container/80 text-on-surface hover:bg-white border border-outline-variant/30 flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]" data-icon="repeat">repeat</span>
+<span>Loop Range</span>
+</button>
+<button class="px-2.5 py-1.5 rounded-lg bg-surface-container/80 text-on-surface hover:bg-white border border-outline-variant/30 flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]" data-icon="alt_route">alt_route</span>
+<span>Auto Punch-In</span>
+</button>
+<button class="px-2.5 py-1.5 rounded-lg bg-surface-container/80 text-on-surface hover:bg-white border border-outline-variant/30 flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]" data-icon="flag">flag</span>
+<span>Cue Drop</span>
+</button>
+</div>
+</div>
+<!-- Precision Studio Amber Stereo Meters & Loudness Target -->
+<div class="flex items-center gap-space-lg ml-auto">
+<!-- Stereo Peak & RMS Meter Bars -->
+<div class="flex items-center gap-3 bg-surface-container/40 px-space-md py-1.5 rounded-xl border border-outline-variant/20">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-meter text-[9px] text-on-surface-variant w-3">L</span>
+<div class="w-36 h-2 rounded-sm recessed-well p-0.5 flex items-center">
+<div class="h-full bg-gradient-to-r from-secondary via-primary-container to-error rounded-sm w-[78%]"></div>
+</div>
+<span class="font-label-meter text-[9px] text-on-surface-variant w-8 text-right">-8.4 dB</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="font-label-meter text-[9px] text-on-surface-variant w-3">R</span>
+<div class="w-36 h-2 rounded-sm recessed-well p-0.5 flex items-center">
+<div class="h-full bg-gradient-to-r from-secondary via-primary-container to-error rounded-sm w-[74%]"></div>
+</div>
+<span class="font-label-meter text-[9px] text-on-surface-variant w-8 text-right">-9.8 dB</span>
+</div>
+</div>
+<div class="h-6 w-px bg-outline-variant/30"></div>
+<!-- Integrated Loudness Target Met Box -->
+<div class="flex items-center gap-2">
+<div class="flex flex-col">
+<span class="text-[9px] font-label-control uppercase tracking-wider text-on-surface-variant">Int. Loudness</span>
+<span class="text-sm font-label-meter font-bold text-on-surface leading-tight">-19.0 <span class="text-[10px] font-normal text-on-surface-variant">LUFS</span></span>
+</div>
+<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-[10px] font-label-control font-semibold">
+<span class="material-symbols-outlined text-[13px]" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span>Target Met</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 2: AUDIO WAVEFORM SCRUBBER ================= -->
+<section class="glass-panel rounded-2xl p-space-md flex flex-col gap-space-sm">
+<!-- Waveform Header Strip: Controls & DB readouts -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-md">
+<span class="font-label-control text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Take 03 Waveform Monitor</span>
+<!-- Cue Point Chips -->
+<div class="flex items-center gap-1.5">
+<span class="px-2 py-0.5 rounded text-[10px] font-label-meter bg-primary-container/15 text-primary border border-primary-container/30">00:04.120 [Hook]</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-label-meter bg-surface-container-high text-on-surface-variant border border-outline-variant/30">00:18.400 [Breath Filter]</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-label-meter bg-secondary-fixed text-on-secondary-fixed border border-secondary/20">00:32.080 [Punch In]</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<!-- Slip Mode Toggle -->
+<button class="px-2 py-0.5 rounded text-[11px] font-label-control bg-surface-container text-on-surface border border-outline-variant/30 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="swap_horiz">swap_horiz</span>
+<span>Slip Mode</span>
+</button>
+<!-- Zoom Controls -->
+<div class="flex items-center rounded-lg bg-surface-container p-0.5 border border-outline-variant/30 text-[10px] font-label-control">
+<button class="px-2 py-0.5 rounded hover:bg-white text-on-surface-variant">1x</button>
+<button class="px-2 py-0.5 rounded bg-white font-bold text-on-surface shadow-xs">2x</button>
+<button class="px-2 py-0.5 rounded hover:bg-white text-on-surface-variant">5x</button>
+<button class="px-2 py-0.5 rounded hover:bg-white text-on-surface-variant">FIT</button>
+</div>
+</div>
+</div>
+<!-- Waveform Display Bed -->
+<div class="relative h-28 w-full rounded-xl recessed-well overflow-hidden flex items-center px-4">
+<!-- Timeline ruler lines (background) -->
+<div class="absolute inset-0 flex justify-between pointer-events-none opacity-25 px-2">
+<div class="h-full border-r border-outline-variant text-[9px] font-label-meter pl-1 pt-1">00:00</div>
+<div class="h-full border-r border-outline-variant text-[9px] font-label-meter pl-1 pt-1">00:10</div>
+<div class="h-full border-r border-outline-variant text-[9px] font-label-meter pl-1 pt-1">00:20</div>
+<div class="h-full border-r border-outline-variant text-[9px] font-label-meter pl-1 pt-1">00:30</div>
+<div class="h-full border-r border-outline-variant text-[9px] font-label-meter pl-1 pt-1">00:40</div>
+<div class="h-full border-r border-outline-variant text-[9px] font-label-meter pl-1 pt-1">00:50</div>
+</div>
+<!-- Procedural Multi-bar Waveform Simulation -->
+<div class="w-full h-20 flex items-center justify-between gap-[2px] z-10 opacity-90">
+<!-- Bars before playhead (passed) -->
+<div class="w-1 h-5 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-9 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-14 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-12 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-7 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-16 bg-on-surface-variant/50 rounded-full"></div>
+<div class="w-1 h-10 bg-on-surface-variant/50 rounded-full"></div>
+<div class="w-1 h-4 bg-on-surface-variant/30 rounded-full"></div>
+<div class="w-1 h-12 bg-on-surface-variant/50 rounded-full"></div>
+<div class="w-1 h-16 bg-on-surface-variant/60 rounded-full"></div>
+<div class="w-1 h-8 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-5 bg-on-surface-variant/30 rounded-full"></div>
+<!-- High Energy Dialog Section -->
+<div class="w-1 h-14 bg-on-surface-variant/60 rounded-full"></div>
+<div class="w-1 h-18 bg-on-surface-variant/70 rounded-full"></div>
+<div class="w-1 h-12 bg-on-surface-variant/50 rounded-full"></div>
+<div class="w-1 h-6 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-14 bg-on-surface-variant/60 rounded-full"></div>
+<div class="w-1 h-10 bg-on-surface-variant/50 rounded-full"></div>
+<div class="w-1 h-16 bg-on-surface-variant/70 rounded-full"></div>
+<div class="w-1 h-18 bg-on-surface-variant/80 rounded-full"></div>
+<div class="w-1 h-12 bg-on-surface-variant/60 rounded-full"></div>
+<div class="w-1 h-8 bg-on-surface-variant/40 rounded-full"></div>
+<!-- Playhead passes around 42% -->
+<div class="w-1 h-14 bg-primary-container rounded-full"></div>
+<div class="w-1 h-18 bg-primary-container rounded-full"></div>
+<div class="w-1 h-16 bg-on-surface-variant/60 rounded-full"></div>
+<div class="w-1 h-11 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-6 bg-on-surface-variant/30 rounded-full"></div>
+<div class="w-1 h-13 bg-on-surface-variant/50 rounded-full"></div>
+<div class="w-1 h-17 bg-on-surface-variant/70 rounded-full"></div>
+<div class="w-1 h-9 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-5 bg-on-surface-variant/30 rounded-full"></div>
+<div class="w-1 h-12 bg-on-surface-variant/50 rounded-full"></div>
+<div class="w-1 h-15 bg-on-surface-variant/60 rounded-full"></div>
+<div class="w-1 h-7 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-13 bg-on-surface-variant/50 rounded-full"></div>
+<div class="w-1 h-16 bg-on-surface-variant/70 rounded-full"></div>
+<div class="w-1 h-10 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-4 bg-on-surface-variant/30 rounded-full"></div>
+<div class="w-1 h-9 bg-on-surface-variant/40 rounded-full"></div>
+<div class="w-1 h-14 bg-on-surface-variant/60 rounded-full"></div>
+<div class="w-1 h-8 bg-on-surface-variant/40 rounded-full"></div>
+</div>
+<!-- Studio Amber Playhead Scrubber with Handle -->
+<div class="absolute left-[44%] top-0 bottom-0 w-0.5 bg-primary-container z-20 pointer-events-none shadow-[0_0_8px_rgba(255,149,0,0.8)]">
+<div class="absolute -top-1 -left-2 w-4 h-3 bg-primary-container rounded-sm flex items-center justify-center text-white text-[9px] font-bold shadow-md">
+              ▼
+            </div>
+<div class="absolute bottom-1 -left-9 px-1.5 py-0.5 bg-on-surface text-surface-container-lowest rounded text-[9px] font-label-meter">
+              00:24.18
+            </div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 3: 5-ROOM DAG STEPPER (PIPELINE) ================= -->
+<section class="glass-panel rounded-2xl p-space-md flex flex-col gap-space-xs">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-base" data-icon="schema">schema</span>
+<span class="font-headline-md text-xs font-semibold uppercase tracking-wider text-on-surface">5-Room Acoustic Pipeline DAG</span>
+</div>
+<span class="text-[11px] font-label-meter text-on-surface-variant">Calibrated Room Impulse Matrix • 96kHz Internal Upsample</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-5 gap-2 relative">
+<!-- Room 1: Passed -->
+<div class="p-2.5 rounded-xl bg-white/70 border border-outline-variant/30 flex flex-col justify-between relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-label-control text-on-surface-variant">STAGE 01</span>
+<span class="material-symbols-outlined text-[16px] text-secondary" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="my-1.5">
+<h4 class="font-semibold text-xs text-on-surface leading-tight">Room 1: Dry Booth</h4>
+<p class="text-[10px] text-on-surface-variant mt-0.5">Capture Profile A</p>
+</div>
+<div class="flex items-center justify-between text-[10px] font-label-meter text-secondary pt-1 border-t border-outline-variant/20">
+<span>Passed</span>
+<span>-0.2 dB Peak</span>
+</div>
+</div>
+<!-- Room 2: Active (Emerald Badge) -->
+<div class="p-2.5 rounded-xl bg-white border-2 border-secondary/50 shadow-sm flex flex-col justify-between relative overflow-hidden ring-2 ring-secondary/15">
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-label-control text-secondary font-bold">STAGE 02</span>
+<span class="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-[9px] font-label-control font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+                Active
+              </span>
+</div>
+<div class="my-1.5">
+<h4 class="font-semibold text-xs text-on-surface leading-tight">Room 2: Noise Bed</h4>
+<p class="text-[10px] text-on-surface-variant mt-0.5">De-bleed &amp; Room Tone</p>
+</div>
+<div class="flex items-center justify-between text-[10px] font-label-meter text-on-surface-variant pt-1 border-t border-outline-variant/20">
+<span class="text-secondary font-semibold">Attenuating</span>
+<span>-42 dB Floor</span>
+</div>
+</div>
+<!-- Room 3: Pending -->
+<div class="p-2.5 rounded-xl bg-white/50 border border-outline-variant/30 flex flex-col justify-between relative">
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-label-control text-on-surface-variant">STAGE 03</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant/50" data-icon="hourglass_top">hourglass_top</span>
+</div>
+<div class="my-1.5">
+<h4 class="font-semibold text-xs text-on-surface leading-tight">Room 3: Dialog EQ</h4>
+<p class="text-[10px] text-on-surface-variant mt-0.5">Spectral Resonance</p>
+</div>
+<div class="flex items-center justify-between text-[10px] font-label-meter text-on-surface-variant pt-1 border-t border-outline-variant/20">
+<span>Pending</span>
+<span>Auto-Q</span>
+</div>
+</div>
+<!-- Room 4: Queued -->
+<div class="p-2.5 rounded-xl bg-white/40 border border-outline-variant/20 flex flex-col justify-between relative opacity-85">
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-label-control text-on-surface-variant">STAGE 04</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant/40" data-icon="pending">pending</span>
+</div>
+<div class="my-1.5">
+<h4 class="font-semibold text-xs text-on-surface leading-tight">Room 4: Compression</h4>
+<p class="text-[10px] text-on-surface-variant mt-0.5">Opto VCA Leveler</p>
+</div>
+<div class="flex items-center justify-between text-[10px] font-label-meter text-on-surface-variant/70 pt-1 border-t border-outline-variant/20">
+<span>Queued</span>
+<span>2.4:1 Target</span>
+</div>
+</div>
+<!-- Room 5: Dolby Atmos Binaural -->
+<div class="p-2.5 rounded-xl bg-white/40 border border-outline-variant/20 flex flex-col justify-between relative opacity-85">
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-label-control text-on-surface-variant">STAGE 05</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant/40" data-icon="spatial_audio">spatial_audio</span>
+</div>
+<div class="my-1.5">
+<h4 class="font-semibold text-xs text-on-surface leading-tight">Room 5: Dolby Atmos</h4>
+<p class="text-[10px] text-on-surface-variant mt-0.5">Binaural Master Bed</p>
+</div>
+<div class="flex items-center justify-between text-[10px] font-label-meter text-on-surface-variant/70 pt-1 border-t border-outline-variant/20">
+<span>Queued</span>
+<span>7.1.4 Spatial</span>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= SECTION 4: LOWER DOCK (VOICE ROSTER & EDITORIAL INSPECTOR) ================= -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-md flex-1 min-h-[340px]">
+<!-- Multi-Cast Voice Roster (7 Cols) -->
+<div class="lg:col-span-7 glass-panel rounded-2xl p-space-md flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-base" data-icon="groups">groups</span>
+<span class="font-headline-md text-xs font-semibold uppercase tracking-wider text-on-surface">Multi-Cast Voice Roster</span>
+</div>
+<span class="text-[11px] font-label-meter text-on-surface-variant">3 Active Performers Assigned</span>
+</div>
+<!-- Cast Cards Container -->
+<div class="flex flex-col gap-2">
+<!-- Performer 1: Aarav Sharma (Live) -->
+<div class="p-2.5 rounded-xl bg-white/90 border border-secondary/40 shadow-xs flex items-center justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover border border-outline-variant/40" data-alt="A refined portrait of a middle-aged Indian male voice narrator with headphones in an Apple minimalist acoustic studio environment with soft natural lighting and warm neutral gray tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHIFx684UqsAvX8plP1BZmq_F9rloNw0Ku5smrrwMjhMCW6e27WNyqMQBihYF0SVGA53rf1AO3nZQe2V578sQnhzOzvjM-t0Nuy0sYPURxxmZNmPtpnGVmzdMV91gA5G3A6PXTEbmWw70DKH5BtHe1jiGaknsZ23gOLxieACf1qmeLSURwgzL9-HGDwRYRaRcrUStanYQNmE5Ws0csChAYljSBXabAnzOY5BnZGjP_HkA5JbU_6fiGv3xfcRGcMEbGqmB6gBsSzemH"/>
+<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-secondary border-2 border-white"></span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h4 class="text-xs font-bold text-on-surface">Aarav Sharma</h4>
+<span class="px-1.5 py-0.2 rounded text-[9px] font-label-control bg-secondary-fixed text-on-secondary-fixed font-semibold">Booth A Live</span>
+</div>
+<p class="text-[11px] text-on-surface-variant">Character: <span class="font-medium text-on-surface">The Silk Caravan Master</span></p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-7 h-7 rounded text-[10px] font-label-control font-bold bg-surface-container text-on-surface hover:bg-white border border-outline-variant/30">M</button>
+<button class="w-7 h-7 rounded text-[10px] font-label-control font-bold bg-primary-container text-white shadow-xs">S</button>
+<button class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-fixed text-on-primary-fixed font-semibold text-xs active:scale-95 transition-all shadow-xs">
+<span class="material-symbols-outlined text-[15px]" data-icon="play_arrow">play_arrow</span>
+<span>Audition</span>
+</button>
+</div>
+</div>
+<!-- Performer 2: Priya Sen (Standby) -->
+<div class="p-2.5 rounded-xl bg-white/70 border border-outline-variant/30 flex items-center justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover border border-outline-variant/40" data-alt="An expressive portrait of an Indian female voice actress in a bright high-fidelity recording booth with warm directional studio lamps and minimalist silver audio gear." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXHntJNw1ZpbL3XfrHL5dgLeygyFTLww2aHNHPn-ESF_Sz257HYyTWjnjHqcQPdUt9P4M_sAAVh83L4Yqe_iFaPLg5PBAdSi0hCSyU9CjCLGaUvcuLL8zaMR8p2Nw-scgjfJOo516iGGlXtz9WnmdNDxgaBAVLCIyhfbdQJI7R3bYKKufeO1lAesMVcsXfoRCc_EwE1FLxj_aQ3QVIOAyILtZboagl4jR57j-_oPAAl5lfKy4KFXVrEsUsImjEhqGEq1xDZkeUkSks"/>
+<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-surface-container-highest border-2 border-white"></span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h4 class="text-xs font-bold text-on-surface">Priya Sen</h4>
+<span class="px-1.5 py-0.2 rounded text-[9px] font-label-control bg-surface-container text-on-surface-variant">Booth B Standby</span>
+</div>
+<p class="text-[11px] text-on-surface-variant">Character: <span class="font-medium text-on-surface">Princess Ananya</span></p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-7 h-7 rounded text-[10px] font-label-control font-bold bg-surface-container text-on-surface-variant hover:bg-white border border-outline-variant/30">M</button>
+<button class="w-7 h-7 rounded text-[10px] font-label-control font-bold bg-surface-container text-on-surface-variant hover:bg-white border border-outline-variant/30">S</button>
+<button class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-white text-on-surface font-semibold text-xs active:scale-95 transition-all border border-outline-variant/30">
+<span class="material-symbols-outlined text-[15px]" data-icon="play_arrow">play_arrow</span>
+<span>Audition</span>
+</button>
+</div>
+</div>
+<!-- Performer 3: Vikram Malhotra (Standby) -->
+<div class="p-2.5 rounded-xl bg-white/70 border border-outline-variant/30 flex items-center justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover border border-outline-variant/40" data-alt="A distinguished senior Indian male voice actor with graying hair wearing a black turtleneck in a pristine modern sound studio with high acoustic wooden diffusion panels." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqXzor-Xi1DrQQQd39yaLic2C1FZiW-hmUO3jq8J-kQg_WfT0dR-aH_DIS8rrzud7iBYtAGjspuEmSnAoteSjyOysnx0SSIuivcx8Gby2vRhW7vFNLbSI2-pYvoBF4PP7ggS_Eqsr5RvNFk7NV5MRnErwPomHyYyys9xxP2RpVvtutnfPeNFmv0vqIF95pFeoc5gkFaNRe-gqCmwFdz4gjdGQf_denDOArZFDV_a7fsQ-rI5V5am2F4CcfXx-eC6fmYGJKTuhePMcV"/>
+<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-surface-container-highest border-2 border-white"></span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h4 class="text-xs font-bold text-on-surface">Vikram Malhotra</h4>
+<span class="px-1.5 py-0.2 rounded text-[9px] font-label-control bg-surface-container text-on-surface-variant">Booth B Standby</span>
+</div>
+<p class="text-[11px] text-on-surface-variant">Character: <span class="font-medium text-on-surface">The Chronicler</span></p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-7 h-7 rounded text-[10px] font-label-control font-bold bg-surface-container text-on-surface-variant hover:bg-white border border-outline-variant/30">M</button>
+<button class="w-7 h-7 rounded text-[10px] font-label-control font-bold bg-surface-container text-on-surface-variant hover:bg-white border border-outline-variant/30">S</button>
+<button class="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-white text-on-surface font-semibold text-xs active:scale-95 transition-all border border-outline-variant/30">
+<span class="material-symbols-outlined text-[15px]" data-icon="play_arrow">play_arrow</span>
+<span>Audition</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Micro-Fader Strip for Selected Actor -->
+<div class="mt-2 pt-2 border-t border-outline-variant/30 flex items-center justify-between text-[11px]">
+<div class="flex items-center gap-2">
+<span class="font-label-control text-on-surface-variant uppercase text-[10px]">Active Strip Gain</span>
+<span class="font-label-meter font-bold text-on-surface">+1.8 dB</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-on-surface-variant">De-Esser: <strong class="text-on-surface font-medium">5.8 kHz (-3.2 dB)</strong></span>
+<span class="text-on-surface-variant">•</span>
+<span class="text-on-surface-variant">Preamp: <strong class="text-on-surface font-medium">Neve 1073 Model</strong></span>
+</div>
+</div>
+</div>
+<!-- Dialogue Editorial Inspector with Hindi Prose (5 Cols) -->
+<div class="lg:col-span-5 glass-panel rounded-2xl p-space-md flex flex-col justify-between">
+<div>
+<!-- Header with Take Selector -->
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-base" data-icon="edit_note">edit_note</span>
+<span class="font-headline-md text-xs font-semibold uppercase tracking-wider text-on-surface">Dialogue Inspector</span>
+</div>
+<!-- Instant Take Selector Dropdown -->
+<div class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-outline-variant/40 shadow-xs">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-xs font-bold text-on-surface">Take 03 - Master</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="arrow_drop_down">arrow_drop_down</span>
+</div>
+</div>
+<!-- Emotion & Tempo Directive Badge -->
+<div class="flex items-center justify-between p-2 rounded-lg bg-surface-container-low border border-outline-variant/30 mb-space-sm">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary-container text-sm" data-icon="record_voice_over">record_voice_over</span>
+<span class="text-xs font-semibold text-on-surface">Melancholy whisper • 62 WPM</span>
+</div>
+<span class="text-[10px] font-label-meter text-on-surface-variant">Cadence: Slow / Breathy</span>
+</div>
+<!-- Devanagari Hindi Script Passage -->
+<div class="p-3 rounded-xl bg-white/95 border border-outline-variant/30 shadow-xs">
+<p class="font-hindi text-base leading-relaxed text-on-surface tracking-wide">
+                "हवा में सूखी मिट्टी और केसर की हल्की महक घुल रही थी। कारवां के ऊँटों के गले की घंटियाँ रात के सन्नाटे में एक अजीब सा धीमा सुर छेड़ रही थीं।"
+              </p>
+</div>
+<!-- Phonetic & Stress Breakdown -->
+<div class="mt-space-sm p-2 rounded-lg bg-surface-container/50 border border-outline-variant/20 flex flex-col gap-1.5">
+<div class="flex items-center justify-between text-[11px]">
+<span class="text-on-surface-variant">Phonetic Guide:</span>
+<span class="font-label-meter font-semibold text-primary">[Kesar • /keː.sər/]</span>
+</div>
+<div class="flex items-center justify-between text-[11px]">
+<span class="text-on-surface-variant">Syllable Stress:</span>
+<div class="flex items-center gap-1 font-label-meter text-[10px]">
+<span class="px-1.5 py-0.5 rounded bg-primary-container/20 text-primary font-bold">KE-</span>
+<span class="text-on-surface-variant">sar</span>
+<span class="text-on-surface-variant/40 ml-1">| Initial Trochaic</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Editorial Action Buttons -->
+<div class="pt-2 border-t border-outline-variant/30 flex items-center justify-between">
+<span class="text-[10px] font-label-control text-on-surface-variant">Narrator: Aarav Sharma</span>
+<div class="flex items-center gap-1.5">
+<button class="px-2 py-1 rounded bg-surface-container text-on-surface-variant hover:text-on-surface text-xs font-medium border border-outline-variant/30">Re-take</button>
+<button class="px-2.5 py-1 rounded bg-secondary-fixed text-on-secondary-fixed text-xs font-bold hover:brightness-105 transition-all">Accept Master</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

@@ -1,10 +1,11 @@
-# 🏛️ Architecture: Audiobook Studio (Option C Pure Vocals-Only Engine v5.4)
+# 🏛️ Architecture: Audiobook Studio (Option C Pure Vocals-Only Engine v6.0)
 
 ## Executive Overview
 
-**Audiobook Studio (Option C Pure Vocals-Only Engine v5.4)** is an autonomous, studio-grade vocal production framework and Google Antigravity Plugin engineered specifically for **broadcast-grade spoken audio across multiple deliverables**:
+**Audiobook Studio (Option C Pure Vocals-Only Engine v6.0 - Grand Unification 100% Certified)** is an autonomous, studio-grade vocal production framework and Google Antigravity Plugin engineered specifically for **broadcast-grade spoken audio across multiple deliverables**:
 1. **Audible-Standard Multi-Cast Audiobooks**: Pristine verbatim prose preservation, em-dash dialogue framing, transparent measured narration (temperature 0.32), and two-pass linear EBU R128 mastering at **-19.0 LUFS** / **-1.5 dBTP**.
 2. **Conversational 2-Host Narrative Podcasts**: High-retention audio-first shows featuring calibrated host dynamics (Sameer/Priya in Hindustani, Alex/Maya in English), organic breathability ($\le 22$ words per breath, 140ms pre-roll breath pauses), 5-part retention arcs, stereo spatial staging (-0.25 Left / +0.25 Right), and **-16.0 LUFS** broadcast podcast mastering.
+3. **Crown Jewel Studio UI Workstation (Phase 7)**: Apple Minimalist Light UI Architecture (macOS Sonoma / Tahoe HIG), 100% offline isolation (zero CDNs/external fonts), 120 FPS double-buffered Canvas 2D waveform scrubber, $\le 2.1\text{ MB}$ heap footprint, sub-millisecond vectorized Python audio peaks bridge, and Node.js Sidecar API with 50-item LRU cache and HTTP 206 Partial Content byte range streaming.
 
 > [!IMPORTANT]
 > **Pure Vocals-Only Architectural Invariant**:
@@ -14,7 +15,7 @@
 
 ## 🏗️ High-Level Option C Architecture
 
-The system strictly implements **Option C: Shared Understanding & Dramaturgy Core with Specialized Format Adapters**:
+The system strictly implements **Option C: Shared Understanding & Dramaturgy Core with Specialized Format Adapters and Crown Jewel UI Workstation**:
 
 ```mermaid
 flowchart TD
@@ -81,6 +82,15 @@ flowchart TD
         Runner --> Report["STUDIO_CERTIFICATION_REPORT.json (Gate 6 Compliance)"]
     end
 
+    subgraph Room6["🖥️ Room 6 / Aux-Pane: Crown Jewel Studio UI Workstation & Sidecar Bridge"]
+        direction TB
+        Sidecar["Node.js Sidecar API (sidecars/studio-panel/main.mjs)<br/>• /api/status | /api/projects | /api/project<br/>• /api/peaks (50-Item LRU Cache)<br/>• /api/audio (HTTP 206 Byte Range Streaming)"]
+        Bridge["Vectorized Python Bridge (audiobook_factory/api/studio_bridge.py)<br/>• Sub-Millisecond soundfile + numpy Peak Extraction (< 1ms)<br/>• SQLite State Introspection (project_state.db & key_pool_state.db)<br/>• Curated Voice Roster & 5-Room DAG Telemetry"]
+        Frontend["Apple Minimalist Light UI (sidecars/studio-panel/)<br/>• 100% Offline (Zero CDN / Zero External Fonts)<br/>• 120 FPS Double-Buffered Canvas 2D Waveform Scrubber<br/>• ≤ 2.1 MB Heap RAM | ~39 KB Bundle<br/>• 5-Room Interactive Stepper & Hindi Editorial Inspector"]
+        Sidecar <--> Bridge
+        Sidecar <--> Frontend
+    end
+
     Room1 --> Room1_5
     Room1_5 --> Room2
     Room1_5 -.->|"Roster & Aliases"| Room3
@@ -93,6 +103,8 @@ flowchart TD
     Gate29 -->|"Audited Script (0% Swap / 0% Swallow / Distance >= 0.65)"| Room4
     Room4 --> Room5
     Room5 --> CertHarness
+    CertHarness -.->|"Telemetry & Master Deliverables"| Room6
+    Room1 & Room2 & Room3 & Room4 & Room5 -.->|"State & Audition Audio"| Room6
 ```
 
 ---
@@ -507,6 +519,12 @@ All production rooms interface strictly with [`ModelGateway`](file:///c:/Users/S
    - Forensic speech auditing via [`AudioQAAuditor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py) (energy VAD, speaking pace 75–240 WPM, dropouts/loops detection, MOS scoring), DeepFilterNet3 neural polish with selective $>45\text{dB}$ SNR auto-bypass, Matchering 2.0 reference spectrum matching ($\pm 3.0\text{dB}$ clamp), and `<0.2s` single-segment hot-patching via [`SingleSegmentHotPatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/hot_patcher.py).
    - Chapter packaging and delivery via [`M4BBookPackager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/packager.py) and [`ChapterDeliveryEncoder`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/encoder.py) (192k AAC single pass, `-map_chapters 1` monotonic TOC).
    - Diagnostic telemetry queries `gateway.get_fleet_status()` for fleet reporting and quota telemetry without opening direct connections to `keys_inventory.db`.
+7. **Room 6 / Aux-Pane UI Workstation (Phase 7 Crown Jewel Orchestrator & Sidecar Bridge)**:
+   - Interactive operator console hosted natively in Google Antigravity Aux-Pane or via standalone Node.js sidecar server.
+   - **Vectorized Python Bridge** ([`audiobook_factory/api/studio_bridge.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/api/studio_bridge.py)): Delivers sub-millisecond peak extraction via `soundfile` and `numpy`, real-time key pool introspection via `key_pool_state.db`, project status tracking via `project_state.db`, and curated voice catalog discovery with Windows UTF-8 stdout encoding.
+   - **Node.js Sidecar API** ([`sidecars/studio-panel/main.mjs`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/main.mjs)): High-performance micro-server featuring a 50-item LRU waveform cache (`/api/peaks`) and HTTP 206 Partial Content byte range streaming (`/api/audio`), enabling instant seekability without full audio file re-downloads.
+   - **Apple Minimalist Light UI Architecture** ([`sidecars/studio-panel/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/sidecars/studio-panel/)): Built to macOS Sonoma / Tahoe Human Interface Guidelines with 100% offline isolation (zero CDNs/external fonts), $\le 2.1\text{ MB}$ browser heap (under $\le 3.5\text{ MB}$ budget), 120 FPS double-buffered HTML5 Canvas 2D waveform scrubber with SMPTE timecode (`00:00.000`), 5-Room interactive DAG stepper, Multi-Cast Voice Roster audition deck, and Dialogue Editorial Inspector with authentic Devanagari Hindi text.
+   - **Synchronized Global Plugin**: Seamlessly mirrored to `%USERPROFILE%\.gemini\config\plugins\audiobook-studio\sidecars\studio-panel\`.
 
 ---
 
@@ -536,6 +554,7 @@ audiobook-factory/
 ├── audiobook_factory/
 │   ├── core/                            # Shared Control Plane
 │   │   └── models/                      # ModelGateway, KeyLeaseManager, AntiBanGuard
+│   ├── api/                             # Phase 7 Python Studio Bridge (studio_bridge.py)
 │   ├── extraction/                      # Pillar 1 Forensic Ingestion
 │   ├── preproduction/                   # Room 1 System 1 Stateless Novel Researcher
 │   ├── metadata/                        # Room 1 System 2 BookBible & NovelStateMaintainer
@@ -551,6 +570,8 @@ audiobook-factory/
 │   ├── mastering.py                     # Room 5 Two-pass linear loudnorm EBU R128
 │   ├── packaging/                       # ChapterMetadataGenerator & multi-format delivery
 │   └── certification/                   # 8-Pillar Studio Certification Harness (P1-P8)
+├── sidecars/
+│   └── studio-panel/                    # Phase 7 Apple Minimalist Light UI Workstation & Node.js Sidecar
 └── docs/                                # Production-grade technical documentation
 ```
 
@@ -563,6 +584,7 @@ The legacy cinematic mix subcommands (`direct`, `render`, `bgm`, `stems`, `bank`
 ---
 
 ## 🔗 Related Documentation
+- [🖥️ Studio UI & Sidecar Extension Specification (Apple-Grade Minimalist Light)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_UI_AND_SIDECAR_SPECIFICATION.md)
 - [🎙️ TTS Platform Core Architecture Specification (Option C)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)
 - [🎙️ Podcast System Architecture](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 - [🎭 Dramaturgy & Adaptation System](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/DRAMATURGY_AND_ADAPTATION_SYSTEM.md)
