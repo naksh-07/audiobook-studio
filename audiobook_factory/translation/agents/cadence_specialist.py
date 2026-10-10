@@ -15,7 +15,7 @@ from audiobook_factory.logger import logger
 from audiobook_factory.model_manager import get_model_manager, TaskType
 from audiobook_factory.safety import get_dramatic_fiction_framing
 from audiobook_factory.sanitizer import validate_and_sanitize_translation
-from audiobook_factory.llm_client import call_gemini as default_call_gemini
+from audiobook_factory.translation.gateway_bridge import execute_translation_llm as default_call_gemini
 
 
 class HindustaniCadenceSpecialist:
@@ -32,7 +32,8 @@ class HindustaniCadenceSpecialist:
         try:
             return get_model_manager().resolve_active_model(TaskType.TRANSLATION)
         except Exception:
-            return "gemini-2.5-flash"
+            from audiobook_factory.translation.contracts import DEFAULT_TRANSLATION_MODEL
+            return DEFAULT_TRANSLATION_MODEL
 
     def refine_cadence(
         self,

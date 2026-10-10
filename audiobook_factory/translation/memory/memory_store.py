@@ -15,7 +15,22 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
 
-from audiobook_factory.audio_utils import _atomic_replace
+import os
+import time
+
+
+def _atomic_replace(src: Path, dst: Path, max_retries: int = 5, backoff_base: float = 0.05) -> None:
+    """Atomic file replacement with Windows file lock retry loop."""
+    for attempt in range(max_retries):
+        try:
+            os.replace(src, dst)
+            return
+        except OSError:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(backoff_base * (2 ** attempt))
+
+
 from audiobook_factory.translation.book_bible import BookBible, FlaggedConflict
 from audiobook_factory.translation.relationship_state import DynamicRelationshipState
 from .events import StoryEvent

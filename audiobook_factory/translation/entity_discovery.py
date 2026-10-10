@@ -264,22 +264,20 @@ Output JSON: An object with:
    - "gender": "male" | "female" | "other"
    - "voice_style": brief description of vocal tone
    - "hindustani_archetype": sociolect archetype
-2. "locations_and_terms": Map of English terms/locations/monikers to Devanagari (e.g. {{"Valyria": "वलेरिया", "Silver Falcon": "सिल्वर फाल्कन"}})
+2. "locations_and_terms": Map of English terms/locations/monikers to Devanagari (e.g. {{"Aldoria": "एल्डोरिया", "Iron Fortress": "आयरन फोर्ट्रेस"}})
 """
         try:
             if call_llm_fn:
                 raw = call_llm_fn(prompt=prompt, system_instruction=sys_prompt, json_mode=True)
             else:
-                from audiobook_factory.llm_client import call_gemini
-                from audiobook_factory.model_manager import TaskType
-                raw = call_gemini(
+                from audiobook_factory.translation.gateway_bridge import execute_translation_llm
+                import json_repair
+                raw_text = execute_translation_llm(
                     prompt=prompt,
                     system_instruction=sys_prompt,
-                    task_type=TaskType.TRANSLATION,
-                    response_mime_type="application/json",
                     temperature=0.1,
-                    max_retries=3,
                 )
+                raw = json_repair.loads(raw_text) if raw_text else {}
 
             res = raw if isinstance(raw, dict) else (json.loads(raw) if isinstance(raw, str) and raw.strip() else {})
             chars_data = res.get("characters", []) if isinstance(res, dict) else []

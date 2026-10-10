@@ -103,8 +103,8 @@ class MultiAgentTranslationCollective:
         if call_llm_fn:
             eff_llm = call_llm_fn
         else:
-            from audiobook_factory.translator import call_gemini
-            eff_llm = lambda prompt, system_instruction="", thinking_budget=1024, **kw: call_gemini(
+            from audiobook_factory.translation.gateway_bridge import execute_translation_llm
+            eff_llm = lambda prompt, system_instruction="", thinking_budget=1024, **kw: execute_translation_llm(
                 prompt=prompt,
                 system_instruction=system_instruction,
                 model=self.model,
@@ -112,9 +112,10 @@ class MultiAgentTranslationCollective:
                 **kw,
             )
 
+        from audiobook_factory.translation.contracts import DEFAULT_TRANSLATION_MODEL
         engine = TranslationEngine(
             llm_fn=eff_llm,
-            model_name=self.model or "gemini-2.5-flash",
+            model_name=self.model or DEFAULT_TRANSLATION_MODEL,
         )
 
         request = TranslationRequest(
@@ -132,6 +133,14 @@ class MultiAgentTranslationCollective:
         )
 
         result = engine.translate(request)
+        if not result.parity.passed_all_gates:
+            logger.warning(
+                f"  [!] [Translation Collective] Parity gate warnings for '{block_title}': "
+                f"{result.parity.rejection_reasons}"
+            )
+            if any("collapse" in r.lower() or "omission" in r.lower() for r in result.parity.rejection_reasons):
+                logger.error(f"  [!] Critical structural divergence flagged by ParityGate in '{block_title}'.")
+
         candidate_hindi = result.translated_markdown
 
         # Deterministic Canon Inspection, Register Audit & Sanitization

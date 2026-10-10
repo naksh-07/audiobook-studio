@@ -67,3 +67,8 @@ class TranslationResult(BaseModel):
     total_chunks: int = 1
     llm_calls_made: int = 1
     elapsed_seconds: float = 0.0
+
+
+# Default Gemini model used for text translation if not resolved dynamically
+DEFAULT_TRANSLATION_MODEL: str = "gemini-2.5-flash"
+

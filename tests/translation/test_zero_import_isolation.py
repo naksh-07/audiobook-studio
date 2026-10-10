@@ -88,6 +88,31 @@ class TestZeroImportIsolation(unittest.TestCase):
         self.assertIsNotNone(engine.chunker)
         self.assertIsNotNone(engine.parity_gate)
 
+    def test_03_assert_zero_forbidden_imports_across_all_translation_modules(self):
+        """Recursively validates that ALL modules in audiobook_factory/translation/ have 0 audio/tts/screenplay imports."""
+        all_py_files = list(TRANSLATION_DIR.rglob("*.py"))
+        self.assertGreater(len(all_py_files), 10, "Must scan all translation modules")
+
+        violations = []
+        for py_file in all_py_files:
+            tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+            file_imports = get_all_imports(tree)
+
+            for lineno, imported_mod in file_imports:
+                for forbidden in FORBIDDEN_IMPORT_PREFIXES:
+                    if imported_mod == forbidden or imported_mod.startswith(forbidden + "."):
+                        rel_path = py_file.relative_to(TRANSLATION_DIR)
+                        violations.append(
+                            f"{rel_path}:{lineno} imports forbidden dependency '{imported_mod}'"
+                        )
+
+        if violations:
+            msg = (
+                f"\nArchitectural Isolation Breach: Found {len(violations)} forbidden dependencies across translation/:\n"
+                + "\n".join(f"  - {v}" for v in violations)
+            )
+            self.fail(msg)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -40,10 +40,18 @@ class TranslationEngine:
     def __init__(
         self,
         llm_fn: Optional[Callable[..., str]] = None,
-        model_name: str = "gemini-2.5-flash",
+        model_name: Optional[str] = None,
     ):
-        self.llm_fn = llm_fn
-        self.model_name = model_name
+        if llm_fn is not None:
+            self.llm_fn = llm_fn
+        else:
+            try:
+                from .gateway_bridge import execute_translation_llm
+                self.llm_fn = execute_translation_llm
+            except Exception:
+                self.llm_fn = None
+        from .contracts import DEFAULT_TRANSLATION_MODEL
+        self.model_name = model_name or DEFAULT_TRANSLATION_MODEL
         self.chunker = BilingualMacroChunker()
         self.alignment_engine = ParagraphAlignmentEngine()
         self.parity_gate = DeterministicParityGate()
@@ -231,15 +239,16 @@ class TranslationEngine:
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8") if e.fp else str(e)
             raise RuntimeError(f"Gemini API HTTP {e.code} Error: {err_body}")
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"Gemini API Network Error: {e.reason}")
 
     @staticmethod
     def _sanitize_output(text: str) -> str:
-        """Strips markdown fences, preambles, and conversational artifacts."""
+        """Strips markdown fences, preambles, and conversational artifacts robustly."""
         cleaned = text.strip()
-        # Remove ```markdown ... ``` fences if wrapped
-        fence_match = re.search(r"^```(?:markdown)?\s*\n(.*?)\n```$", cleaned, re.DOTALL | re.IGNORECASE)
-        if fence_match:
-            cleaned = fence_match.group(1).strip()
+        # Robustly strip opening and closing fences (even if output is truncated)
+        cleaned = re.sub(r"^```(?:markdown|json|md|text)?\s*\n?", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\n?```\s*$", "", cleaned)
 
         # Strip common AI preambles
         cleaned = re.sub(

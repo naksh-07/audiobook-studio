@@ -10,7 +10,7 @@ Zero-token full-text verification in pure Python:
 """
 
 import re
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Optional
 from .contracts import ParityMetrics
 
 

@@ -67,7 +67,8 @@ class IntelligentTranslationPipeline:
             try:
                 model = get_model_manager().resolve_active_model(TaskType.TRANSLATION)
             except Exception:
-                model = "gemini-2.5-flash"
+                from audiobook_factory.translation.contracts import DEFAULT_TRANSLATION_MODEL
+                model = DEFAULT_TRANSLATION_MODEL
         self.model = model
         self.policy = policy or get_default_translation_policy()
         self.book_bible = BookBible.load_from_project(self.project_dir)
