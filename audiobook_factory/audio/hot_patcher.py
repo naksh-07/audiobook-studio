@@ -122,8 +122,9 @@ class SingleSegmentHotPatcher:
                     data = w_pre.readframes(chunk_to_read)
                     if not data:
                         break
+                    frames_read = len(data) // (nchannels * sampwidth)
                     w_out.writeframes(data)
-                    frames_written += chunk_to_read
+                    frames_written += frames_read
 
                 # Part 2: Stream the new segment audio
                 while True:

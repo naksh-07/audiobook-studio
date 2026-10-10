@@ -174,7 +174,7 @@ class M4BBookPackager:
             safe_name = "".join(c for c in title if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_")
             output_filename = f"{safe_name}.m4b"
 
-        final_m4b = output_dir / output_filename
+        final_m4b = output_dir / Path(output_filename).name
 
         # 3. Discover Mastered Chapter Audio Deliverables
         all_audio = (

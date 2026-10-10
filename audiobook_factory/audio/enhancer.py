@@ -12,6 +12,7 @@ Invariants (ADR-023):
 """
 
 from __future__ import annotations
+import os
 import math
 import wave
 from pathlib import Path
@@ -53,7 +54,15 @@ class NeuralVocalEnhancer:
 
         if self._has_df and self.config.enable_neural_enhancement:
             try:
-                self._df_model, self._df_state, _ = init_df()
+                prev_offline = os.environ.get("HF_HUB_OFFLINE")
+                os.environ["HF_HUB_OFFLINE"] = "1"
+                try:
+                    self._df_model, self._df_state, _ = init_df()
+                finally:
+                    if prev_offline is not None:
+                        os.environ["HF_HUB_OFFLINE"] = prev_offline
+                    else:
+                        os.environ.pop("HF_HUB_OFFLINE", None)
                 if torch and torch.cuda.is_available():
                     self._df_model = self._df_model.cuda()
             except Exception as e:
@@ -78,8 +87,12 @@ class NeuralVocalEnhancer:
         if len(mono) < 100:
             return 50.0
 
-        block_size = max(10, len(mono) // 50)
-        blocks = [float(np.mean(mono[i * block_size : (i + 1) * block_size] ** 2)) for i in range(50)]
+        num_blocks = min(50, len(mono) // 10)
+        if num_blocks == 0:
+            return 50.0
+
+        block_size = len(mono) // num_blocks
+        blocks = [float(np.mean(mono[i * block_size : (i + 1) * block_size] ** 2)) for i in range(num_blocks)]
         sorted_energies = sorted(blocks)
 
         min_noise_energy = sorted_energies[0]

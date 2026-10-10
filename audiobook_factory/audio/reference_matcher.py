@@ -126,12 +126,17 @@ class ReferenceSpectrumMatcher:
         t_mono = np.mean(target, axis=1) if target.ndim > 1 else target
         r_mono = np.mean(reference, axis=1) if reference.ndim > 1 else reference
 
-        # Compute FFT magnitude spectra
         n_fft = 4096
         hop = 2048
 
-        _, _, t_spec = sig.stft(t_mono, fs=sr, nperseg=n_fft, noverlap=hop)
-        _, _, r_spec = sig.stft(r_mono, fs=sr, nperseg=n_fft, noverlap=hop)
+        def pad_to_nfft(arr: np.ndarray) -> np.ndarray:
+            return np.pad(arr, (0, max(0, n_fft - len(arr)))) if len(arr) < n_fft else arr
+
+        t_mono_padded = pad_to_nfft(t_mono)
+        r_mono_padded = pad_to_nfft(r_mono)
+
+        _, _, t_spec = sig.stft(t_mono_padded, fs=sr, nperseg=n_fft, noverlap=hop)
+        _, _, r_spec = sig.stft(r_mono_padded, fs=sr, nperseg=n_fft, noverlap=hop)
 
         t_mag = np.mean(np.abs(t_spec), axis=1) + 1e-8
         r_mag = np.mean(np.abs(r_spec), axis=1) + 1e-8
@@ -152,9 +157,12 @@ class ReferenceSpectrumMatcher:
         out_channels = []
         for ch in range(target.shape[1] if target.ndim > 1 else 1):
             ch_data = target[:, ch] if target.ndim > 1 else target
-            f, t_bins, zxx = sig.stft(ch_data, fs=sr, nperseg=n_fft, noverlap=hop)
+            ch_data_padded = pad_to_nfft(ch_data)
+            
+            f, t_bins, zxx = sig.stft(ch_data_padded, fs=sr, nperseg=n_fft, noverlap=hop)
             zxx_filtered = zxx * linear_filter_gains[:, np.newaxis]
             _, reconstructed = sig.istft(zxx_filtered, fs=sr, nperseg=n_fft, noverlap=hop)
+            
             # Match original length
             if len(reconstructed) < len(ch_data):
                 reconstructed = np.pad(reconstructed, (0, len(ch_data) - len(reconstructed)))

@@ -232,6 +232,8 @@ class AudioIngestionManager:
         if not segment_uid:
             hash_input = f"{chapter_id}:{segment_index}:{speaker}:{voice_name}:{spoken_text or literary_text}".encode("utf-8")
             segment_uid = hashlib.sha256(hash_input).hexdigest()[:12]
+        else:
+            segment_uid = "".join(c for c in segment_uid if c.isalnum() or c in ("-", "_"))
 
         out_filename = f"c{chapter_id:03d}_s{segment_index:04d}_{segment_uid}.wav"
         out_path = self.output_dir / out_filename
