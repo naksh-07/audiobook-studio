@@ -313,6 +313,18 @@ class PodcastOrchestrator:
         """
         proj_dir = Path(project_dir).resolve()
         script_p = Path(script_file).resolve()
+
+        # Gate 2.9 Pre-TTS Sanity Check for Podcast Episode
+        if os.environ.get("SKIP_PRE_TTS_GATE", "false").lower() not in ("true", "1", "yes"):
+            from audiobook_factory.gates.pre_synthesis import audit_gate2_9_pre_tts_sanity
+            audit_gate2_9_pre_tts_sanity(
+                script_file=script_p,
+                project_dir=proj_dir,
+                format_mode="podcast",
+                strict=True,
+            )
+            logger.info(f"[*] Gate 2.9 Pre-TTS Sanity: PASSED for Podcast Episode {chapter_num}")
+
         dispatcher = TTSDispatcher(
             project_dir=proj_dir,
             default_voice=default_voice,

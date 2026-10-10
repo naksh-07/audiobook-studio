@@ -89,6 +89,30 @@ def verify_pre_synthesis_gates(
         )
         raise GateAuditError(f"Gate 2.5 Dramatic Fidelity raised an unexpected error for Chapter {chapter_num:02d}: {e}") from e
 
+    # Gate 2.9: Pre-TTS Config & Attribution Sanity Gate (Fail-Closed)
+    try:
+        from audiobook_factory.gates.pre_synthesis import audit_gate2_9_pre_tts_sanity
+        if os.environ.get("SKIP_PRE_TTS_GATE", "false").lower() not in ("true", "1", "yes"):
+            gate2_9_res = audit_gate2_9_pre_tts_sanity(
+                script_file=script_file,
+                project_dir=project_dir,
+                format_mode="audiobook",
+                strict=True,
+            )
+            logger.info(f"[*] Gate 2.9 Pre-TTS Sanity: PASSED for Chapter {chapter_num:02d}")
+    except GateAuditError as e:
+        if os.environ.get("FORCE_GATE", "false").lower() in ("true", "1", "yes"):
+            logger.warning(f"  [!] GATE 2.9 PRE-TTS SANITY FORCED for Chapter {chapter_num:02d}: {e}")
+        else:
+            logger.error(f"\n[!] 🛑 GATE 2.9 PRE-TTS SANITY FAILED for Chapter {chapter_num:02d}: {e}")
+            raise
+    except Exception as e:
+        logger.error(
+            f"[!] 🛑 GATE 2.9 UNEXPECTED CRASH for Chapter {chapter_num:02d}: {e}. "
+            "Aborting to prevent un-validated screenplay from reaching synthesis."
+        )
+        raise GateAuditError(f"Gate 2.9 Pre-TTS Sanity raised an unexpected error for Chapter {chapter_num:02d}: {e}") from e
+
 
 def verify_performance_fidelity_gate(
     manifests_dir: Path,

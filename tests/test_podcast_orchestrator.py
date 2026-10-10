@@ -69,8 +69,9 @@ def test_orchestrator_synthesize_podcast_script(mock_podcast_project):
     """Test synthesis delegation to TTSDispatcher."""
     orchestrator = PodcastOrchestrator()
     script_file = mock_podcast_project / "scripts" / "chapter_001_podcast_script.json"
+    dummy_script = [{"index": 1, "speaker": "Host_A", "type": "dialogue", "text": "Welcome to our discussion today.", "pan": -0.25}]
     script_file.parent.mkdir(parents=True, exist_ok=True)
-    script_file.write_text("[]", encoding="utf-8")
+    script_file.write_text(json.dumps(dummy_script), encoding="utf-8")
 
     audio_chunks_dir = mock_podcast_project / "audio_chunks"
     audio_chunks_dir.mkdir(parents=True, exist_ok=True)
