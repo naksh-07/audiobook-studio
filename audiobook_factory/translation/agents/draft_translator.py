@@ -30,7 +30,10 @@ class LiteraryDraftTranslator:
     def _resolve_model(self) -> str:
         if self.model:
             return self.model
-        return get_model_manager().resolve_active_model(TaskType.TRANSLATION)
+        try:
+            return get_model_manager().resolve_active_model(TaskType.TRANSLATION)
+        except Exception:
+            return "gemini-2.5-flash"
 
     def _detect_scene_mode(
         self,

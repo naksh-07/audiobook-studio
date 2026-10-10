@@ -32,6 +32,7 @@ PROMPT_VERSION = "3.0.0"
 from audiobook_factory.key_manager import get_persistent_key_pool
 from audiobook_factory.cadence import get_stealth_sdk_headers
 from audiobook_factory.advisory_lexicon import get_advisory_db
+from audiobook_factory.translation.parity_gate import DeterministicParityGate
 
 pool = get_persistent_key_pool()
 
@@ -597,6 +598,19 @@ def translate_chapter(
                 glossary=glossary,
                 model=model,
             )
+        # Deterministic Full-Text Parity Gate Validation
+        gate = DeterministicParityGate()
+        parity = gate.verify(chapter_text, res)
+        if not parity.passed_all_gates:
+            logger.warning(
+                f"  [!] Parity Gate Warning for {chapter_title}: {parity.rejection_reasons} "
+                f"(length_ratio={parity.length_ratio:.2f}, quote_parity={parity.quote_parity_ratio:.2f})"
+            )
+        else:
+            logger.info(
+                f"  [+] Parity Gate PASSED for {chapter_title} "
+                f"(length_ratio={parity.length_ratio:.2f}, para_parity={parity.paragraph_parity_ratio:.2f})"
+            )
         return res
 
     # For long chapters, split across paragraph boundaries using TRANSLATION_TARGET_WORDS (650 words)
@@ -670,6 +684,19 @@ def translate_chapter(
             block_label=block_label,
             glossary=glossary,
             model=model,
+        )
+    # Deterministic Full-Text Parity Gate Validation
+    gate = DeterministicParityGate()
+    parity = gate.verify(chapter_text, full_trans)
+    if not parity.passed_all_gates:
+        logger.warning(
+            f"  [!] Parity Gate Warning for chunked {chapter_title}: {parity.rejection_reasons} "
+            f"(length_ratio={parity.length_ratio:.2f}, quote_parity={parity.quote_parity_ratio:.2f})"
+        )
+    else:
+        logger.info(
+            f"  [+] Parity Gate PASSED for chunked {chapter_title} "
+            f"(length_ratio={parity.length_ratio:.2f}, para_parity={parity.paragraph_parity_ratio:.2f})"
         )
     return full_trans
 

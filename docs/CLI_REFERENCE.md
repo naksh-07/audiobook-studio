@@ -130,10 +130,17 @@ python audiobook_cli.py extract "tests/fixtures/sample_short.pdf" --force-gate
 
 ## 4. Literary Translation (`translate`)
 
-Translates extracted chapters into literary dramatic Hindustani using the 4-Agent Translation Collective.
+Translates extracted chapters into literary dramatic Hindustani using the Option D Standalone Translation Engine (single generative pass with `thinking_budget = 1024`, macro-chunking, and deterministic parity verification).
 
+### Audiobook Studio Pipeline (Room 2)
 ```bash
 python audiobook_cli.py translate <BOOK_SLUG> [--model <MODEL>]
+```
+
+### Standalone Decoupled CLI (Independent Subsystem)
+The translation engine can also be executed completely independently from the audiobook pipeline for standalone books, documents, or scripts:
+```bash
+python -m audiobook_factory.translation.cli translate input_chapter.txt -o output_hindi.md --tier RAW_UNRATED
 ```
 
 ---

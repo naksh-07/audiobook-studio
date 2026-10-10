@@ -44,12 +44,12 @@ class TestLiteraryAdvisory(unittest.TestCase):
     def test_02_format_guidelines_for_prompt(self):
         guidance = self.db.get_formatted_prompt_guidelines()
         self.assertIn("DYNAMIC LITERARY ADVISORY", guidance)
-        self.assertIn("गोरी-चिट्टी", guidance)
+        self.assertIn("सुनहरे बालों वाली", guidance)
         self.assertIn("Banned Robotic Antipatterns", guidance)
 
     def test_03_audit_literary_register_cleans_antipatterns(self):
         raw_robotic_text = (
-            "नमस्ते, गेराल्ट! वह सुनहरी लड़की अपनी कुंवारी चोटी हिला रही थी "
+            "नमस्ते, मुसाफिर! वह सुनहरी लड़की अपनी कुंवारी चोटी हिला रही थी "
             "और सराय में सब दारू पी रहे थे।"
         )
         is_clean, cleaned, warnings = audit_literary_register(raw_robotic_text)
@@ -64,13 +64,14 @@ class TestLiteraryAdvisory(unittest.TestCase):
         repaired, actions = TieredRepairEngine.apply_deterministic_repair(raw_robotic_text)
         self.assertNotIn("सुनहरी लड़की", repaired)
         self.assertNotIn("कुंवारी चोटी", repaired)
-        self.assertIn("गोरी-चिट्टी", repaired)
+        self.assertIn("सुनहरे बालों वाली", repaired)
+        self.assertIn("लंबी चोटी", repaired)
         self.assertIn("नमस्ते", repaired)
         self.assertIn("दारू", repaired)
 
     def test_04_audit_literary_register_passes_calibrated_text(self):
         calibrated_text = (
-            "सलाम, गेराल्ट! वह गोरी-चिट्टी कमसिन लड़की अपनी लंबी चोटी हिला रही थी "
+            "सलाम, मुसाफिर! वह सुनहरे बालों वाली लड़की अपनी लंबी चोटी हिला रही थी "
             "और सराय में सब मदिरा और शराब पी रहे थे।"
         )
         is_clean, cleaned, warnings = audit_literary_register(calibrated_text)

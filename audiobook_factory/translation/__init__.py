@@ -2,6 +2,19 @@
 Audiobook Factory - Literary Translation Intelligence, Context, and Verification Package.
 """
 
+from .contracts import (
+    FidelityTier,
+    TranslationRequest,
+    TranslationResult,
+    ParagraphAlignment,
+    ParityMetrics,
+)
+from .chunker import BilingualMacroChunker, MacroChunk
+from .parity_gate import DeterministicParityGate
+from .alignment import ParagraphAlignmentEngine
+from .prompt_builder import DynamicPromptBuilder
+from .engine import TranslationEngine
+
 from .translation_policy import TranslationPolicyConfig, get_default_translation_policy
 from .book_bible import BookBible, BookEntity, DynamicRelationship
 from .character_profile import CharacterLanguageProfile, get_character_profile
@@ -125,5 +138,17 @@ __all__ = [
     "TranslationQualityCritic",
     "MultiAgentTranslationCollective",
     "get_translation_collective",
+    # Option D Standalone Translation Engine & Contracts
+    "TranslationEngine",
+    "TranslationRequest",
+    "TranslationResult",
+    "FidelityTier",
+    "ParagraphAlignment",
+    "ParityMetrics",
+    "BilingualMacroChunker",
+    "MacroChunk",
+    "DeterministicParityGate",
+    "ParagraphAlignmentEngine",
+    "DynamicPromptBuilder",
 ]
 
