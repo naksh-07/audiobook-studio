@@ -15,7 +15,8 @@ flowchart LR
     G1A --> G1["Gate 1:<br/>Voice Roster & Cast Lock"]
     G1 --> G2["Gate 2:<br/>LLM Screenplay Auditor"]
     G2 --> G25["Gate 2.5:<br/>LLM Dramatic Critic"]
-    G25 --> G28["Gate 2.8:<br/>LLM Vocal Acting Judge"]
+    G25 --> G29["Gate 2.9:<br/>Pre-TTS Sanity Gate"]
+    G29 --> G28["Gate 2.8:<br/>LLM Vocal Acting Judge"]
     G28 --> G3["Gate 3 / 3.5:<br/>Manifest Feasibility"]
     G3 --> G38["Gate 3.8:<br/>Audio Reality Auditor"]
     G38 --> GSB1["Gate SB-1:<br/>Sound Bank Audio Verification"]
@@ -386,33 +387,148 @@ class StudioCertificationReport(BaseModel):
 
 ### Gate 2.9: Pre-TTS Config & Attribution Sanity Gate (Fail-Closed Stage 3 -> Stage 4 Boundary)
 *(Authoritative implementation: [`audiobook_factory/gates/pre_synthesis.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py))*
+
 - **Function**: `audit_gate2_9_pre_tts_sanity(script_file: Union[Path, str, List[Dict[str, Any]]], project_dir: Optional[Union[Path, str]] = None, source_file: Optional[Union[Path, str]] = None, source_text: Optional[str] = None, format_mode: Literal["audiobook", "podcast"] = "audiobook", call_llm_fn: Optional[Any] = None, skip_llm: bool = False, strict: bool = True) -> AuditResult`
 - **Modules**: [`audiobook_factory/gates/pre_synthesis.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py), [`audiobook_factory/orchestration/gates.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/orchestration/gates.py), [`audiobook_factory/podcast/orchestrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/orchestrator.py)
-- **Data Models**: [`AuditResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py), [`GateAuditError`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py), [`PreSynthesisLLMVerdict`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py)
+- **Data Models**: [`AuditResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py), [`GateAuditError`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py), [`PreSynthesisLLMVerdict`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L28-L49)
 - **Pipeline Stage**: Executed synchronously at the exit of Stage 3 (Screenplay / Dramaturgy / Podcast Scripting) immediately before handing script batches to Room 4 TTS Dispatchers.
-- **Dual-Tier Hybrid Architecture**:
-  - **Tier 1 (Deterministic Fast Checks)**:
-    1. **Speaker Whitelist & Catalog Cross-Reference**: Strictly verifies that every speaker token in the script is registered in `character_roster.json`, `voice_registry.json`, or default role sets (`Narrator`, `Narration`, `Foley`, `Host_A`, `Host_B`). Unregistered or misspelled characters strictly halt synthesis via `GateAuditError`.
-    2. **Anti-Swap Attribution & Gender Inflection Guard**: Exploits Hindi/Devanagari first-person grammatical gender discordance (`रहा हूँ` / `करूँगा` = masculine vs `रही हूँ` / `करूँगी` = feminine) cross-referenced against character gender metadata. Emits actionable warnings or defects upon detecting speaker turn inversion ($A \leftrightarrow B$).
-    3. **Anti-Swallow Dialogue Guard**: Scans `Narrator` segments for embedded dialogue quotes (`"..."` or `“...”`) accompanied by speech lead-in verbs (`said`, `कहा`, `बोला`, `replied`). Strictly aborts if direct dialogue is swallowed into narration.
-    4. **Acoustic Parameter Range Clamping**: Enforces acoustic parameter ceilings before audio synthesis:
-       - Pitch multiplier ratio clamped strictly to $[0.65, 1.35]$ (audiobook) or semitone offset $[-12.0, 12.0]$ (podcast).
-       - Speed multiplier clamped strictly to $[0.75, 1.30]$.
-       - Non-null, assigned `voice_id` verification in `voice_registry.json`.
-    5. **Podcast Stereo Spatial Staging**: In podcast format mode, enforces Host A left pan ($pan \le -0.20$), Host B right pan ($pan \ge +0.20$), and breathability punctuation across long turns ($> 45$ words).
-    6. **Text Hygiene & Fence Elimination**: Blocks empty lines, unstripped Markdown fences (````json```), and conversational LLM chatter preambles (*"Here is the script..."*).
-  - **Tier 2 (Adversarial LLM Attribution & Dramaturgy Sanity Judge - `LLMPreSynthesisJudge`)**:
-    - **Engine**: Powered by Google AI Studio Gemini models utilizing our 123+ rotating API key pool via `ModelGateway.generate_text()` with AntiBanGuard 11.0 RPM pacing, session affinity, and `BLOCK_NONE` creative safety framing.
-    - **Deep Contextual Audit**: Analyzes dialogue flow against character cast bibles and source chapter narrative context (`source_file` / `source_text`).
-    - **Zero Speaker Turn Inversion**: Detects subtle context-dependent speaker swaps ($A \leftrightarrow B$) where Character A speaks Character B's lines, or where dialogue is spoken out of turn.
-    - **Narrator Dialogue Recovery**: Catches character dialogue swallowed into indirect or passive narration.
-    - **Persona & Register Alignment**: Verifies that character lines adhere to their authentic sociolect, age, status, and emotional trajectory.
-    - **Podcast Dual-Host Banter Sanity**: Ensures balanced turn-taking, distinct hosting personas, and zero host dialogue collision.
-- **Fail-Closed Invariant**: Any critical defect in Tier 1 or Tier 2 raises `GateAuditError` and terminates synthesis immediately, preventing corrupted audio stem generation and saving Gemini Flash TTS voice synthesis quota.
-- **CLI & API Integration**:
-  - API: `from audiobook_factory.gates import audit_gate2_9_pre_tts_sanity, PreSynthesisGate, LLMPreSynthesisJudge, PreSynthesisLLMVerdict`
-  - Audiobook Orchestration: Integrated in `audiobook_factory.orchestration.gates.verify_pre_synthesis_gates()`.
-  - Podcast Orchestration: Integrated in `audiobook_factory.podcast.orchestrator.PodcastOrchestrator.synthesize_podcast_script()`.
+
+#### Executive Overview
+Gate 2.9 is the authoritative, fail-closed pre-synthesis gate guarding Room 4 speech generation. In multi-voice audiobook and podcast production, speech synthesis is an expensive, rate-metered operation consuming Google Gemini Flash TTS quotas (10 RPD per key on `gemini-3.8-flash-tts`). Feeding improperly attributed, structurally corrupt, or acoustically un-calibrated scripts into TTS causes severe downstream defects:
+- Swapped character dialogues ($A \leftrightarrow B$) resulting in male voices performing female roles or incorrect emotional arcs.
+- Spoken dialogue swallowed into narrator segments, destroying multi-cast immersion.
+- Raw Markdown fences (```` ```json ````) or LLM conversational meta-chatter read aloud by neural voices.
+- Out-of-bounds pitch or speed parameters producing robotic or cartoonish acoustic distortions.
+
+Gate 2.9 enforces a **Dual-Tier Hybrid Architecture**: Tier 1 executes ultra-fast deterministic regex, whitelist, and acoustic clamping in milliseconds at zero token cost, while Tier 2 executes an adversarial LLM attribution and dramaturgy audit powered by Gemini models across the 123+ API key pool.
+
+```mermaid
+flowchart TD
+    subgraph ScriptInput["📥 Screenplay / Podcast Script Input"]
+        Script["Raw Script Segments<br/>(scripts/chapter_XXX_hi_script.json or podcast_script.json)"]
+        Context["Contextual Artifacts<br/>• character_roster.json / voice_registry.json<br/>• podcast_config.json / BookBible<br/>• Source Narrative (source_file / source_text)"]
+    end
+
+    subgraph Tier1["⚡ Tier 1: Deterministic Fast-Path Audit (Local 0-Token)"]
+        direction TB
+        T1_Mono["1. Sequential Monotonicity<br/>(index = 1, 2, 3...)"]
+        T1_White["2. Speaker Whitelist Verification<br/>(Must resolve in roster / voice catalog)"]
+        T1_Gender["3. Anti-Swap Gender Inflection Guard<br/>(Hindi verbal inflections: रहा हूँ vs रही हूँ)"]
+        T1_LeadIn["4. Speech Verb Co-Reference<br/>('Geralt said:' cannot be assigned to Renfri)"]
+        T1_Swallow["5. Anti-Swallow Dialogue Guard<br/>(0 dialogue quotes inside Narrator segments)"]
+        T1_Acoustic["6. Acoustic Range Clamping<br/>(Pitch [0.65, 1.35], Speed [0.75, 1.30], non-null voice)"]
+        T1_Podcast["7. Podcast Spatial Staging<br/>(Host A <= -0.20, Host B >= +0.20, breathability <= 45w)"]
+        T1_Hygiene["8. Text Hygiene & Breathability<br/>(No markdown fences, no conversational preambles)"]
+        
+        T1_Mono --> T1_White --> T1_Gender --> T1_LeadIn --> T1_Swallow --> T1_Acoustic --> T1_Podcast --> T1_Hygiene
+    end
+
+    subgraph Tier1Eval{"Tier 1 Decision"}
+        T1_Hygiene --> Tier1Eval
+    end
+
+    Tier1Eval -->|Critical Defects Detected| FailTier1["🛑 Fail-Closed Abort<br/>Raise GateAuditError<br/>Halt before TTS dispatch"]
+    Tier1Eval -->|Clean & skip_llm=False| Tier2["🧠 Tier 2: Adversarial LLM Attribution Judge (LLMPreSynthesisJudge)"]
+    Tier1Eval -->|Clean & skip_llm=True| PassGate["✅ PASS Gate 2.9<br/>Hand off to TTSDispatcher (Room 4)"]
+
+    subgraph Tier2Engine["Control Plane: ModelGateway (123+ Gemini Key Pool)"]
+        Tier2 --> Stratify["Segment & Narrative Stratification<br/>(Sample: Head 10, Mid 20, Tail 10)"]
+        Stratify --> Gateway["ModelGateway.generate_text()<br/>• AntiBanGuard 11.0 RPM Token-Bucket<br/>• Session Affinity: session_id='gate2_9_pre_tts'<br/>• Stealth Headers: x-goog-api-client<br/>• Creative Safety: BLOCK_NONE"]
+        Gateway --> LLMVerdict["PreSynthesisLLMVerdict<br/>• status: 'PASS' | 'FAIL'<br/>• attribution_accuracy >= 0.85<br/>• speaker_swaps: []<br/>• swallowed_dialogue: []<br/>• persona_mismatches: []"]
+    end
+
+    subgraph Tier2Eval{"Tier 2 Decision"}
+        LLMVerdict --> Tier2Eval
+    end
+
+    Tier2Eval -->|FAIL / Swaps / Swallowed / Accuracy < 0.85| FailTier2["🛑 Fail-Closed Abort<br/>Raise GateAuditError<br/>Prevent API quota burn"]
+    Tier2Eval -->|PASS & 0 Swaps & 0 Swallowed| PassGate
+```
+
+#### Dual-Tier Responsibilities & Auditing Matrix
+
+| Tier | Subsystem | Responsibility | Verification Mechanism | Failure Consequence |
+|---|---|---|---|---|
+| **Tier 1** | **Monotonic Indexing** | Segment index sequence | Asserts $index_i == i$ for all segments $1 \dots N$. | Fatal `GateAuditError`. |
+| **Tier 1** | **Speaker Whitelist** | Prevent hallucinated actors | Cross-references normalized speaker against `character_roster.json`, `voice_registry.json`, `podcast_config.json`, or default roles (`Narrator`, `Narration`, `Foley`, `Host_A`, `Host_B`). | Fatal `GateAuditError`. |
+| **Tier 1** | **Anti-Swap Gender Inflections** | Hindi grammatical gender match | Boundary-regex matching on Devanagari first-person verb inflections (`MALE_HINDI_INFLECTIONS` vs `FEMALE_HINDI_INFLECTIONS`). | Actionable warning for potential turn inversion. |
+| **Tier 1** | **Speech Verb Co-Reference** | Lead-in attribution alignment | Regex `SPEECH_VERB_LEAD_IN` matching previous narrator tag (e.g. *उसने कहा*, *said:*) against current dialogue speaker. | Actionable warning for lead-in mismatch. |
+| **Tier 1** | **Consecutive Repeats** | Prevent turn monopolization | Flags $\ge 2$ consecutive dialogue turns by the same character without narrator or conversational response. | Warning for unbroken monologue. |
+| **Tier 1** | **Anti-Swallow Dialogue Guard** | Quote separation | Scans `Narrator` lines for enclosed quotation marks ($" \dots "$ or $“ \dots ”$) accompanied by terminal punctuation or speech verbs. | Fatal `GateAuditError`. |
+| **Tier 1** | **Acoustic Clamping** | Pitch, speed & voice safety | Audiobooks: pitch $\in [0.65, 1.35]$, speed $\in [0.75, 1.30]$. Podcasts: semitone pitch $\in [-12.0, 12.0]$, speed $\in [0.75, 1.30]$. Voice ID must be non-null and assigned. | Fatal `GateAuditError`. |
+| **Tier 1** | **Podcast Stereo Spatial Pan** | Dual-host separation | Host A pan $\le -0.20$ (Left-Mid), Host B pan $\ge +0.20$ (Right-Mid). Monologues $> 45$ words must contain pause punctuation. | Warning on spatial collapse or run-on monologues. |
+| **Tier 1** | **Text Hygiene** | Strip synthesis contaminants | Regex `MARKDOWN_FENCE_PATTERN` (```` ```json ````) and `LLM_CHATTER_PATTERN` (*"Certainly, here is the script:"*). | Fatal `GateAuditError`. |
+| **Tier 2** | **Speaker Turn Inversion ($A \leftrightarrow B$)** | Dramatic attribution accuracy | LLM judge cross-references dialogue flow against source text and character personas in `BookBible`. | Fatal `GateAuditError`. |
+| **Tier 2** | **Swallowed Dialogue Recovery** | Conversational dialogue in narration | LLM judge detects character speech embedded in indirect narration. | Fatal `GateAuditError`. |
+| **Tier 2** | **Persona & Register Alignment** | Sociolect & character integrity | LLM judge evaluates dialogue against character archetypes, gender, age, and honorific registers. | Persona mismatch warning. |
+| **Tier 2** | **Podcast Dual-Host Banter** | Staging balance | LLM judge ensures conversational chemistry, turn balance, and distinct viewpoints between Host A and Host B. | Banter defect warning or fatal abort. |
+
+#### Data Contracts & Schema: `PreSynthesisLLMVerdict`
+
+Defined in [`audiobook_factory/gates/pre_synthesis.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L28-L49):
+
+```python
+class PreSynthesisLLMVerdict(BaseModel):
+    """LLM evaluation verdict for pre-synthesis dialogue attribution and sanity."""
+    model_config = ConfigDict(extra="ignore")
+
+    status: str = Field(..., description="'PASS' or 'FAIL'")
+    score: float = Field(..., ge=0.0, le=1.0, description="Overall sanity score [0.0 - 1.0]")
+    attribution_accuracy: float = Field(default=1.0, ge=0.0, le=1.0, description="Dialogue attribution score [0.0 - 1.0]")
+    speaker_swaps: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of dialogue lines misassigned to wrong character or inverted ($A <-> B$)"
+    )
+    swallowed_dialogue: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Direct spoken dialogue quotes wrongly embedded inside narrator lines"
+    )
+    persona_mismatches: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Character voice style or emotional tone severe inconsistencies"
+    )
+    reason: str = Field(default="", description="Summary explanation of the audit evaluation")
+    recommendations: List[str] = Field(default_factory=list, description="Actionable remediation directives")
+```
+
+#### Fail-Closed Contract & Pipeline Integration
+
+Gate 2.9 is integrated as a mandatory quality checkpoint across both pipeline paths:
+
+1. **Audiobook Pipeline** ([`audiobook_factory/orchestration/gates.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/orchestration/gates.py#L92-L116)):
+   ```python
+   # Gate 2.9: Pre-TTS Config & Attribution Sanity Gate (Fail-Closed)
+   from audiobook_factory.gates.pre_synthesis import audit_gate2_9_pre_tts_sanity
+   if os.environ.get("SKIP_PRE_TTS_GATE", "false").lower() not in ("true", "1", "yes"):
+       gate2_9_res = audit_gate2_9_pre_tts_sanity(
+           script_file=script_file,
+           project_dir=project_dir,
+           source_file=source_chap_file if source_chap_file.exists() else None,
+           format_mode="audiobook",
+           strict=True,
+       )
+   ```
+
+2. **Podcast Pipeline** ([`audiobook_factory/podcast/orchestrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/orchestrator.py#L317-L327)):
+   ```python
+   # Gate 2.9 Pre-TTS Sanity Check for Podcast Episode
+   if os.environ.get("SKIP_PRE_TTS_GATE", "false").lower() not in ("true", "1", "yes"):
+       from audiobook_factory.gates.pre_synthesis import audit_gate2_9_pre_tts_sanity
+       audit_gate2_9_pre_tts_sanity(
+           script_file=script_p,
+           project_dir=proj_dir,
+           format_mode="podcast",
+           strict=True,
+       )
+   ```
+
+3. **Operational Environment Overrides**:
+   - `SKIP_PRE_TTS_GATE=true`: Bypasses Gate 2.9 entirely (use strictly in developer offline scratch sessions).
+   - `FORCE_GATE=true`: Degrades `GateAuditError` from a fatal process crash to a logged warning, allowing synthesis to proceed despite defects.
+   - `skip_llm=True` (API flag): Executes Tier 1 deterministic checks while skipping Tier 2 LLM judge execution (ideal for rapid offline unit tests).
+
+4. **Telemetry & Audit Ledger**:
+   On pass, Gate 2.9 embeds complete LLM evaluation findings directly into the returned `AuditResult.details["llm_audit"]`, capturing attribution accuracy, persona observations, and model rationale into the project's permanent audit ledger.
 
 ---
 

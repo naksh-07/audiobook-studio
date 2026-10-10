@@ -47,12 +47,15 @@ flowchart TD
         DramAST -->|Conversational Spoken-First| PodcastAd["PodcastAdapter (adapters/podcast.py)<br/>• 2-Host Dynamic (Inquisitive Driver <-> Domain Expert)<br/>• SpokenBreathabilityTransformer (<= 22 words, 140ms breath)<br/>• 5-Part Retention Arc (Cold Open to Show Outro)<br/>• Stereo Spatial Staging (-0.25 Left / +0.25 Right)"]
     end
 
+    subgraph Gate29["🛡️ Gate 2.9: Pre-TTS Config & Attribution Sanity Gate (Fail-Closed Boundary)"]
+        G29["PreSynthesisGate & LLMPreSynthesisJudge<br/>• Tier 1: Deterministic Fast-Path (Whitelist, Hindi Gender Inflection, Acoustic Bounds)<br/>• Tier 2: Adversarial LLM Attribution Judge (123+ Gemini Key Pool, BLOCK_NONE)<br/>• Fail-Closed: Raises GateAuditError to prevent API quota burn"]
+    end
+
     subgraph Room4["🎙️ Room 4: 4D Formant Multi-Voice TTS & Editorial"]
-        AudiobookAd & PodcastAd --> Caster["Character Caster & 4D Acoustic Formants<br/>Pitch Δ (+/-4-12%), Tempo & Parametric EQ Curves"]
+        Caster["Character Caster & 4D Acoustic Formants<br/>Pitch Δ (+/-4-12%), Tempo & Parametric EQ Curves"]
         Caster --> TTS["Gemini Flash TTS Key Pool (120+ Active Keys)<br/>Prosodic Acting, Speech Tags & Breath Marks"]
         TTS --> Critic["TakeAuditionCritic & Audio Take QA"]
         Critic --> Editorial["Dialogue Editorial Layer (DE-01 - DE-07)<br/>Endpoint Snapping, Hann Micro-Fades & Turn Latency"]
-    end
     end
 
     subgraph Room5["🎛️ Room 5: Broadcast Mastering & Multi-Format Packaging"]
@@ -72,7 +75,8 @@ flowchart TD
     Room1_5 -.->|"Dynamic Voice Lock"| Room4
     Room2 --> Room3
     Room3 --> Room3Adapters
-    Room3Adapters --> Room4
+    Room3Adapters --> Gate29
+    Gate29 -->|"Audited Script (0% Swap / 0% Swallow)"| Room4
     Room4 --> Room5
     Room5 --> CertHarness
 ```
@@ -190,6 +194,32 @@ Room 1.5 is the decoupled, single-pass per-chapter lexical analysis, entity disc
    - `SpokenBreathabilityTransformer`: Splits sentences to $\le 22$ words per breath with 140ms pre-roll breath pauses.
    - 5-part retention arc: `cold_open_hook` $\to$ `show_intro` $\to$ `scene_deepdive` $\to$ `cognitive_reset_banter` $\to$ `show_outro`.
    - Stereo spatial staging: Host A at $-0.25$ (Left-Mid) and Host B at $+0.25$ (Right-Mid).
+
+---
+
+### Room 3 $\rightarrow$ Room 4 Boundary: Gate 2.9 Pre-TTS Config & Attribution Sanity Gate
+*Modules:* [`audiobook_factory/gates/pre_synthesis.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py), [`audiobook_factory/orchestration/gates.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/orchestration/gates.py), [`audiobook_factory/podcast/orchestrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/orchestrator.py)
+
+Gate 2.9 stands as the authoritative, fail-closed verification boundary positioned immediately before Room 4 TTS voice dispatch. In production vocal pipelines, synthesizing speech via Gemini Flash TTS consumes rate-limited API quota (10 RPD per key on `gemini-3.8-flash-tts`). Generating audio for defective screenplay segments—such as swapped character roles ($A \leftrightarrow B$), dialogue swallowed into narrator segments, unstripped Markdown fences, or out-of-bounds pitch multipliers—wastes quota and produces corrupted audio stems. Gate 2.9 eliminates this by strictly auditing scripts across both production tracks before synthesis begins:
+
+1. **Dual-Track Execution Paths**:
+   - **Audiobook Execution Path** ([`audiobook_factory.orchestration.gates.verify_pre_synthesis_gates()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/orchestration/gates.py#L92-L116)): Audits chapter screenplay scripts (`scripts/chapter_XXX_hi_script.json`) against source narrative prose (`extracted/` or `translation/`), `character_roster.json`, and `voice_registry.json`. If critical defects occur, raises `GateAuditError`, halting synthesis before `TTSDispatcher` is invoked.
+   - **Dual-Track Podcast Execution Path** ([`PodcastOrchestrator.synthesize_podcast_script()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/orchestrator.py#L317-L327)): Audits 2-host conversational scripts (`scripts/chapter_XXX_podcast_script.json`) against `podcast_config.json`, verifying host whitelists, stereo spatial panning (Host A left $\le -0.20$, Host B right $\ge +0.20$), and monologue breathability ($\le 45$ words without pause punctuation).
+
+2. **Dual-Tier Hybrid Architecture**:
+   - **Tier 1 (Deterministic Fast-Path)**: Executes instant, 0-token local validation:
+     - *Sequential Monotonicity*: Enforces $index_1 < index_2 < index_3$ starting at 1.
+     - *Speaker Whitelist*: Verifies that every speaker token resolves in `character_roster.json`, `voice_registry.json`, `podcast_config.json`, or canonical defaults (`Narrator`, `Host_A`, `Host_B`).
+     - *Anti-Swap Gender Inflection*: Checks Hindi grammatical first-person verb inflections (`रहा हूँ` / `करूँगा` vs `रही हूँ` / `करूँगी`) against roster character genders to catch gender-discordant speaker turn inversions.
+     - *Speech Verb Co-Reference*: Matches dialogue attribution against preceding narrator tags (e.g. *Geralt said: ...* must be attributed to Geralt, not Renfri).
+     - *Anti-Swallow Dialogue Guard*: Flags quotation marks in `Narrator` lines accompanied by speech verbs (`कहा`, `बोला`, `said`, `asked`).
+     - *Acoustic Parameter Clamping*: Pitch shift clamped to $[0.65, 1.35]$ (ratio) or $[-12.0, 12.0]$ (semitones for podcast); speed multiplier clamped to $[0.75, 1.30]$; asserts non-null, assigned `voice_id`.
+     - *Text Hygiene*: Blocks raw Markdown code fences (```` ```json ````) and unstripped conversational LLM preambles (*"Here is the script..."*).
+   - **Tier 2 (Adversarial LLM Attribution & Dramaturgy Sanity Judge — [`LLMPreSynthesisJudge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L51-L237))**:
+     - *ModelGateway Control Plane*: Dispatched through [`ModelGateway.generate_text()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py#L98) utilizing the 123+ API key round-robin pool with AntiBanGuard 11.0 RPM pacing, sticky session affinity (`session_id="gate2_9_pre_tts"`), stealth SDK headers (`x-goog-api-client`), and permanent `BLOCK_NONE` creative safety framing.
+     - *Deep Contextual Audit*: Stratifies script segments (head 10, middle 20, tail 10) against source narrative context and cast profiles from `BookBible`.
+     - *Attribution Accuracy & Inversions*: Detects true speaker turn swaps ($A \leftrightarrow B$) where Character A speaks Character B's line, or where direct quotes were converted into passive narrator text.
+     - *Pydantic v2 Verdict Contract*: Validates output against [`PreSynthesisLLMVerdict`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L28-L49). Any detected speaker swap, swallowed dialogue, or attribution accuracy $< 0.85$ triggers immediate fail-closed abort via `GateAuditError`.
 
 ---
 
@@ -339,9 +369,10 @@ All production rooms interface strictly with [`ModelGateway`](file:///c:/Users/S
 3. **Room 2 (Translation Collective)**:
    - Dispatches translation prompts through `gateway.generate_text(task="translation", min_tier=ModelTier.TIER_1_FLAGSHIP)`.
    - The translation engine receives pristine text output without managing rate-limiting delays or rotating key pools.
-4. **Room 3 (Screenplay & Anti-Swap Attribution)**:
+4. **Room 3 (Screenplay, Anti-Swap Attribution & Gate 2.9 Pre-TTS Sanity)**:
    - Encloses scene chunking within `with gateway.lease_session(session_id=scene_id):`.
    - Maintains sticky key affinity across 8–15 continuous dialogue turns, avoiding edge ban heuristics while analyzing speaker attribution.
+   - Executes Gate 2.9 Pre-TTS Sanity Gate ([`LLMPreSynthesisJudge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L51-L237)) with sticky session affinity (`session_id="gate2_9_pre_tts"`), auditing dialogue attribution, gender inflections, and dramaturgy sanity before handing off to Room 4.
 5. **Room 4 (Multi-Voice TTS Performance)**:
    - Dispatches speech generation through `gateway.synthesize_speech(text=..., voice_name=..., task="tts")`.
    - The gateway leases keys explicitly for the `gemini-3.8-flash-tts` audio model, enforces the strict 10 RPD daily quota ceilings, and transparently rotates to fresh keys upon exhaustion.

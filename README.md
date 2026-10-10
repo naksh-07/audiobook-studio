@@ -78,8 +78,12 @@ flowchart TD
         DramAST -->|Conversational Spoken-First| PodcastAd["PodcastAdapter (adapters/podcast.py)<br/>• 2-Host Dynamic (Sameer/Priya & Alex/Maya)<br/>• SpokenBreathabilityTransformer (<= 22 words)<br/>• 5-Part Retention Arc (Cold Open to Outro)<br/>• Stereo Spatial Staging (-0.25 Left / +0.25 Right)"]
     end
 
+    subgraph Gate29["🛡️ Gate 2.9: Pre-TTS Sanity Gate (Fail-Closed Boundary)"]
+        G29["PreSynthesisGate & LLMPreSynthesisJudge<br/>• Tier 1: Deterministic Fast-Path (Whitelist & Acoustic Clamping)<br/>• Tier 2: Adversarial LLM Attribution Judge (123+ Key Pool)"]
+    end
+
     subgraph Room4["🎙️ Room 4: 4D Formants & Voice Performance"]
-        AudiobookAd & PodcastAd --> Caster["Character Caster & 4D Acoustic Formants<br/>Pitch Δ (+/-4-12%), Tempo & Parametric EQ Curves"]
+        Caster["Character Caster & 4D Acoustic Formants<br/>Pitch Δ (+/-4-12%), Tempo & Parametric EQ Curves"]
         Caster --> TTS["Gemini Flash TTS Key Pool (120+ Active Keys)<br/>Prosodic Acting, Speech Tags & Breath Marks"]
         TTS --> Editorial["Dialogue Editorial Layer (DE-01 - DE-07)<br/>Endpoint Snapping, Hann Micro-Fades & Turn Latency"]
     end
@@ -101,7 +105,8 @@ flowchart TD
     Room1_5 -.->|"Dynamic Voice Lock"| Room4
     Room2 --> Room3
     Room3 --> Adapters
-    Adapters --> Room4
+    Adapters --> Gate29
+    Gate29 -->|"Audited Script (0% Swap / 0% Swallow)"| Room4
     Room4 --> Room5
     Room5 --> CertHarness
 ```
@@ -291,6 +296,7 @@ All quality gates are fail-closed:
 - **Gate 1 / NR-GATE-01/03**: Dramatis Personae, $\ge 4\%$ Voice Step Separation & $[0.70, 1.30]$ Pitch Bounds.
 - **Gate 2**: DialogueAttributionAuditor (0% Speaker Turn Swaps).
 - **Gate 2.5**: Stanislavski Acting Restraint & Dramatic Validation.
+- **Gate 2.9**: Pre-TTS Config & Attribution Sanity Gate (Dual-Tier Hybrid: Tier 1 regex/schema/whitelist/acoustic clamping + Tier 2 Adversarial LLM Attribution Judge via 123+ Gemini key pool).
 - **Gate 5**: Dialogue Editorial Snapping & Hann Micro-fades.
 - **Gate 6**: Two-Pass Linear Loudnorm Certification (-19.0 LUFS, -1.5 dBTP).
 - **8-Pillar Harness**: Comprehensive Studio Production Certification Scorecard (P1 through P8).

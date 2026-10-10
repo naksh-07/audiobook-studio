@@ -2872,6 +2872,239 @@ class RequestRouter:
 
 ---
 
+## 🛡️ Gate 2.9: Pre-TTS Config & Attribution Sanity ([`audiobook_factory.gates.pre_synthesis`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py))
+
+*Authoritative pre-synthesis verification gate running immediately prior to Room 4 TTS dispatch. Protects both Audiobook and Dual-Track Podcast execution paths from expensive API quota waste and acoustic corruption via a Dual-Tier Hybrid Architecture.*
+
+### 1. Data Contracts & Schemas
+
+#### [`PreSynthesisLLMVerdict`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L28-L49)
+*Pydantic v2 schema encapsulating the structured verdict returned by the Tier 2 Adversarial LLM Judge.*
+
+```python
+class PreSynthesisLLMVerdict(BaseModel):
+    """LLM evaluation verdict for pre-synthesis dialogue attribution and sanity."""
+    model_config = ConfigDict(extra="ignore")
+
+    status: str = Field(..., description="'PASS' or 'FAIL'")
+    score: float = Field(..., ge=0.0, le=1.0, description="Overall sanity score [0.0 - 1.0]")
+    attribution_accuracy: float = Field(default=1.0, ge=0.0, le=1.0, description="Attribution accuracy score [0.0 - 1.0]")
+    speaker_swaps: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of dialogue lines misassigned to wrong character or inverted ($A <-> B$)"
+    )
+    swallowed_dialogue: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Direct spoken dialogue quotes wrongly embedded inside narrator lines"
+    )
+    persona_mismatches: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Character voice style or emotional tone severe inconsistencies"
+    )
+    reason: str = Field(default="", description="High-level narrative reason for the verdict")
+    recommendations: List[str] = Field(default_factory=list, description="Actionable directives for repairing detected defects")
+```
+
+#### Supporting Contracts ([`audiobook_factory.gates.contracts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py))
+
+```python
+class AuditResult(BaseModel):
+    """Encapsulates the consolidated result of a quality gate evaluation."""
+    gate: str
+    gate_name: str
+    status: Literal["PASS", "FAIL", "WARNING", "SKIPPED"]
+    passed: bool
+    errors: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+class GateAuditError(Exception):
+    """Raised when a fail-closed quality gate detects critical unrecoverable defects."""
+```
+
+---
+
+### 2. [`LLMPreSynthesisJudge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L51-L237)
+*Tier 2 Adversarial LLM Auditor evaluating pre-synthesis script segments against character profiles, narrative context, and formatting rules. Dispatched via ModelGateway across the 123+ API key round-robin pool.*
+
+```python
+class LLMPreSynthesisJudge:
+    """
+    Adversarial LLM Auditor evaluating pre-synthesis script segments against
+    character profiles, dramatic context, and format rules.
+    Runs via ModelGateway with 123+ API key round-robin pool.
+    """
+    SYSTEM_INSTRUCTION: str  # Comprehensive adversarial supervisor prompt
+
+    @classmethod
+    def audit_pre_synthesis(
+        cls,
+        segments: List[Dict[str, Any]],
+        project_dir: Path,
+        source_text: Optional[str] = None,
+        format_mode: str = "audiobook",
+        call_llm_fn: Optional[Any] = None,
+    ) -> PreSynthesisLLMVerdict:
+        """
+        Audits dialogue attribution and dramatic sanity across screenplay segments.
+
+        Parameters:
+            segments: List of script segment dictionaries (containing 'index', 'speaker', 'type', 'text', 'emotion').
+            project_dir: Path to the book project directory (used to load character_roster.json / podcast_config.json).
+            source_text: Optional uncompressed source chapter text used for contextual narrative grounding.
+            format_mode: "audiobook" or "podcast".
+            call_llm_fn: Optional custom callable hook for testing or direct prompt injection.
+
+        Returns:
+            PreSynthesisLLMVerdict containing pass/fail status, scores, speaker swaps, and recommendations.
+
+        Behavior:
+            - When segments > 40, stratifies a representative 40-segment sample: Head 10, Body 20, Tail 10.
+            - When source_text > 8000 characters, extracts Head (2000), Mid (4000), and Tail (2000) excerpts.
+            - Automatically parses character_roster.json or podcast_config.json to ground the cast roster.
+            - Dispatches prompt through ModelGateway.generate_text() with AntiBanGuard 11.0 RPM pacing,
+              sticky session affinity ('gate2_9_pre_tts'), stealth SDK headers, and BLOCK_NONE safety framing.
+        """
+
+    @classmethod
+    def _call_gateway(cls, prompt: str, system_instruction: str) -> PreSynthesisLLMVerdict:
+        """
+        Dispatches prompt via ModelGateway.generate_text().
+        Handles offline/test execution when MOCK_OFFLINE, UNIT_TEST_MODE, or PYTEST_CURRENT_TEST is set.
+        """
+```
+
+---
+
+### 3. [`PreSynthesisGate`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L239-L691)
+*Core gate class executing both Tier 1 deterministic fast checks and Tier 2 LLM judge auditing.*
+
+```python
+class PreSynthesisGate:
+    """
+    Evaluates screenplay segments for acoustic and attribution correctness
+    prior to TTS dispatch.
+    """
+
+    # Compiled Regular Expression Patterns
+    MARKDOWN_FENCE_PATTERN: Pattern[str]  # Matches ```json, ```markdown, ```text, ```
+    LLM_CHATTER_PATTERN: Pattern[str]     # Matches "Here is the script:", "Certainly! Below is the...", etc.
+    MALE_HINDI_INFLECTIONS: Pattern[str]  # Matches first-person masculine verbs: रहा हूँ, जाऊँगा, करूँगा, etc.
+    FEMALE_HINDI_INFLECTIONS: Pattern[str]# Matches first-person feminine verbs: रही हूँ, जाऊँगी, करूँगी, etc.
+    SPEECH_VERB_LEAD_IN: Pattern[str]     # Matches dialogue speech verbs: said, asked, ने कहा, बोला, बोली, etc.
+
+    @classmethod
+    def audit_script(
+        cls,
+        script_file_or_data: Union[Path, str, List[Dict[str, Any]]],
+        project_dir: Optional[Union[Path, str]] = None,
+        source_file: Optional[Union[Path, str]] = None,
+        source_text: Optional[str] = None,
+        format_mode: Literal["audiobook", "podcast"] = "audiobook",
+        call_llm_fn: Optional[Any] = None,
+        skip_llm: bool = False,
+        strict: bool = True,
+    ) -> AuditResult:
+        """
+        Executes complete Gate 2.9 Pre-TTS validation:
+        Tier 1: Deterministic structural, whitelist, and acoustic bounds checks.
+        Tier 2: Adversarial LLM Attribution & Dramaturgy Sanity Judge (ModelGateway 123+ key pool).
+
+        Parameters:
+            script_file_or_data: Filesystem path to script JSON or in-memory list of segment dictionaries.
+            project_dir: Optional project root path (auto-inferred from script path if omitted).
+            source_file: Optional path to raw source chapter text file.
+            source_text: Optional in-memory source chapter text string.
+            format_mode: "audiobook" (ratio pitch [0.65, 1.35]) or "podcast" (semitone pitch [-12, +12]).
+            call_llm_fn: Optional custom callable hook for testing LLM verdicts without network calls.
+            skip_llm: When True, bypasses Tier 2 LLM judge and evaluates only Tier 1 deterministic checks.
+            strict: When True, any critical defect immediately raises GateAuditError (fail-closed).
+
+        Returns:
+            AuditResult with gate='GATE_2_9_PRE_TTS', passed=bool, errors, warnings, and details.
+
+        Raises:
+            GateAuditError: If strict=True and any critical defect (unregistered speaker, out-of-bounds
+                            acoustic parameter, swallowed dialogue, or LLM speaker swap) is detected.
+        """
+```
+
+#### Private Helper Methods
+
+```python
+    @classmethod
+    def _audit_segment_acoustic_params(
+        cls, idx: int, speaker: str, seg: Dict[str, Any],
+        voice_registry: Dict[str, Any], format_mode: str,
+        errors: List[str], warnings: List[str]
+    ) -> None:
+        """Audits pitch_shift, speed_multiplier, and non-null assigned voice IDs."""
+
+    @classmethod
+    def _audit_podcast_segment(
+        cls, idx: int, speaker: str, seg: Dict[str, Any],
+        text: str, errors: List[str], warnings: List[str]
+    ) -> None:
+        """Audits podcast-specific breathability punctuation and stereo spatial pan staging."""
+
+    @classmethod
+    def _resolve_catalogs(
+        cls, project_dir: Path, format_mode: str
+    ) -> Tuple[Set[str], Dict[str, str], Dict[str, Any]]:
+        """Loads allowed speakers, gender mappings, and voice registries from project directory."""
+
+    @classmethod
+    def _load_segments(
+        cls, script_file_or_data: Union[Path, str, List[Dict[str, Any]]]
+    ) -> Tuple[List[Dict[str, Any]], Optional[Path]]:
+        """Parses segments from a filesystem JSON file or validates an in-memory list."""
+
+    @classmethod
+    def _finalize_result(
+        cls, errors: List[str], warnings: List[str], details: Dict[str, Any], strict: bool
+    ) -> AuditResult:
+        """Constructs AuditResult; if strict=True and errors exist, raises GateAuditError."""
+
+    @staticmethod
+    def _norm(s: str) -> str:
+        """Normalizes speaker name (lowercased, stripped, underscores replaced with spaces, Devanagari nuktas removed)."""
+```
+
+---
+
+### 4. Public Entry Point: [`audit_gate2_9_pre_tts_sanity`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L693-L717)
+
+```python
+def audit_gate2_9_pre_tts_sanity(
+    script_file: Union[Path, str, List[Dict[str, Any]]],
+    project_dir: Optional[Union[Path, str]] = None,
+    source_file: Optional[Union[Path, str]] = None,
+    source_text: Optional[str] = None,
+    format_mode: Literal["audiobook", "podcast"] = "audiobook",
+    call_llm_fn: Optional[Any] = None,
+    skip_llm: bool = False,
+    strict: bool = True,
+) -> AuditResult:
+    """
+    Public entry point for Gate 2.9: Pre-TTS Config & Attribution Sanity Gate.
+    Combines Tier 1 fast-path local validation with Tier 2 LLM Attribution Judge (ModelGateway 123+ key pool).
+
+    Example Usage:
+        from audiobook_factory.gates.pre_synthesis import audit_gate2_9_pre_tts_sanity
+
+        result = audit_gate2_9_pre_tts_sanity(
+            script_file="audiobooks/projects/my_project/scripts/chapter_001_hi_script.json",
+            project_dir="audiobooks/projects/my_project",
+            source_file="audiobooks/projects/my_project/extracted/chapter_001.txt",
+            format_mode="audiobook",
+            strict=True,
+        )
+        print(f"Gate 2.9 Status: {result.status}, Errors: {len(result.errors)}")
+    """
+```
+
+---
+
 ## 📊 Production Telemetry Ledger ([`audiobook_factory.telemetry`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/telemetry.py))
 
 ```python

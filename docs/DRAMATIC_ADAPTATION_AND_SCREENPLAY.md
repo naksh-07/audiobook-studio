@@ -40,20 +40,21 @@ flowchart TD
         PBG --> ScriptClean["clean_screenplay_pass2:<br/>Dramatic Plan Metadata Enrichment"]
         ScriptClean --> DV["DramaticValidator:<br/>5-Pillar Arc & Epistemic Audit"]
         DV --> G25{"Gate 2.5:<br/>Dramatic Fidelity Audit"}
+        G25 -->|PASS| G29{"Gate 2.9:<br/>Pre-TTS Sanity Gate<br/>(Tier 1 & Tier 2)"}
     end
 
-    subgraph S4["Stage 4: Autonomous Directing Layer"]
-        G25 -->|PASS| Dir["AgentDirector (3 Passes):<br/>Silence Carving (>= 60%) + BGM + Foley"]
-        Dir --> Manifest["CreativeManifest v3.0"]
+    subgraph S4["Stage 4: Autonomous Directing & TTS Voice Realization"]
+        G29 -->|PASS| TTSDisp["TTSDispatcher & 4D Formants<br/>(Gemini Flash TTS 120+ Key Pool)"]
+        TTSDisp --> Editorial["Dialogue Editorial Layer (DE-01 - DE-07)<br/>(Endpoint Snapping & Micro-Fades)"]
     end
 
-    subgraph S5["Stage 5: Acoustic Compositor & Mastering"]
-        Manifest --> Renderer["Manifest Soundscape Renderer & DSP Master<br/>(Sidechain Ducking + 2.2kHz Notch + EBU R128)"]
-        Renderer --> Stems["5 Discrete DME Stems (DX, MX, FX, AMB, ME)"]
+    subgraph S5["Stage 5: Vocal Mastering & Audio Engineering"]
+        Editorial --> Renderer["Two-Pass Linear Loudnorm Master<br/>(EBU R128 -19.0 LUFS / -1.5 dBTP)"]
+        Renderer --> MasterAudio["Mastered Vocal Chapter Audio"]
     end
 
     subgraph S6["Stage 6: Packaging & Delivery"]
-        Stems --> M4BPack["M4B Packager & Container Specs (Gate 6D)"]
+        MasterAudio --> M4BPack["M4B Packager & Container Specs (Gate 6D)"]
         M4BPack --> FinalM4B["Final Chapterized M4B Audiobook"]
     end
 ```
@@ -832,46 +833,55 @@ To resolve the dual problems of **LLM Overload** (context saturation and swallow
 
 ## 🤝 Downstream Handoff Guidelines
 
-The dramatic intelligence synthesized in Stage 3 feeds directly into downstream stages through standardized contracts:
+The dramatic intelligence synthesized in Stage 3 feeds directly into downstream speech synthesis and audio engineering through standardized contracts:
 
 ```mermaid
 flowchart TD
-    S3Script["Stage 3: Screenplay Script JSON<br/>(Enriched ScreenplaySegments)"] --> S4["Stage 4: AgentDirector"]
-    S3Plan["Stage 3: DramaticPlan JSON<br/>(Scene & Beat Blueprints)"] --> S4
-    S3Bible["Stage 3: Performance Bible JSON<br/>(Pacing, Energy, Quirks)"] --> S6TTS["Stage 6: TTSDispatcher"]
+    S3Script["Stage 3: Screenplay Script JSON<br/>(scripts/chapter_XXX_hi_script.json)"] --> G29["🛡️ Gate 2.9: Pre-TTS Config & Attribution Sanity<br/>(audiobook_factory.gates.pre_synthesis)"]
+    S3Plan["Stage 3: DramaticPlan JSON<br/>(dramaturgy/chapter_XXX_dramatic_plan.json)"] --> G29
+    S3Bible["Stage 3: Performance Bible JSON<br/>(performance_bible.json)"] --> G29
 
-    subgraph DirectingHandoff["Handoff to Stage 4 (Directing)"]
-        S4 --> Pass1["Pass 1 (Silence Carving):<br/>Uses beat tension & performance_priority<br/>to carve surgical silence (>= 60% mandate)"]
-        S4 --> Pass2["Pass 2 (Music Director):<br/>Maps scene_type & tension_curve<br/>to FTS5 valence/arousal queries"]
-        S4 --> Pass3["Pass 3 (Acoustic Foley):<br/>Anchors physical Foley to actioning verbs<br/>and kinetic strikes"]
+    subgraph Gate29Audit["Gate 2.9 Dual-Tier Hybrid Audit"]
+        G29 --> T1["Tier 1: Deterministic Fast-Path<br/>• Monotonic indexing (1, 2, 3...)<br/>• Speaker whitelist vs character_roster.json<br/>• Hindi gender inflection anti-swap guard<br/>• Speech verb co-reference matching<br/>• Anti-swallow quote detection in Narrator lines<br/>• Acoustic clamping: pitch [0.65, 1.35], speed [0.75, 1.30]<br/>• Text hygiene (no markdown fences, no LLM chatter)"]
+        T1 --> T2["Tier 2: Adversarial LLM Attribution Judge<br/>(LLMPreSynthesisJudge via ModelGateway 123+ Keys)<br/>• Cross-references source text vs stratified segments<br/>• Detects speaker turn inversions (A <-> B)<br/>• Detects dialogue swallowed into narration<br/>• Verifies persona, gender, and sociolect fit"]
     end
 
-    subgraph AudioHandoff["Handoff to Stage 5 (Mastering DSP)"]
-        Pass1 --> DSP["CinemaAudioEngine & DSP Master"]
-        Pass2 --> DSP
-        Pass3 --> DSP
-        DSP --> Headroom["intensity_level ('explosive' -> TP -2.0 dBTP, limiter 0.82)"]
-        DSP --> Intimacy["pre_roll_breath_ms (200-250ms ASMR breath intake)"]
-        DSP --> Spatial["spatial.pan & spatial.proximity (Stereo Azimuth Staging)"]
-        DSP --> Reverb["acoustic_env ('cathedral', 'binaural_whisper' IR Reverb)"]
-    end
+    T2 -->|FAIL: GateAuditError| Abort["🛑 Synthesis Aborted<br/>(API Quota Protected)"]
+    T2 -->|PASS: PreSynthesisLLMVerdict| S4TTS["Room 4: TTSDispatcher<br/>(Gemini Flash TTS Key Pool)"]
 
-    subgraph TTSHandoff["Handoff to Stage 6 (Speech Synthesis)"]
-        S6TTS --> Prompt["Injects sociolect delivery_style & pacing<br/>into Gemini 3.1 Flash TTS instructions"]
-        S6TTS --> Safety["Permanent BLOCK_NONE safety filters<br/>prevent adult dramatic censorship"]
+    subgraph VocalPerformance["Room 4 & Room 5 Pure Vocals Engineering"]
+        S4TTS --> Formants["4D Formant DSP Modulation<br/>(Pitch Δ +/-4-12%, Parametric EQ Curves)"]
+        Formants --> Editorial["Dialogue Editorial Layer (DE-01 - DE-07)<br/>(Endpoint Snapping & Hann Micro-Fades)"]
+        Editorial --> Master["Two-Pass Linear Loudnorm Master<br/>(EBU R128 -19.0 LUFS / -1.5 dBTP)"]
+        Master --> M4B["Chaptered M4B Container with Cover Art"]
     end
 ```
 
-### 1. Handoff to Stage 4: `AgentDirector`
-- **Silence Carving:** Pass 1 inspects `performance_priority` (`background`, `standard`, `high_focus`, `climactic`) and `tension_before` $\rightarrow$ `tension_after`. Dialogue with low priority or declining tension receives zero musical underscore, enforcing the $\ge 60\%$ acoustic silence standard.
-- **Musical Scoring:** Pass 2 maps `scene_type` (`combat`, `horror`, `romance`) and tension indices directly to SQLite FTS5 music search queries for tempo, valence, and arousal.
-- **Acoustic Foley:** Pass 3 utilizes `actioning` verbs (`threaten`, `probe`, `challenge`) and action beat splits (`speaker: "Foley"`, `text: "[ACTION]"`) to place tactile sound effects at accurate temporal offsets ($\sim 15\%$ for preparation, $\sim 75\%$ for kinetic impact).
+### 1. The Authoritative Pre-TTS Handoff Boundary: Gate 2.9
+Before `TTSDispatcher` begins speech synthesis, Gate 2.9 ([`audiobook_factory.gates.pre_synthesis`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py)) executes as the final, fail-closed pre-synthesis gate auditing the screenplay script. It protects the production pipeline and Google Gemini Flash TTS quotas from being wasted on corrupt, swapped, or acoustically distorted scripts:
+- **Tier 1 Deterministic Fast-Path**:
+  - *Sequential Monotonicity*: Verifies that segment indices are strictly sequential ($index = 1, 2, 3\dots$) without gaps or reordering.
+  - *Speaker Whitelist Validation*: Every segment speaker is cross-referenced against `character_roster.json`, `voice_registry.json`, `podcast_config.json`, and canonical role defaults. Non-canonical or misspelled speakers trigger immediate failure.
+  - *Anti-Swap Gender Inflection Guard*: Analyzes Devanagari first-person grammatical verb inflections (`रहा हूँ` / `करूँगा` = masculine vs `रही हूँ` / `करूँगी` = feminine) against character roster genders to detect inverted speaker assignments.
+  - *Speech Verb Co-Reference*: Matches dialogue attribution against preceding narrator tags (e.g. *उसने कहा*, *Geralt said: ...*).
+  - *Anti-Swallow Dialogue Guard*: Scans `Narrator` lines for embedded dialogue quotation marks ($" \dots "$ or $“ \dots ”$) accompanied by speech lead-in verbs.
+  - *Acoustic Parameter Clamping*: Pitch shift clamped to $[0.65, 1.35]$ (ratio) or $[-12.0, 12.0]$ (semitones for podcast); speed multiplier clamped to $[0.75, 1.30]$; asserts non-null, assigned `voice_id`.
+  - *Text Hygiene*: Blocks raw Markdown code fences (```` ```json ````) and unstripped conversational LLM preambles (*"Here is the script..."*).
+- **Tier 2 Adversarial LLM Attribution Judge ([`LLMPreSynthesisJudge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L51-L237))**:
+  - Leverages Google AI Studio Gemini models utilizing our 123+ API key round-robin pool via [`ModelGateway.generate_text()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py#L98).
+  - Protected by AntiBanGuard 11.0 RPM token-bucket rate limiting, sticky chapter session affinity (`session_id="gate2_9_pre_tts"`), stealth SDK headers (`x-goog-api-client`), and permanent `BLOCK_NONE` creative safety framing.
+  - Deep contextual audit: Stratifies script segments against source chapter narrative context (`source_file` / `source_text`) and character cast profiles from `BookBible`.
+  - Detects true speaker turn inversions ($A \leftrightarrow B$), character dialogue swallowed into narrator segments, persona sociolect mismatches, and podcast dual-host banter balance.
+  - Evaluates strict [`PreSynthesisLLMVerdict`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/pre_synthesis.py#L28-L49) Pydantic v2 schema.
+- **Fail-Closed Contract**: Any critical defect in Tier 1 or Tier 2 raises [`GateAuditError`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/contracts.py) and halts synthesis immediately. Corrupted audio stems are never generated, safeguarding Gemini Flash TTS quotas.
 
-### 2. Handoff to Stage 5: Audio Mastering & DSP
-- **Dynamic Headroom:** Master DSP chains read `intensity_level`. Lines tagged `explosive` trigger tighter limiter settings (`limiter=0.82`, True Peak ceiling $-2.0\text{ dBTP}$); lines tagged `low` adjust Loudness Range (`LRA = 6.0 LU`) to preserve intimate close-mic textures.
-- **Spatial Panning:** `spatial.pan` ($-0.6$ attacker left, $+0.6$ defender right, $0.0$ center) and `spatial.proximity` (`intimate_close`) direct stereo azimuth staging without mono phase cancellation ($r \ge 0.85$).
-- **Acoustic Environment:** `acoustic_env` tags (`cathedral`, `stone_hall`, `binaural_whisper`) select dynamic impulse response (IR) convolution reverb profiles.
+### 2. Handoff to Room 4: `TTSDispatcher` & 4D Acoustic Formants
+Once Gate 2.9 certifies the screenplay script, segments are handed off to `TTSDispatcher`:
+- **Voice Guidance**: `TTSDispatcher` injects character `acting.delivery_style`, `pacing`, and `restraint_level` directly into Gemini Flash TTS system prompts.
+- **Prosody Tags**: Neural vocal tags validated in Stage 3 (`[whispers]`, `[growl]`, `[bellowing battlecry]`, `[combat strain]`) are synthesized natively by Gemini 3.1 Flash without censorship blocks.
+- **4D Acoustic Formant Modulation**: Modulates pitch delta ($\pm 4-12\%$), tempo rate, and 4D parametric EQ curves (`equalizer=f=...`) via FFmpeg DSP to prevent vocal convergence across shared base TTS voices.
 
-### 3. Handoff to Stage 6: Precision TTS Synthesizer
-- **Voice Guidance:** `TTSDispatcher` injects character `acting.delivery_style`, `pacing`, and `restraint_level` directly into Gemini Flash TTS system prompts.
-- **Prosody Tags:** Neural vocal tags validated in Stage 3 (`[whispers]`, `[growl]`, `[bellowing battlecry]`, `[combat strain]`) are synthesized natively by Gemini 3.1 Flash without censorship blocks.
+### 3. Handoff to Room 5: Dialogue Editorial & Broadcast Vocal Mastering
+- **Dialogue Editorial Layer (DE-01 - DE-07)**: Endpoint zero-crossing snapping (-52 dBFS speech floor), Hann micro-fades (12ms pre-speech fade-in / 18ms post-speech fade-out), and contextual turn latency (250ms–700ms).
+- **Two-Pass Linear Loudnorm**: Mastered to broadcast EBU R128 **-19.0 LUFS** ($\pm 0.5$ LU) with a **-1.5 dBTP** True Peak ceiling.
+- **Packaging**: Packaged into a chapterized `.m4b` container with embedded square cover art and monotonic seek tables.
