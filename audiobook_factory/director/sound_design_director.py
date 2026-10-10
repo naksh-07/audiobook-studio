@@ -151,7 +151,7 @@ Output STRICT JSON schema:
         seen_models = set()
         models_to_try = [m for m in candidate_models if not (m in seen_models or seen_models.add(m))]
 
-        from audiobook_factory.llm_client import call_gemini
+        from audiobook_factory.dramaturgy.gateway_bridge import execute_dramaturgy_llm
 
         system_instruction = (
             "You are an elite Audio Drama Director & Supervising Sound Designer (BBC Radio 4 / Hollywood standard). "
@@ -159,11 +159,11 @@ Output STRICT JSON schema:
         )
 
         try:
-            parsed = call_gemini(
+            parsed = execute_dramaturgy_llm(
                 prompt=prompt,
                 system_instruction=system_instruction,
-                task_type=TaskType.DIRECTING,
-                response_mime_type="application/json",
+                task="directing",
+                json_mode=True,
                 max_retries=max_retries,
             )
             if parsed and "music_cues" in parsed:

@@ -24,8 +24,11 @@ from audiobook_factory.podcast.contracts import (
 )
 from audiobook_factory.podcast.persona_engine import HostPersonaEngine
 from audiobook_factory.podcast.spoken_transformer import SpokenBreathabilityTransformer
-from audiobook_factory.llm_client import call_gemini
+from audiobook_factory.dramaturgy.gateway_bridge import execute_dramaturgy_llm
 from audiobook_factory.model_manager import get_model_manager, TaskType, LLMUnavailableError
+
+# Backward compatibility alias for testing hooks; routes to ModelGateway by default
+call_gemini = execute_dramaturgy_llm
 
 logger = logging.getLogger("AudiobookFactory")
 
@@ -139,12 +142,11 @@ OUTPUT FORMAT: Strict JSON list of dialogue turns:
                 raw_turns = call_gemini(
                     prompt=prompt,
                     system_instruction=sys_prompt,
-                    task_type=TaskType.SCREENPLAY,
-                    response_mime_type="application/json",
+                    task="screenplay",
+                    model=model,
+                    json_mode=True,
                     max_output_tokens=16384,
                     thinking_budget=1024,
-                    max_retries=5,
-                    model=model,
                 )
             except Exception as e:
                 logger.error(f"  [!] Podcast LLM generation failed: {e}")

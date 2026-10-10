@@ -10,7 +10,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional, Callable
 
-from audiobook_factory.llm_client import call_gemini as default_call_gemini
+from audiobook_factory.dramaturgy.gateway_bridge import execute_dramaturgy_llm
 from audiobook_factory.model_manager import get_model_manager, TaskType
 from audiobook_factory.safety import get_dramatic_fiction_framing
 
@@ -92,15 +92,14 @@ Output JSON: A list of objects matching by "index":
                     import json_repair
                     enriched = json_repair.loads(enriched)
             else:
-                enriched = default_call_gemini(
+                enriched = execute_dramaturgy_llm(
                     prompt=prompt,
                     system_instruction=sys_prompt,
-                    task_type=TaskType.SCREENPLAY,
-                    response_mime_type="application/json",
+                    task="screenplay",
+                    model=model,
+                    json_mode=True,
                     max_output_tokens=16384,
                     thinking_budget=1024,
-                    max_retries=6,
-                    model=model,
                 )
         except Exception as e:
             logger.warning(f"  [!] StanislavskiSubtextDirector notice: {e}. Preserving input baseline.")

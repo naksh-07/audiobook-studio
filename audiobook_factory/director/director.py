@@ -2,8 +2,6 @@ from __future__ import annotations
 import os
 import json
 import time
-import urllib.request
-import urllib.error
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 

@@ -209,7 +209,8 @@ class StudioCertificationRunner:
                             findings.append(f"Non-monotonic segment indices in {sf.name}")
                             score -= 30.0
                 except Exception as e:
-                    warnings.append(f"Could not read script {sf.name}: {e}")
+                    findings.append(f"Could not read script {sf.name}: {e}")
+                    score -= 50.0
 
         status: AuditStatus = "FAILED" if findings else ("WARNING" if warnings else "PASSED")
         return PillarAuditResult(
@@ -255,7 +256,8 @@ class StudioCertificationRunner:
                             warnings.append(f"Possible unstripped quote in Narrator line in {sf.name}")
                             score -= 5.0
             except Exception as e:
-                warnings.append(f"Error parsing {sf.name}: {e}")
+                findings.append(f"Error parsing {sf.name} during attribution audit: {e}")
+                score -= 50.0
 
         status: AuditStatus = "FAILED" if findings else ("WARNING" if warnings else "PASSED")
         return PillarAuditResult(
@@ -296,8 +298,9 @@ class StudioCertificationRunner:
                                 if b in acting:
                                     findings.append(f"Banned theatrical directive '{b}' found in {sf.name}")
                                     score -= 20.0
-            except Exception:
-                pass
+            except Exception as e:
+                findings.append(f"Error parsing {sf.name} during performance audit: {e}")
+                score -= 50.0
 
         status: AuditStatus = "FAILED" if findings else ("WARNING" if warnings else "PASSED")
         return PillarAuditResult(

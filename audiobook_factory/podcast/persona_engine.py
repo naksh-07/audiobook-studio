@@ -65,7 +65,8 @@ class HostPersonaEngine:
                 if isinstance(h_data, dict):
                     res[h_id] = HostProfile.model_validate(h_data)
             return res if res else None
-        except Exception:
+        except Exception as e:
+            logger.warning(f"  [!] Failed to load hosts from config {p}: {e}")
             return None
 
     @staticmethod

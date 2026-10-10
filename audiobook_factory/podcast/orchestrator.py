@@ -242,16 +242,19 @@ class PodcastOrchestrator:
             from audiobook_factory.translation.book_bible import BookBible
             from audiobook_factory.translation.memory import MemoryStore, MemoryRetriever
             bible = BookBible.load_from_project(proj_dir)
-            m_store = MemoryStore.load(MemoryStore.default_store_path(proj_dir), book_bible=bible)
-            mem_ctx = MemoryRetriever.retrieve_for_scene(
-                store=m_store,
-                book_bible=bible,
-                chapter=chapter_num,
-                scene_id=chap_stem,
-                scene_text=content,
-            )
-        except Exception:
-            pass
+            if bible:
+                m_path = MemoryStore.default_store_path(proj_dir)
+                if m_path.exists():
+                    m_store = MemoryStore.load(m_path, book_bible=bible)
+                    mem_ctx = MemoryRetriever.retrieve_for_scene(
+                        store=m_store,
+                        book_bible=bible,
+                        chapter=chapter_num,
+                        scene_id=chap_stem,
+                        scene_text=content,
+                    )
+        except Exception as e:
+            logger.warning(f"  [-] Optional Memory/BookBible context load skipped for {proj_dir.name}: {e}")
 
         # 1. Synthesize Shared Dramaturgy Core
         known_chars = list(bible.characters.keys()) if bible and bible.characters else None
