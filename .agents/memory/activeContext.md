@@ -22,7 +22,7 @@
   - Core: Universal Dramatic AST (`dramaturgy/contracts.py`, `SceneAnalyzer`, `BeatPlanner`, `PerformanceBible`).
   - Control Plane: `gateway_bridge.py` wired to `ModelGateway.generate_text()` (zero raw HTTP calls).
   - Adapters: `AudiobookAdapter` (Gate 2.5) & `PodcastAdapter` (Sameer/Priya, Alex/Maya, breathability <=22 words).
-  - Gate 2.9: Pre-TTS Config & Attribution Sanity Gate (`audiobook_factory/gates/pre_synthesis.py`) enforcing speaker whitelist, Hindi gender discordance anti-swap, anti-swallow dialogue, and acoustic parameter clamping fail-closed across both audiobook and podcast pipelines.
+  - Gate 2.9: Dual-Tier Pre-TTS Sanity Gate (`audiobook_factory/gates/pre_synthesis.py`): Tier 1 structural fast-checks + Tier 2 Adversarial LLM Attribution Judge (`LLMPreSynthesisJudge` via 123+ key pool) enforcing 0% speaker swap, anti-swallow dialogue, and acoustic parameter clamping fail-closed across both pipelines.
   - 8-Pillar Harness: `StudioCertificationRunner` (P1 Ingestion to P8 Packaging, Gate 6 fail-closed compliance).
   - Multi-format packaging: `.m4b` audiobook (-19 LUFS) & `.m4a` podcast (-16 LUFS with stereo pan -0.25/+0.25).
 - **Next Milestone**: Phase 5 Studio TTS Platform Core (`origin/tts-system`). 4-Tier TTS Engine, TakeBank & Net-Silence.
