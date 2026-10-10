@@ -1,9 +1,9 @@
 // Backend for Audiobook Studio UI Extension Sidecar.
 // Hosts local HTTP server and bridges Antigravity with the Python production engine.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { platform, release } from 'node:os';
-import { dirname, join, resolve, extname } from 'node:path';
+import { dirname, join, resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawn } from 'node:child_process';
 import { Response, SidecarApp } from 'sidecar_sdk';
@@ -40,7 +40,14 @@ function runPythonBridge(subcommand, extraArgs = []) {
       timeout: 20000,
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
     });
-    return JSON.parse(stdout);
+    const outStr = stdout.trim();
+    try {
+      return JSON.parse(outStr);
+    } catch (parseErr) {
+      const match = outStr.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+      if (match) return JSON.parse(match[0]);
+      throw parseErr;
+    }
   } catch (err) {
     console.error(`Bridge error on '${subcommand}':`, err.message);
     return {
@@ -84,7 +91,9 @@ app.api('/api/projects', () => {
 // GET /api/project?slug=...: Returns detailed chapters, roster, and segment states
 app.api('/api/project', (data) => {
   const slug = data.slug;
-  if (!slug) return { error: 'Missing slug parameter' };
+  if (!slug || typeof slug !== 'string' || !/^[a-zA-Z0-9_\-\.]+$/.test(slug)) {
+    return { error: 'Invalid or missing slug parameter' };
+  }
   return runPythonBridge('project-detail', ['--slug', slug]);
 }, 'GET');
 
@@ -101,13 +110,15 @@ const MAX_PEAKS_CACHE_SIZE = 50;
 app.api('/api/peaks', (data) => {
   const relPath = data.path;
   if (!relPath) return { error: 'Missing path parameter' };
-  const numPoints = parseInt(data.points || '400', 10) || 400;
+  const rawPoints = parseInt(data.points || '400', 10);
+  const numPoints = Math.max(10, Math.min(2000, isNaN(rawPoints) ? 400 : rawPoints));
 
-  // Resolve safe path inside ENGINE_DIR
+  // Resolve safe path inside ENGINE_DIR with strict separator boundary defense
   const safeBase = resolve(ENGINE_DIR);
+  const safePrefix = safeBase.endsWith(sep) ? safeBase : safeBase + sep;
   const targetPath = resolve(safeBase, relPath.replace(/^[\/\\]+/, ''));
 
-  if (!targetPath.startsWith(safeBase)) {
+  if (targetPath !== safeBase && !targetPath.startsWith(safePrefix)) {
     return { error: 'Access denied outside engine dir' };
   }
 
@@ -135,16 +146,17 @@ app.api('/api/peaks', (data) => {
   return result;
 }, 'GET');
 
-// GET /api/audio?path=...: Streams local audio files with HTTP 206 Partial Content support
+// GET /api/audio?path=...: Streams local audio files with HTTP 206 Partial Content & memory-safe chunk reading
 app.api('/api/audio', (data) => {
   const relPath = data.path;
   if (!relPath) return { error: 'Missing path parameter' };
 
-  // Resolve safe path inside ENGINE_DIR
+  // Resolve safe path inside ENGINE_DIR with strict separator boundary defense
   const safeBase = resolve(ENGINE_DIR);
+  const safePrefix = safeBase.endsWith(sep) ? safeBase : safeBase + sep;
   const targetPath = resolve(safeBase, relPath.replace(/^[\/\\]+/, ''));
 
-  if (!targetPath.startsWith(safeBase)) {
+  if (targetPath !== safeBase && !targetPath.startsWith(safePrefix)) {
     return new Response(JSON.stringify({ error: 'Access denied outside engine dir' }), { status: 403, contentType: 'application/json' });
   }
 
@@ -159,10 +171,11 @@ app.api('/api/audio', (data) => {
   else if (ext === '.mp3') contentType = 'audio/mpeg';
 
   try {
-    const fileBuf = readFileSync(targetPath);
+    const stat = statSync(targetPath);
+    const totalSize = stat.size;
     let status = 200;
     const headers = {
-      'Content-Length': String(fileBuf.length),
+      'Content-Length': String(totalSize),
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'public, max-age=3600',
     };
@@ -170,7 +183,7 @@ app.api('/api/audio', (data) => {
     // Range request support for fine-grained scrubbing without whole-file redownload
     if (data.range || data.start !== undefined) {
       let start = 0;
-      let end = fileBuf.length - 1;
+      let end = totalSize - 1;
       if (data.range) {
         const match = /bytes=(\d+)-(\d*)/.exec(data.range);
         if (match) {
@@ -181,15 +194,38 @@ app.api('/api/audio', (data) => {
         start = parseInt(data.start, 10);
         if (data.end !== undefined) end = parseInt(data.end, 10);
       }
-      start = Math.max(0, Math.min(start, fileBuf.length - 1));
-      end = Math.max(start, Math.min(end, fileBuf.length - 1));
-      const chunk = fileBuf.subarray(start, end + 1);
+      if (isNaN(start)) start = 0;
+      if (isNaN(end)) end = totalSize - 1;
+      
+      if (start > end || start >= totalSize || start < 0) {
+        return new Response(JSON.stringify({ error: 'Range Not Satisfiable' }), { 
+          status: 416, 
+          contentType: 'application/json',
+          headers: { 'Content-Range': `bytes */${totalSize}` } 
+        });
+      }
+
+      start = Math.max(0, Math.min(start, totalSize - 1));
+      end = Math.max(start, Math.min(end, totalSize - 1));
+      const chunkLength = end - start + 1;
+      
+      // Memory-safe streaming: allocate only the requested byte chunk
+      const chunk = Buffer.alloc(chunkLength);
+      const fd = openSync(targetPath, 'r');
+      try {
+        readSync(fd, chunk, 0, chunkLength, start);
+      } finally {
+        closeSync(fd);
+      }
+
       status = 206;
-      headers['Content-Range'] = `bytes ${start}-${end}/${fileBuf.length}`;
-      headers['Content-Length'] = String(chunk.length);
+      headers['Content-Range'] = `bytes ${start}-${end}/${totalSize}`;
+      headers['Content-Length'] = String(chunkLength);
       return new Response(chunk, { status, contentType, headers });
     }
 
+    // Full file response: read safely
+    const fileBuf = readFileSync(targetPath);
     return new Response(fileBuf, {
       contentType,
       headers,

@@ -45,6 +45,15 @@ function formatSMPTE(seconds) {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${frames.toString().padStart(2, '0')}`;
 }
 
+function escapeHTML(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 async function apiFetch(path, options = {}) {
   try {
     if (sidecar && typeof sidecar.fetch === 'function') {
@@ -56,6 +65,10 @@ async function apiFetch(path, options = {}) {
       return res.json();
     } else {
       const res = await fetch(path, options);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
       return res.json();
     }
   } catch (err) {
@@ -167,6 +180,10 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
 }
 
 function updatePlayhead() {
+  if (state.rafId) {
+    cancelAnimationFrame(state.rafId);
+    state.rafId = null;
+  }
   if (!audioPlayer) return;
   const cur = audioPlayer.currentTime || 0;
   const dur = state.audioDuration || audioPlayer.duration || 1;
@@ -204,6 +221,7 @@ function updateMeters(cur, dur) {
   if (!leftFill || !rightFill) return;
 
   if (state.isPlaying) {
+    cur = isNaN(cur) ? 0 : cur;
     // Generate organic micro-variance RMS around -19 LUFS / -8 dB peaks
     const wobble1 = Math.sin(cur * 14) * 0.15 + Math.cos(cur * 28) * 0.08;
     const wobble2 = Math.cos(cur * 18) * 0.14 + Math.sin(cur * 32) * 0.07;
@@ -231,6 +249,7 @@ function updateMeters(cur, dur) {
 
 async function loadAudioTrack(relAudioPath) {
   if (!relAudioPath) return;
+  if (state.isPlaying) togglePlay(false);
   state.activeAudioPath = relAudioPath;
 
   // Load downsampled peaks from server
@@ -258,6 +277,7 @@ function setupScrubberEvents() {
 
   const handleScrub = (e) => {
     const rect = viewport.getBoundingClientRect();
+    if (rect.width === 0) return;
     const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const fraction = x / rect.width;
     const targetTime = fraction * (state.audioDuration || audioPlayer.duration || 0);
@@ -351,36 +371,39 @@ function renderProjectUI(detail) {
   }
 
   // 5-Room DAG Stepper Sync
-  renderDAGStepper(detail.rooms);
+  renderDAGStepper(detail.pipeline_dag || detail.rooms);
 
   // Multi-Cast Voice Roster
-  renderVoiceRoster(detail.character_roster || []);
+  renderVoiceRoster(detail.characters || detail.character_roster || []);
 
   // Dialogue Segments & Inspector
-  if (Array.isArray(detail.segments) && detail.segments.length > 0) {
-    selectDialogueSegment(detail.segments[0]);
+  const segments = detail.recent_segments || detail.segments || [];
+  if (Array.isArray(segments) && segments.length > 0) {
+    selectDialogueSegment(segments[0]);
   }
 
   // Auto-load first available audio chunk
-  if (detail.active_audio_path) {
-    loadAudioTrack(detail.active_audio_path);
-  } else if (Array.isArray(detail.segments)) {
-    const segWithAudio = detail.segments.find(s => s.audio_file);
+  const activeAudio = detail.active_audio || detail.active_audio_path;
+  if (activeAudio) {
+    loadAudioTrack(activeAudio);
+  } else if (Array.isArray(segments)) {
+    const segWithAudio = segments.find(s => s.audio_path || s.audio_file);
     if (segWithAudio) {
-      loadAudioTrack(segWithAudio.audio_file);
+      loadAudioTrack(segWithAudio.audio_path || segWithAudio.audio_file);
     }
   }
 }
 
 function renderDAGStepper(rooms) {
   if (!rooms) return;
-  const roomKeys = ['room1_ingest', 'room2_trans', 'room3_dramat', 'room4_tts', 'room5_master'];
+  const roomKeys = ['room1_ingest', 'room2_translate', 'room3_dramaturgy', 'room4_synth', 'room5_master'];
+  const fallbackKeys = ['room1_ingest', 'room2_trans', 'room3_dramat', 'room4_tts', 'room5_master'];
   const elementIds = ['dag-room1', 'dag-room2', 'dag-room3', 'dag-room4', 'dag-room5'];
 
   elementIds.forEach((id, idx) => {
     const el = $(id);
     if (!el) return;
-    const roomState = rooms[roomKeys[idx]] || 'queued';
+    const roomState = rooms[roomKeys[idx]] || rooms[fallbackKeys[idx]] || 'queued';
 
     el.classList.remove('completed', 'active');
     if (roomState === 'completed') {
@@ -408,21 +431,23 @@ function renderVoiceRoster(roster) {
     const card = document.createElement('div');
     card.className = 'roster-card';
 
-    const initials = (char.character_name || 'CH').substring(0, 2).toUpperCase();
-    const model = char.voice_model || 'Gemini Flash';
-    const pitch = char.pitch || '+0%';
-    const tempo = char.tempo || '1.0x';
+    const charName = char.name || char.character_name || 'Character';
+    const initials = escapeHTML(charName.substring(0, 2).toUpperCase());
+    const model = escapeHTML(char.voice || char.voice_model || 'Gemini Flash');
+    const pitch = escapeHTML(char.pitch || '+0%');
+    const tempo = escapeHTML(char.tempo || '1.0x');
+    const sampleAudio = escapeHTML(char.sample_audio || '');
 
     card.innerHTML = `
       <div style="display: flex; align-items: center; gap: 10px;">
         <div class="avatar-badge">${initials}</div>
         <div>
-          <div style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${char.character_name}</div>
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${escapeHTML(charName)}</div>
           <div style="font-size: 10px; color: var(--text-muted);">${model} • Pitch ${pitch} • ${tempo}</div>
         </div>
       </div>
       <div>
-        <button class="btn-audition" data-sample="${char.sample_audio || ''}">
+        <button class="btn-audition" data-sample="${sampleAudio}">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           <span>Audition</span>
         </button>
@@ -450,29 +475,34 @@ function selectDialogueSegment(segment) {
   state.currentSegment = segment;
   if (!segment) return;
 
+  const turnId = segment.seg_num || segment.id || segment.segment_id || '01';
+  const speaker = segment.speaker || 'Narrator';
+  const audioPath = segment.audio_path || segment.audio_file;
+
   const turnEl = $('inspector-turn-id');
-  if (turnEl) turnEl.textContent = `Turn ${segment.turn_id || segment.segment_id} • ${segment.speaker}`;
+  if (turnEl) turnEl.textContent = `Turn ${turnId} • ${speaker}`;
 
   const directiveEl = $('inspector-directive');
   if (directiveEl) directiveEl.textContent = segment.directive || 'Calm, articulate audiobook narration';
 
   const speakerEl = $('inspector-speaker');
-  if (speakerEl) speakerEl.textContent = segment.speaker || 'Narrator';
+  if (speakerEl) speakerEl.textContent = speaker;
 
   const textEl = $('inspector-hindi-text');
   if (textEl) textEl.textContent = `"${segment.text_content || '...'}"`;
 
   const statusEl = $('inspector-segment-status');
   if (statusEl) {
-    statusEl.textContent = segment.has_audio ? 'Audio Rendered' : 'Pending Synthesis';
-    statusEl.style.color = segment.has_audio ? 'var(--studio-green)' : 'var(--studio-amber-dark)';
+    const hasAudio = !!audioPath;
+    statusEl.textContent = hasAudio ? 'Audio Rendered' : 'Pending Synthesis';
+    statusEl.style.color = hasAudio ? 'var(--studio-green)' : 'var(--studio-amber-dark)';
   }
 
   const loadAudioBtn = $('btn-load-segment-audio');
   if (loadAudioBtn) {
     loadAudioBtn.onclick = () => {
-      if (segment.audio_file) {
-        loadAudioTrack(segment.audio_file);
+      if (audioPath) {
+        loadAudioTrack(audioPath);
         togglePlay(true);
       }
     };
@@ -570,17 +600,19 @@ function setupTransportControls() {
 }
 
 function navigateSegments(direction) {
-  if (!state.currentProject || !Array.isArray(state.currentProject.segments)) return;
-  const segments = state.currentProject.segments;
-  if (segments.length === 0) return;
+  if (!state.currentProject) return;
+  const segments = state.currentProject.recent_segments || state.currentProject.segments || [];
+  if (!Array.isArray(segments) || segments.length === 0) return;
 
-  const curIdx = state.currentSegment ? segments.findIndex(s => s.segment_id === state.currentSegment.segment_id) : 0;
-  const nextIdx = Math.max(0, Math.min(segments.length - 1, curIdx + direction));
+  const curId = state.currentSegment ? (state.currentSegment.id || state.currentSegment.segment_id) : null;
+  const curIdx = curId ? segments.findIndex(s => (s.id || s.segment_id) === curId) : 0;
+  const nextIdx = Math.max(0, Math.min(segments.length - 1, (curIdx === -1 ? 0 : curIdx) + direction));
   const nextSeg = segments[nextIdx];
 
   selectDialogueSegment(nextSeg);
-  if (nextSeg.audio_file) {
-    loadAudioTrack(nextSeg.audio_file);
+  const audioPath = nextSeg.audio_path || nextSeg.audio_file;
+  if (audioPath) {
+    loadAudioTrack(audioPath);
   }
 }
 

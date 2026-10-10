@@ -396,7 +396,26 @@ def extract_audio_peaks(audio_path: str, num_points: int = 400) -> Dict[str, Any
     try:
         data, sr = sf.read(str(path), dtype="float32")
     except Exception as e:
-        raise RuntimeError(f"Failed to read audio file '{path}': {e}") from e
+        # Fallback for formats unsupported by libsndfile (e.g., m4a, m4b, mp3)
+        import subprocess
+        try:
+            probe_cmd = [
+                "ffprobe", "-v", "error", "-select_streams", "a:0",
+                "-show_entries", "stream=sample_rate", "-of",
+                "default=noprint_wrappers=1:nokey=1", str(path)
+            ]
+            sr_str = subprocess.check_output(probe_cmd, text=True, stderr=subprocess.DEVNULL).strip()
+            sr = int(sr_str)
+            
+            ffmpeg_cmd = [
+                "ffmpeg", "-i", str(path), "-f", "f32le", "-ac", "1",
+                "-ar", str(sr), "-v", "quiet", "-"
+            ]
+            raw_data = subprocess.check_output(ffmpeg_cmd, stderr=subprocess.DEVNULL)
+            data = np.frombuffer(raw_data, dtype="float32")
+        except Exception as ffmpeg_err:
+            raise RuntimeError(f"Failed to read audio file '{path}': sf error: {e}, ffmpeg error: {ffmpeg_err}") from e
+
 
     # Mono downmix if stereo/multichannel
     if data.ndim > 1:
