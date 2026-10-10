@@ -40,10 +40,10 @@ All 8 specialized branches fork from common baseline `308e0eb` (`v5.2`):
 | **L1** | `origin/model-and-keys-manager` | [`audiobook_factory/core/models/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/) | **ACID Key Lease Manager**, 7 Iron Shields Anti-Ban Guard, 50+ Model Registry, Polymorphic Adapters (`gemini`, `openai_compat`, `local_gpu`), `ModelGateway` Facade, `keys` CLI | **MERGED & VERIFIED** | 43/43 Dedicated + 80/80 Extraction Green |
 | **L2** | `origin/extraction-system` | [`audiobook_factory/extraction/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/) | Forensic Ingestion (PDF XY-cut, EPUB aside filter, LaTeX math/table AST blocks, Gate 0.1) | **INTEGRATED ON MAIN** | 80/80 Green (100%) |
 | **L3** | `origin/research-system` | [`audiobook_factory/preproduction/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/)<br/>[`audiobook_factory/metadata/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/) | **2-System Decoupled Novel Researcher**: Book DNA, Cast Lock ($\ge 4.0\%$ pitch spacing, $[0.70, 1.30]$ bounds), Dramatis Personae, Gate NR-GATE-06 atomic commit & rollback | **MERGED & VERIFIED** | 26/26 Green (100%) |
-| **L4** | `origin/translation` | `audiobook_factory/translation/` | **Option D Standalone Translation**: Single-pass deliberative translation (Gemini Flash `thinking_budget=1024`), macro-chunking, full-text deterministic parity gates, zero audio imports | QUEUED (Phase 3) | 8 test suites |
-| **L5** | `origin/dramaturgy` | `audiobook_factory/dramaturgy/`<br/>`audiobook_factory/adapters/` | **Option C Universal Dramaturgy AST**: `dramatic_plan.json`, `AudiobookAdapter` (verbatim prose & Anti-Swap attribution), `PodcastAdapter` (2-host dynamics), Gate 2.5 Validator | QUEUED (Phase 4) | 8 test suites |
-| **L6** | `origin/tts-system` | `audiobook_factory/tts/` | **Option C 4-Tier TTS Platform Core**: `GenericTTSClient`, `LongFormTTSClient`, `MultiCastStudioClient`, TakeBank, net-silence stitching, float-domain DSP | QUEUED (Phase 5) | 8 test suites |
-| **L7** | `origin/audio-mixing-and-production` | `audiobook_factory/audio/` | **v5.4 AI Vocal Mastering Workstation**: Pure Vocals-Only, 30Hz highpass, 5ms Hann taper, dialogue editorial, Spotify Pedalboard/DeepFilterNet fallbacks, EBU R128 (-19 LUFS) | QUEUED (Phase 6) | 7 test suites |
+| **L4** | `origin/translation` | `audiobook_factory/translation/` | **Option D Standalone Translation**: Single-pass deliberative translation (Gemini Flash `thinking_budget=1024`), macro-chunking, full-text deterministic parity gates, zero audio imports | **MERGED & VERIFIED** | 105/105 Green |
+| **L5** | `origin/dramaturgy` | `audiobook_factory/dramaturgy/`<br/>`audiobook_factory/adapters/` | **Option C Universal Dramaturgy AST**: `dramatic_plan.json`, `AudiobookAdapter` (verbatim prose & Anti-Swap attribution), `PodcastAdapter` (2-host dynamics), Gate 2.5 Validator | **MERGED & VERIFIED** | 56/56 Green |
+| **L6** | `origin/tts-system` | `audiobook_factory/tts/` | **Option C Modular TTS Platform Core**: `GenericTTSClient`, `LongFormTTSClient`, `MultiCastStudioClient`, TakeBank, net-silence stitching, float-domain DSP | **MERGED & VERIFIED** | 61/61 Green |
+| **L7** | `origin/audio-mixing-and-production` | `audiobook_factory/audio/` | **v5.4 AI Vocal Mastering Workstation**: Pure Vocals-Only, 30Hz highpass, 5ms Hann taper, dialogue editorial, Spotify Pedalboard/DeepFilterNet fallbacks, EBU R128 (-19 LUFS) | **QUEUED (Phase 6)** | 7 test suites |
 | **L8** | `origin/Voculs` | `audiobook_factory/dag/`<br/>`sidecars/studio-panel/` | **v6.0 Enterprise DAG Orchestrator**: SQLite WAL `pipeline_ledger.db`, diff reconciler, modular CLI suite, Antigravity Studio Panel sidecar UI extension | QUEUED (Phase 7) | 179/179 Green |
 
 ---
@@ -311,6 +311,47 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
 
 ---
 
+## 5.7 Phase 5 Detailed Blueprint & Execution Sign-Off: `origin/tts-system` (Option C)
+
+### 5.7.1 Objectives & Deliverables
+- **Modular Studio TTS Platform Core Architecture** ([`audiobook_factory/tts/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/)):
+  - **Tier 1 Client Facades** ([`facades/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/)):
+    - [`generic_client.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/generic_client.py): `GenericTTSClient` single-utterance and raw byte stream synthesis.
+    - [`long_form_client.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/long_form_client.py): `LongFormTTSClient` chapter & essay streaming with resume checkpoints.
+    - [`multi_cast_client.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/multi_cast_client.py): `MultiCastStudioClient` ensemble screenplay casting, binding SVCCS profiles and acoustic formants.
+  - **Tier 2 Universal Input Guard & Chunker** ([`guard/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/), [`chunker.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/chunker.py)):
+    - [`input_guard.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/input_guard.py): `UniversalInputGuard` sacred vs. spoken boundary, NFC normalization.
+    - [`numeral_expander.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/numeral_expander.py): `DevanagariNumeralExpander` numerals, currencies (₹, $, €), percentages, units into Hindi words.
+    - [`delivery_extractor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/delivery_extractor.py): `DeliveryIntentExtractor` stage cue scrubbing (`[whispers]`, `(anger)`) into structured `DeliveryIntent`.
+    - [`chunker.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/chunker.py): `SemanticProseChunker` 4-tier hierarchy (Paragraph -> Sentence -> Clause -> Word) with zero mid-word splits.
+  - **Tier 3 Pluggable Model Adapters & Dynamic Registry** ([`providers/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/)):
+    - [`base.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/base.py): `BaseTTSModelAdapter` abstract contract.
+    - [`gemini_adapter.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini_adapter.py): `GeminiTTSAdapter` (123+ key pool, `BLOCK_NONE` creative safety, `[0.30, 0.52]` temperature clamp, Narrator locked at `0.32`).
+    - [`qwen_adapter.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/qwen_adapter.py): `QwenTTSAdapter` (HardwareVRAMGuard local fallback).
+    - [`registry.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/registry.py): `ModelAdapterRegistry` with intelligent fallback cascades.
+  - **Tier 4 Quality Gates, 4D Formants & Editorial DSP** ([`dsp/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/dsp/), [`quality_gate.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/quality_gate.py), [`formant_sculptor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/formant_sculptor.py), [`take_bank_manager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/take_bank_manager.py)):
+    - [`quality_gate.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/quality_gate.py): `TwoTierAudioQualityGate` (Acoustic math metrics + Phonetic omission checks).
+    - [`formant_sculptor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/formant_sculptor.py): `FormantSculptor` 4D biquad parametric EQ with headroom pre-attenuation and soft tanh limiting.
+    - [`take_bank_manager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/take_bank_manager.py): `TakeBankManager` candidate takes (standard, restraint, vulnerable) auditioning & scoring.
+    - [`editorial.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/dsp/editorial.py): `ZeroCrossingAligner`, `HannFadeProcessor` (12ms in / 18ms out), `NetSilenceProcessor`.
+  - **Tier 5 Core Orchestrator & Backward Compatibility** ([`core_orchestrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/core_orchestrator.py)):
+    - `TTSCoreOrchestrator` full lifecycle coordination.
+    - 100% backward-compatible re-exports in [`audiobook_factory/tts/__init__.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/__init__.py) and [`audiobook_factory/tts_dispatcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts_dispatcher.py).
+    - Exposed `tts` subcommand in [`audiobook_cli.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_cli.py) and registered lazy imports in [`audiobook_factory/__init__.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/__init__.py).
+
+### 5.7.2 Forensic Verification & Audit Ledger (Phase 5 Sign-Off)
+1. **Commit Chain**:
+   - `f5c99fd`: *feat(tts): merge Studio TTS Platform Core (Phase 5) from origin/tts-system into main*
+   - `5655c12`: *feat(cli,tts): register modular TTS symbols in lazy imports and wire tts CLI subcommand*
+2. **Adversarial Hardening Highlights**:
+   - Unified DC bias normalization condition in `audio_qc_agent.py` to preserve rail-clipped audio detection while correcting minor drift.
+   - Synchronized `KeyLeaseManager` delegation with `global_key_pool` in `key_manager.py`.
+   - Verified studio temperature clamping range `[0.30, 0.52]` across `test_canonical_path_integration.py`.
+   - 61/61 dedicated tests in `tests/tts/` green (100%).
+3. **Sign-Off Status**: COMPLETED, AUDITED, HARDENED, & OFFICIALLY SIGNED OFF. Ready for Phase 6 (`origin/audio-mixing-and-production`).
+
+---
+
 ## 6. Forward Milestones Summary
 
 | Phase | Subsystem | Status | Target Test Baseline | Key Deliverable |
@@ -320,8 +361,8 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
 | **Phase 3** | Standalone Translation (Option D) | **COMPLETED & VERIFIED** | 105/105 + 225+ Unified Green | Single-Pass Macro-Chunker, DeterministicParityGate & Gateway Bridge (`origin/translation`) |
 | **Room 1.5** | Standalone Glossary & Metadata | **COMPLETED & VERIFIED** | 8/8 + 28/28 Unified Green | Multi-Consumer Projections, Tri-Partite Taxonomy & Zero-Token Fast Path (`audiobook_factory/glossary/`) |
 | **Phase 4** | Universal Dramaturgy (Option C) | **COMPLETED & VERIFIED** | 54/54 + 56/56 + 1,025+ Green | Chapter Dramatic AST, Dual-Host Adapters, Studio Certification & Packaging (`origin/dramaturgy`) |
-| **Phase 5** | Studio TTS Platform Core | **READY TO EXECUTE** | ~1,150 Tests | 4-Tier TTS Engine, TakeBank & Net-Silence (`origin/tts-system`) |
-| **Phase 6** | Pro-Grade AI Vocal Mastering | Queued | ~1,200 Tests | C++ JUCE / FFmpeg Vocal Mastering & M4B (`origin/audio-mixing-and-production`) |
+| **Phase 5** | Studio TTS Platform Core | **COMPLETED & VERIFIED** | 61/61 + ~1,120+ Unified Green | 5-Tier Modular TTS Platform Core, TakeBank & Net-Silence (`origin/tts-system`) |
+| **Phase 6** | Pro-Grade AI Vocal Mastering | **READY TO EXECUTE** | ~1,200 Tests | C++ JUCE / FFmpeg Vocal Mastering & M4B (`origin/audio-mixing-and-production`) |
 | **Phase 7** | Enterprise DAG Orchestrator & UI | Queued | ~1,250 Tests | SQLite WAL Pipeline Ledger & Studio Panel UI (`origin/Voculs`) |
 
 
