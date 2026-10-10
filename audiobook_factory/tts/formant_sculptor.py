@@ -70,6 +70,9 @@ class FormantSculptor:
         """
         Applies calibrated parametric EQ filters corresponding to the FormantProfile on 16-bit PCM.
         """
+        if sample_rate <= 0 or not pcm_bytes:
+            return pcm_bytes
+
         if isinstance(profile, str):
             try:
                 profile = FormantProfile(profile.lower())
@@ -77,7 +80,58 @@ class FormantSculptor:
                 profile = FormantProfile.NEUTRAL
 
         filters = cls.EQ_PRESETS.get(profile, [])
-        if not filters or not pcm_bytes:
+        return cls.apply_custom_filters(pcm_bytes, filters, sample_rate=sample_rate)
+
+    @classmethod
+    def apply_spectral_formant_profile(
+        cls,
+        pcm_bytes: bytes,
+        spectral_profile: Any,
+        sample_rate: int = 24000,
+    ) -> bytes:
+        """
+        Bridges Room 3.5 (SVCCS) SpectralFormantProfile directly into FormantSculptor PCM DSP.
+        Applies surgical analog-style EQ offsets (+/- 2-3 dB at 150 Hz, 2.8 kHz, 3.2 kHz, 8 kHz).
+        """
+        if sample_rate <= 0 or not pcm_bytes or not spectral_profile:
+            return pcm_bytes
+
+        filters: List[Tuple[float, float, float]] = []
+
+        # Extract attributes from SpectralFormantProfile object or dict
+        if isinstance(spectral_profile, dict):
+            chest = float(spectral_profile.get("chest_resonance_150hz_db", 0.0))
+            nasal = float(spectral_profile.get("nasal_presence_2800hz_db", 0.0))
+            throat = float(spectral_profile.get("throat_clarity_3200hz_db", 0.0))
+            air = float(spectral_profile.get("air_shelf_8000hz_db", 0.0))
+        else:
+            chest = float(getattr(spectral_profile, "chest_resonance_150hz_db", 0.0))
+            nasal = float(getattr(spectral_profile, "nasal_presence_2800hz_db", 0.0))
+            throat = float(getattr(spectral_profile, "throat_clarity_3200hz_db", 0.0))
+            air = float(getattr(spectral_profile, "air_shelf_8000hz_db", 0.0))
+
+        if abs(chest) >= 0.2:
+            filters.append((150.0, chest, 1.2))
+        if abs(nasal) >= 0.2:
+            filters.append((2800.0, nasal, 1.4))
+        if abs(throat) >= 0.2:
+            filters.append((3200.0, throat, 1.4))
+        if abs(air) >= 0.2:
+            filters.append((8000.0, air, 1.0))
+
+        return cls.apply_custom_filters(pcm_bytes, filters, sample_rate=sample_rate)
+
+    @classmethod
+    def apply_custom_filters(
+        cls,
+        pcm_bytes: bytes,
+        filters: List[Tuple[float, float, float]],
+        sample_rate: int = 24000,
+    ) -> bytes:
+        """
+        Applies an arbitrary list of biquad peaking EQ filters (center_hz, gain_db, q) on 16-bit PCM.
+        """
+        if sample_rate <= 0 or not filters or not pcm_bytes:
             return pcm_bytes
 
         # Unpack 16-bit signed PCM samples into float
@@ -118,7 +172,7 @@ class FormantSculptor:
         """
         Implements a standard 2nd-order Peaking EQ Biquad Filter (Robert Bristow-Johnson Audio EQ Cookbook).
         """
-        if abs(gain_db) < 0.05:
+        if sample_rate <= 0 or center_hz <= 0.0 or abs(gain_db) < 0.05:
             return samples
 
         # Guard against Nyquist limit
@@ -126,7 +180,7 @@ class FormantSculptor:
             return samples
 
         A = 10.0 ** (gain_db / 40.0)
-        w0 = 2.0 * math.pi * center_hz / sample_rate
+        w0 = 2.0 * math.pi * center_hz / float(sample_rate)
         alpha = math.sin(w0) / (2.0 * max(0.1, q))
 
         b0 = 1.0 + alpha * A

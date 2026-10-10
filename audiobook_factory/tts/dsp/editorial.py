@@ -120,9 +120,8 @@ class NetSilenceProcessor:
 
     @classmethod
     def measure_tail_decay_ms(cls, pcm_bytes: bytes, sample_rate: int = 24000) -> int:
-        """Measures trailing room tone / acoustic decay in milliseconds."""
         sample_count = len(pcm_bytes) // 2
-        if sample_count == 0:
+        if sample_count == 0 or sample_rate <= 0:
             return 0
 
         samples = struct.unpack(f"<{sample_count}h", pcm_bytes)
@@ -140,7 +139,7 @@ class NetSilenceProcessor:
     def measure_head_margin_ms(cls, pcm_bytes: bytes, sample_rate: int = 24000) -> int:
         """Measures pre-speech silence margin in milliseconds."""
         sample_count = len(pcm_bytes) // 2
-        if sample_count == 0:
+        if sample_count == 0 or sample_rate <= 0:
             return 0
 
         samples = struct.unpack(f"<{sample_count}h", pcm_bytes)
@@ -172,6 +171,8 @@ class NetSilenceProcessor:
     @classmethod
     def generate_silence_pcm(cls, duration_ms: int, sample_rate: int = 24000) -> bytes:
         """Generates zero-amplitude 16-bit mono silence PCM bytes."""
+        if sample_rate <= 0 or duration_ms <= 0:
+            return b""
         num_samples = int(sample_rate * (duration_ms / 1000.0))
         return b"\x00\x00" * num_samples
 
@@ -198,6 +199,7 @@ class EditorialDSPEngine:
         if not chunks_pcm:
             return b"", 0.0
 
+        effective_sample_rate = max(1, sample_rate)
         output_buffers: List[bytes] = []
         total_samples = 0
 
@@ -217,7 +219,7 @@ class EditorialDSPEngine:
 
             # 2. Apply Hann micro-fades
             faded_pcm = HannFadeProcessor.apply_hann_micro_fades(
-                raw_pcm, sample_rate=sample_rate, apply_tpdf_dither=True
+                raw_pcm, sample_rate=effective_sample_rate, apply_tpdf_dither=True
             )
             output_buffers.append(faded_pcm)
             total_samples += len(faded_pcm) // 2
@@ -225,9 +227,9 @@ class EditorialDSPEngine:
             # 2. If not the last chunk, calculate and insert net silence
             if idx < len(chunks_pcm) - 1:
                 target_pause = target_pauses_ms[idx] if idx < len(target_pauses_ms) else 350
-                tail_decay = NetSilenceProcessor.measure_tail_decay_ms(raw_pcm, sample_rate=sample_rate)
+                tail_decay = NetSilenceProcessor.measure_tail_decay_ms(raw_pcm, sample_rate=effective_sample_rate)
                 next_raw = chunks_pcm[idx + 1]
-                head_margin = NetSilenceProcessor.measure_head_margin_ms(next_raw, sample_rate=sample_rate)
+                head_margin = NetSilenceProcessor.measure_head_margin_ms(next_raw, sample_rate=effective_sample_rate)
 
                 net_pause_ms = NetSilenceProcessor.calculate_net_silence_ms(
                     target_pause_ms=target_pause,
@@ -235,10 +237,10 @@ class EditorialDSPEngine:
                     head_margin_ms=head_margin,
                 )
 
-                silence_pcm = NetSilenceProcessor.generate_silence_pcm(net_pause_ms, sample_rate=sample_rate)
+                silence_pcm = NetSilenceProcessor.generate_silence_pcm(net_pause_ms, sample_rate=effective_sample_rate)
                 output_buffers.append(silence_pcm)
                 total_samples += len(silence_pcm) // 2
 
         full_pcm = b"".join(output_buffers)
-        total_dur = total_samples / float(sample_rate)
+        total_dur = total_samples / float(effective_sample_rate)
         return full_pcm, total_dur

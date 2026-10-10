@@ -8,11 +8,12 @@
 [![Control Plane](https://img.shields.io/badge/Control%20Plane-ModelGateway%20%26%20KeyLease-blueviolet.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models)
 [![Fleet Health](https://img.shields.io/badge/Active%20Fleet-123%20Keys%20(Zero--Secret)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/CLI_REFERENCE.md#12-key-inventory--fleet-monitor-keys)
 [![TTS Engine](https://img.shields.io/badge/TTS-Google%20Gemini%20Flash%20TTS-green.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GEMINI_TTS_SYNTHESIS_AND_DIRECTING.md)
+[![TTS Platform Core](https://img.shields.io/badge/TTS%20Platform%20Core-Option%20C%20(100%25%20Certified)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)
 [![Voice Casting](https://img.shields.io/badge/Voice%20Casting-Option%20C%20(2%2C089%20Voices)-blue.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_VOICE_CASTING_AND_CALIBRATION.md)
 [![Audiobook Master](https://img.shields.io/badge/Audiobook%20Master-EBU%20R128%20(-19%20LUFS)-purple.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/AUDIO_ENGINEERING.md)
 [![Podcast Master](https://img.shields.io/badge/Podcast%20Master-EBU%20R128%20(-16%20LUFS)-indigo.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 [![Certification](https://img.shields.io/badge/Certification-8--Pillar%20Studio%20Harness-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/QUALITY_GATES.md)
-[![Tests](https://img.shields.io/badge/Tests-880%2B%20100%25%20Passing-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests)
+[![Tests](https://img.shields.io/badge/Tests-882%2F882%20Passing%20(100%25)-brightgreen.svg)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/tests)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
 ---
@@ -92,10 +93,11 @@ flowchart TD
         G29["PreSynthesisGate & LLMPreSynthesisJudge<br/>• Tier 1: Deterministic Fast-Path (Whitelist & Acoustic Clamping)<br/>• Tier 2: Adversarial LLM Attribution Judge (123+ Key Pool)"]
     end
 
-    subgraph Room4["🎙️ Room 4: 4D Formants & Voice Performance"]
-        Caster["Character Caster & 4D Acoustic Formants<br/>Pitch Δ (+/-4-12%), Tempo & Parametric EQ Curves"]
-        Caster --> TTS["Gemini Flash TTS Key Pool (120+ Active Keys)<br/>Prosodic Acting, Speech Tags & Breath Marks"]
-        TTS --> Editorial["Dialogue Editorial Layer (DE-01 - DE-07)<br/>Endpoint Snapping, Hann Micro-Fades & Turn Latency"]
+    subgraph Room4["🎙️ Room 4: Studio TTS Platform Core (Option C)"]
+        Facades["Client Facades<br/>• GenericTTSClient (Single Utterance)<br/>• LongFormTTSClient (Prose Streams)<br/>• MultiCastStudioClient (Ensemble Screenplay)"]
+        Facades --> SharedCore["Shared Core: Universal Input Guards & 4-Tier Chunker"]
+        SharedCore --> AdaptersTTS["Pluggable Adapters: Gemini 3.8 Flash & Qwen3-TTS"]
+        AdaptersTTS --> Editorial["Editorial DSP: Hann Fades, Net Silence & 4D Formants"]
     end
 
     subgraph Room5["🎛️ Room 5: Broadcast Mastering & Multi-Format Packaging"]
@@ -164,6 +166,14 @@ Deterministic, automated pre-release certification covering:
 - **P6 Loudness**: EBU R128 loudness compliance (-19.0 LUFS for Audiobooks / -16.0 LUFS for Podcasts).
 - **P7 Spatial**: 2-Host spatial azimuth separation ($-0.25$ Left / $+0.25$ Right).
 - **P8 Packaging**: Valid `.m4b` / `.m4a` containers, TOC seek table monotonicity, and square cover art.
+
+### 5. Modular Studio TTS Platform Core (Option C)
+- **Specialized Client Facades**: Dedicated high-level entrypoints for ad-hoc speech ([`GenericTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/generic_client.py)), continuous novel prose ([`LongFormTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/long_form_client.py)), and ensemble multi-character dramas ([`MultiCastStudioClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/multi_cast_client.py)).
+- **Universal Input Guards**: Deterministic phonetization of Devanagari numerals ($0-9, ०-९$), currencies ($\$, ₹, €$), percentages, and units via [`NumeralAndTokenExpander`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/numeral_expander.py) while preserving sacred authorial prose.
+- **4-Tier Semantic Prose Chunker**: Decomposes text along Scene $\to$ Paragraph $\to$ Sentence $\to$ Clause boundaries (80–160 words) with zero mid-word cuts.
+- **Pluggable Model Adapters**: Dual-provider architecture supporting **Google Gemini 3.8 Flash Cloud TTS** and local **Qwen3-TTS** registered in [`ModelAdapterRegistry`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/registry.py).
+- **Two-Tier Quality Gate**: Sub-5ms mathematical acoustic probe (peak $\ge 1500$, $-52 \le \text{RMS} \le -6\text{ dBFS}$, zero dead air) and phonetic duration ratio validation.
+- **Editorial DSP & Formant Sculpting**: 12ms/18ms Hann micro-fades, net-silence dynamic pause subtraction, 2nd-order biquad peaking EQ formants, and TakeBank multi-take auditioning.
 
 ---
 
@@ -262,6 +272,61 @@ audiobook-cli master my_project
 audiobook-cli package my_project --format both --cover "cover.jpg"
 ```
 
+### Ad-Hoc Speech Synthesis (`tts`)
+```bash
+# 1. Quick audition of a narrator voice in English via GenericTTSClient
+audiobook-cli tts "Welcome to the studio production line." --voice Puck --out welcome.wav
+
+# 2. Devanagari Hindi text with automatic numeral, currency & unit phonetization
+audiobook-cli tts "अध्याय ५: व्यापारी ने उसे ₹५०० और $२० दिए।" --voice Aoede --model gemini-3.8-flash --out hindi_sample.wav
+
+# 3. Direct execution via python module
+python audiobook_cli.py tts "Character voice test sequence." --voice Charon --out test_charon.wav
+```
+
+---
+
+## 🐍 Python API Quickstart: Modular TTS Platform Core
+
+The modular TTS Platform Core provides clean facades for direct programmatic integration:
+
+```python
+from pathlib import Path
+from audiobook_factory.tts import (
+    GenericTTSClient,
+    LongFormTTSClient,
+    MultiCastStudioClient,
+    DeliveryIntent,
+)
+
+# 1. Ad-Hoc Single Utterance (<800ms)
+client = GenericTTSClient()
+saved_path, chunk, validation = client.speak(
+    text="नमस्ते दुनिया! आज का तापमान 25°C है और लागत ₹500 है।",
+    voice="Aoede",
+    model="gemini-3.8-flash",
+    output_path=Path("output/hello_hindi.wav"),
+)
+print(f"[+] Saved to: {saved_path} (Duration: {chunk.duration_sec:.2f}s, Status: {validation.status})")
+
+# 2. In-Memory RIFF WAV Stream (for APIs & Webhooks)
+wav_bytes = client.speak_to_bytes(
+    text="Direct in-memory speech synthesis with zero disk I/O.",
+    voice="Puck",
+)
+print(f"[+] In-memory audio size: {len(wav_bytes)} bytes")
+
+# 3. Long-Form Novel Prose with 4-Tier Semantic Chunking & Checkpoints
+long_client = LongFormTTSClient()
+out_wav, total_sec, chunks = long_client.synthesize_prose(
+    text="लंबा गद्य पाठ यहाँ जाएगा...",
+    output_path=Path("output/prose_stream.wav"),
+    voice="Puck",
+    target_words_per_chunk=120,
+)
+print(f"[+] Prose stream complete: {total_sec:.2f}s across {len(chunks)} semantic chunks")
+```
+
 ---
 
 ## 🔌 Antigravity Plugin Ecosystem
@@ -324,6 +389,8 @@ All quality gates are fail-closed:
 
 For exhaustive technical guides, visit the [`docs/`](docs/) directory and subsystem manuals:
 - [🏛️ Option C Architecture Blueprint](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md)
+- [🎙️ Studio TTS Platform Core Specification (Option C)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)
+- [📚 Comprehensive API Reference Manual](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/API_REFERENCE.md)
 - [🎙️ Room 3.5: Studio Voice Casting & Acoustic Calibration Engine](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_VOICE_CASTING_AND_CALIBRATION.md)
 - [🎙️ 2-Host Podcast System Architecture](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 - [🎭 Dramaturgy & Multi-Format Adaptation System](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/DRAMATURGY_AND_ADAPTATION_SYSTEM.md)

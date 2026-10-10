@@ -214,7 +214,7 @@ def main():
             cmd_podcast(a)
 
     def _handle_tts(a):
-        from audiobook_factory.tts.facades.generic_client import GenericTTSClient
+        from audiobook_factory import GenericTTSClient
         client = GenericTTSClient(model=a.model, default_voice=a.voice)
         print(f"[*] Synthesizing speech via GenericTTSClient ({a.model}, voice: {a.voice})...")
         out_path = Path(a.out)

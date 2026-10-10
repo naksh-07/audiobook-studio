@@ -193,6 +193,13 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
                 )
                 time.sleep(1.0 * attempt)
 
+            except json.JSONDecodeError as e:
+                last_error = RuntimeError(f"Gemini TTS returned malformed non-JSON payload: {e}")
+                logger.warning(
+                    f"[!] Gemini TTS attempt {attempt}/{self.max_retries} received malformed JSON on key {key_preview}: {e}"
+                )
+                time.sleep(1.0 * attempt)
+
             except Exception as e:
                 last_error = e
                 logger.warning(

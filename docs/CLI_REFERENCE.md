@@ -35,7 +35,8 @@ python audiobook_cli.py [COMMAND] [OPTIONS]
 | **[`synthesize`](#10-speech-synthesis-synthesize)** | Audio (TTS) | WAV Chunks | Synthesizes dialogue segments via Gemini Flash TTS with 4D formants. |
 | **[`master`](#11-vocal-dsp-mastering-master)** | Mastering | Master WAV | Concatenates segments with Hann micro-fades and normalizes to broadcast EBU R128. |
 | **[`keys`](#12-key-inventory--fleet-monitor-keys)** | Control Plane | Fleet Status | Inspects key fleet status, active leases (`Concurrency = 1`), audit logs, and resets quotas. |
-| **[`podcast-cli`](#13-modular-podcast-subsystem-cli)** | Modular Engine | Subsystem | Dedicated CLI for granular podcast workflows (`produce`, `script`, `render`, `inspect`). |
+| **[`tts`](#13-ad-hoc-speech-synthesis-tts)** | Utterance / Audition | `output.wav` | Ad-hoc speech synthesis via modular TTS Platform Core ([`GenericTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/generic_client.py)). |
+| **[`podcast-cli`](#14-modular-podcast-subsystem-cli)** | Modular Engine | Subsystem | Dedicated CLI for granular podcast workflows (`produce`, `script`, `render`, `inspect`). |
 
 ---
 
@@ -536,7 +537,52 @@ python audiobook_cli.py keys reset
 
 ---
 
-## 13. Modular Podcast Subsystem CLI
+## 13. Ad-Hoc Speech Synthesis (`tts`)
+
+Synthesizes ad-hoc speech from arbitrary text or literary prompts directly via the modular **TTS Platform Core** ([`audiobook_factory.tts`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/__init__.py)) using [`GenericTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/generic_client.py).
+
+```bash
+audiobook-cli tts "<TEXT>" [OPTIONS]
+# or:
+python audiobook_cli.py tts "<TEXT>" [OPTIONS]
+```
+
+### Positional Arguments
+- `<TEXT>`: The sentence, dialogue line, or text prompt to synthesize. Supports English prose and Devanagari Hindi text with automatic numeral, currency, and acronym expansion.
+
+### Options
+| Option | Type | Default | Description |
+|---|:---:|:---:|---|
+| `--voice` | String | `Puck` | Neural voice identifier (e.g. `Puck`, `Aoede`, `Charon`, `Fenrir`, `Kore`, `Zephyr`). |
+| `--model` | String | `gemini-3.8-flash` | TTS model engine (e.g. `gemini-3.8-flash`, `gemini-2.5-flash`, `qwen3-tts`). |
+| `--out` | Path | `output.wav` | Output destination path for the 16-bit PCM RIFF WAV audio file. |
+
+### Technical Architecture & Behavior
+1. **Universal Input Guard**: Sanitizes text through [`UniversalInputGuard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/input_guard.py), eliminating C0 control chars, normalizing Unicode to NFC, and extracting bracketed delivery intent (`[whispering]`).
+2. **Deterministic Phonetization**: Automatically converts all inline digits ($0-9, ०-९$), currencies ($\$, ₹, €$), percentages, and units into spoken Hindi words via [`NumeralAndTokenExpander`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/numeral_expander.py) (aliased as `DevanagariNumeralExpander`).
+3. **Pluggable Model Dispatch**: Routes request through [`ModelAdapterRegistry`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/registry.py) to [`GeminiTTSAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini_adapter.py) or [`QwenTTSAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/qwen_adapter.py).
+4. **Two-Tier Quality Audit**: Audits synthesized waveform via [`TwoTierAudioQualityGate`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/quality_gate.py) (Peak $\ge 1500$, $-52 \le \text{RMS} \le -6\text{ dBFS}$, $|DC| \le 0.05$, zero dead air) before disk write.
+5. **Ultra-Low Latency**: Delivers pristine, broadcast-ready 24kHz 16-bit linear PCM WAV output in $< 800\text{ms}$.
+
+### Examples
+
+```bash
+# 1. Quick audition of a narrator voice in English
+audiobook-cli tts "Welcome to the studio production line." --voice Puck --out welcome.wav
+
+# 2. Devanagari Hindi text with automatic numeral and currency phonetization
+audiobook-cli tts "अध्याय ५: व्यापारी ने उसे ₹५०० और $२० दिए।" --voice Aoede --model gemini-3.8-flash --out hindi_sample.wav
+
+# 3. Dramatic character voice audition with Charon
+audiobook-cli tts "मैं पीछे नहीं हटूंगा, चाहे जो भी हो जाए।" --voice Charon --out dramatic_test.wav
+
+# 4. Custom output path with alternative model
+python audiobook_cli.py tts "System diagnostics fully operational." --voice Fenrir --model gemini-2.5-flash --out tests/audio/diag.wav
+```
+
+---
+
+## 14. Modular Podcast Subsystem CLI
 
 For granular control over individual stages of technical document verbalization and production, use the standalone module CLI [`audiobook_factory.podcast.cli`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/cli.py):
 
@@ -604,7 +650,7 @@ Output includes total spoken turns, total word count, estimated runtime, cast co
 
 ---
 
-## 14. 📦 Archived Subsystems Notice
+## 15. 📦 Archived Subsystems Notice
 
 The legacy subcommands (`direct`, `render`, `bgm`, `stems`, `bank`) belong to the decoupled 5-track cinematic audio engine and are archived in `archive/cinematic_audio/`. They are not part of the active Vocals-Only pipeline.
 
@@ -612,6 +658,7 @@ The legacy subcommands (`direct`, `render`, `bgm`, `stems`, `bank`) belong to th
 
 ## 🔗 Related Documentation
 - [🏛️ Option C Architecture Blueprint](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md)
+- [🎙️ TTS Platform Core Architecture Specification](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)
 - [🎙️ Podcast System Architecture](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 - [🎭 Dramaturgy & Adaptation System](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/DRAMATURGY_AND_ADAPTATION_SYSTEM.md)
 - [📚 Glossary & Chapter Metadata Subsystem](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/GLOSSARY_AND_METADATA_SUBSYSTEM.md)

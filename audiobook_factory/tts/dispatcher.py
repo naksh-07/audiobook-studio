@@ -177,8 +177,11 @@ class TTSDispatcher:
         self.pronunciation_repair = PronunciationRepairEngine(auditor=self.pronunciation_auditor)
 
         # Formal Cast Lock Subsystem (Wave 1 Upgrade)
-        from audiobook_factory.casting import CastLockManager
-        self.cast_lock_manager = CastLockManager(self.project_dir)
+        try:
+            from audiobook_factory.casting import CastLockManager
+            self.cast_lock_manager = CastLockManager(self.project_dir)
+        except (ImportError, ModuleNotFoundError):
+            self.cast_lock_manager = None
 
         # Character Voice DNA & Reference Subsystems (Wave 2 Upgrade)
         from audiobook_factory.identity import VoiceDNABank, ReferenceVoiceBank

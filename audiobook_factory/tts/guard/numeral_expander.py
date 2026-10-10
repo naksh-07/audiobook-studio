@@ -232,3 +232,7 @@ class NumeralAndTokenExpander:
             else:
                 res.append(c)
         return "".join(res)
+
+
+# Alias for spec and backward compatibility
+DevanagariNumeralExpander = NumeralAndTokenExpander

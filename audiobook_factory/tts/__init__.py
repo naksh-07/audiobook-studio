@@ -18,6 +18,7 @@ from audiobook_factory.tts.contracts import (
 from audiobook_factory.tts.guard import (
     UniversalInputGuard,
     NumeralAndTokenExpander,
+    DevanagariNumeralExpander,
     DeliveryIntentExtractor,
     number_to_hindi_words,
 )
@@ -111,6 +112,7 @@ __all__ = [
     "ChapterMasterResult",
     "UniversalInputGuard",
     "NumeralAndTokenExpander",
+    "DevanagariNumeralExpander",
     "DeliveryIntentExtractor",
     "number_to_hindi_words",
     "BaseTTSModelAdapter",

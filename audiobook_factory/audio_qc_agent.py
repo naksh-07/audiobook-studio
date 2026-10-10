@@ -112,8 +112,8 @@ class AudioQCAgent:
         clean_bytes = np.clip(np.round(samples), -32768, 32767).astype(np.int16).tobytes()
 
         telemetry = {
-            "original_duration_sec": round(total_samples / rate, 3),
-            "clean_duration_sec": round(len(samples) / rate, 3),
+            "original_duration_sec": round(total_samples / float(rate), 3) if rate > 0 else 0.0,
+            "clean_duration_sec": round(len(samples) / float(rate), 3) if rate > 0 else 0.0,
             "trimmed_dead_air_ms": trimmed_dead_air_ms,
             "anomalies_removed": anomalies,
         }
