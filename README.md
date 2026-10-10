@@ -359,11 +359,14 @@ xcopy /E /I /Y . "%USERPROFILE%\.gemini\config\plugins\audiobook-studio"
 
 ## 🧪 Verification & Quality Testing
 
-Audiobook Studio is certified by 1,126 passing automated unit, integration, and contract tests (100% green):
+Audiobook Studio is certified by 1,183 passing automated unit, integration, and contract tests (100% green across 1,191 test matrix):
 
 ```bash
 # Run complete test suite
 pytest tests/ -v
+
+# Run Room 5 vocal mastering and audio production tests
+pytest tests/audio/ tests/test_audio_production_e2e_pilot.py -v
 
 # Run Option C dramaturgy and SPU alignment tests
 pytest tests/test_dramaturgy_spu_alignment.py tests/test_dialogue_attribution_auditor.py -v

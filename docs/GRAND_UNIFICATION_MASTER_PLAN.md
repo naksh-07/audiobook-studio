@@ -43,8 +43,8 @@ All 8 specialized branches fork from common baseline `308e0eb` (`v5.2`):
 | **L4** | `origin/translation` | `audiobook_factory/translation/` | **Option D Standalone Translation**: Single-pass deliberative translation (Gemini Flash `thinking_budget=1024`), macro-chunking, full-text deterministic parity gates, zero audio imports | **MERGED & VERIFIED** | 105/105 Green |
 | **L5** | `origin/dramaturgy` | `audiobook_factory/dramaturgy/`<br/>`audiobook_factory/adapters/` | **Option C Universal Dramaturgy AST**: `dramatic_plan.json`, `AudiobookAdapter` (verbatim prose & Anti-Swap attribution), `PodcastAdapter` (2-host dynamics), Gate 2.5 Validator | **MERGED & VERIFIED** | 56/56 Green |
 | **L6** | `origin/tts-system` | `audiobook_factory/tts/` | **Option C Modular TTS Platform Core**: `GenericTTSClient`, `LongFormTTSClient`, `MultiCastStudioClient`, TakeBank, net-silence stitching, float-domain DSP | **MERGED & VERIFIED** | 61/61 Green |
-| **L7** | `origin/audio-mixing-and-production` | `audiobook_factory/audio/` | **v5.4 AI Vocal Mastering Workstation**: Pure Vocals-Only, 30Hz highpass, 5ms Hann taper, dialogue editorial, Spotify Pedalboard/DeepFilterNet fallbacks, EBU R128 (-19 LUFS) | **QUEUED (Phase 6)** | 7 test suites |
-| **L8** | `origin/Voculs` | `audiobook_factory/dag/`<br/>`sidecars/studio-panel/` | **v6.0 Enterprise DAG Orchestrator**: SQLite WAL `pipeline_ledger.db`, diff reconciler, modular CLI suite, Antigravity Studio Panel sidecar UI extension | QUEUED (Phase 7) | 179/179 Green |
+| **L7** | `origin/audio-mixing-and-production` | [`audiobook_factory/audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/) | **v5.4 AI Vocal Mastering Workstation**: Pure Vocals-Only, 30Hz highpass, 5ms Hann taper, dialogue editorial, Spotify Pedalboard/DeepFilterNet fallbacks, EBU R128 (-19 LUFS) | **MERGED & VERIFIED** | 57/57 Dedicated + 1,183 Full Suite Green |
+| **L8** | `origin/Voculs` | `audiobook_factory/dag/`<br/>`sidecars/studio-panel/` | **v6.0 Enterprise DAG Orchestrator**: SQLite WAL `pipeline_ledger.db`, diff reconciler, modular CLI suite, Antigravity Studio Panel sidecar UI extension | **READY TO EXECUTE (Phase 7)** | 179/179 Green |
 
 ---
 
@@ -359,6 +359,32 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
 
 ---
 
+## 5.8 Phase 6 Detailed Blueprint & Execution Sign-Off: `origin/audio-mixing-and-production` (v5.4)
+
+### 5.8.1 Objectives & Deliverables
+- **Room 5 Pro-Grade AI Vocal Mastering Workstation** ([`audiobook_factory/audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/)):
+  - **Contracts & Configuration** ([`contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py)): Canonical Pydantic schemas (`DSPConfig`, `QAAuditConfig`, `QAAuditResult`, `EnhancerConfig`, `SpectrumMatchConfig`, `SegmentHashRecord`, `ChapterManifestLedger`).
+  - **C++ JUCE Vocal DSP Processor** ([`dsp.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py)): `VocalDSPProcessor` coordinating Spotify Pedalboard 4-band vocal parametric EQ (75Hz subsonic cut, 320Hz boxiness reduction, 3.2kHz presence lift), optical vocal compressor, True Peak limiter ($\le -1.5\text{ dBTP}$), and seamless deterministic FFmpeg dual-pass linear loudnorm fallback (-19.0 LUFS vocal target).
+  - **Forensic Audio QA Auditor** ([`qa_auditor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py)): `AudioQAAuditor` energy VAD, speaking rate bounds (75–240 WPM), repetition loops, dropouts, and perceptual MOS score estimator.
+  - **Neural Vocal Polish & Noise Reduction** ([`enhancer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/enhancer.py)): `NeuralVocalEnhancer` DeepFilterNet3 neural polish with selective $>45\text{dB}$ SNR auto-bypass to protect pristine studio stems.
+  - **Reference Spectrum Matcher** ([`reference_matcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/reference_matcher.py)): `ReferenceSpectrumMatcher` Matchering 2.0 FFT spectral matching with strict $\pm 3.0\text{dB}$ clamp to prevent acoustic distortion.
+  - **Chapter Segment Ledger & Hot Patcher** ([`ledger.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/ledger.py), [`hot_patcher.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/hot_patcher.py)): `ChapterSegmentLedger` DAG segment hashing and `SingleSegmentHotPatcher` enabling $<0.2\text{s}$ surgical line repair without re-synthesizing or re-mastering entire chapters.
+  - **Stream Composer & Editorial Bridge** ([`stream_composer.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/stream_composer.py), [`editorial.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/editorial.py)): Syntactic punctuation pauses, speaker stereo staging, Hann micro-fades (12ms in / 18ms out), and dialogue turn latency snapping.
+  - **Chapter Packaging & Delivery** ([`packager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/packager.py), [`encoder.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/encoder.py)): `ChapterDeliveryEncoder` (192k AAC single pass) and `M4BBookPackager` (`-map_chapters 1` monotonic TOC and cover art packaging).
+  - **MCP Server & Unified CLI**: [`audiobook_factory/mcp/server.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py) and CLI subcommands `dsp`, `qa-audit`, `enhance`, `match-ref`.
+
+### 5.8.2 Forensic Verification & Audit Ledger (Phase 6 Sign-Off)
+1. **Commit Chain**:
+   - `ed446a8`: *feat(audio): merge Phase 6 Pro-Grade AI Vocal Mastering Workstation (v5.4)*
+2. **Dedicated Audio Test Matrix**:
+   - `tests/audio/` + `tests/test_audio_production_e2e_pilot.py`: **57 / 57 passed** (100% green).
+   - Cross-module mastering & contracts: **82 / 82 passed** (100% green).
+3. **Full Regression Test Matrix**:
+   - **1,183 passed, 8 skipped, 0 failures** across all 1,191 tests in the repository (100% green).
+4. **Sign-Off Status**: COMPLETED, AUDITED, HARDENED, & OFFICIALLY SIGNED OFF. Ready for Phase 7 (`origin/Voculs`).
+
+---
+
 ## 6. Forward Milestones Summary
 
 | Phase | Subsystem | Status | Target Test Baseline | Key Deliverable |
@@ -369,8 +395,8 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
 | **Room 1.5** | Standalone Glossary & Metadata | **COMPLETED & VERIFIED** | 8/8 + 28/28 Unified Green | Multi-Consumer Projections, Tri-Partite Taxonomy & Zero-Token Fast Path (`audiobook_factory/glossary/`) |
 | **Phase 4** | Universal Dramaturgy (Option C) | **COMPLETED & VERIFIED** | 54/54 + 56/56 + 1,025+ Green | Chapter Dramatic AST, Dual-Host Adapters, Studio Certification & Packaging (`origin/dramaturgy`) |
 | **Phase 5** | Studio TTS Platform Core & Control Plane Hardening | **COMPLETED & VERIFIED** | 1,121/1,121 Unified Green | 5-Tier Modular TTS Platform Core, ModelGateway Bridge, TakeBank & Net-Silence (`origin/tts-system`) |
-| **Phase 6** | Pro-Grade AI Vocal Mastering | **READY TO EXECUTE** | ~1,200 Tests | C++ JUCE / FFmpeg Vocal Mastering & M4B (`origin/audio-mixing-and-production`) |
-| **Phase 7** | Enterprise DAG Orchestrator & UI | Queued | ~1,250 Tests | SQLite WAL Pipeline Ledger & Studio Panel UI (`origin/Voculs`) |
+| **Phase 6** | Pro-Grade AI Vocal Mastering | **COMPLETED & VERIFIED** | 57/57 + 1,183/1,183 Full Suite Green | C++ JUCE / FFmpeg Vocal Mastering & M4B (`origin/audio-mixing-and-production`) |
+| **Phase 7** | Enterprise DAG Orchestrator & UI | **READY TO EXECUTE** | ~1,250 Tests | SQLite WAL Pipeline Ledger & Studio Panel UI (`origin/Voculs`) |
 
 
 

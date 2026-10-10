@@ -425,7 +425,7 @@ The TTS Platform Core test suite validates all contracts, edge cases, audio proc
 ---
 
 ## 10. Certified Quality Scorecard
-- **Repository Full Test Matrix**: **1,126 passed**, 8 skipped, 0 failures.
+- **Repository Full Test Matrix**: **1,183 passed**, 8 skipped, 0 failures.
 - **Dedicated TTS Test Matrix**: **66 passed**, 0 failures in `tests/tts/`.
 - **Model Gateway Integration**: **5 passed**, 0 failures in `tests/test_model_gateway_integration.py`.
 - **Batch Planning & Declicking**: **43 passed**, 0 failures in `tests/test_batch_planner_and_declicking.py` & `test_audit_fixes.py`.

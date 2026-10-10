@@ -463,8 +463,11 @@ All production rooms interface strictly with [`ModelGateway`](file:///c:/Users/S
    - Eliminates all rogue `urllib` calls and strips plaintext key query parameters (`?key={key}`) in favor of official stealth `X-goog-api-key` headers.
    - AntiBanGuard 7 Iron Shields are fully enforced across all synthesis calls (11.0 RPM token-bucket rate limiter, 18s–32s key-switch cooldown, emergency global tripwire).
    - Audio payload frames are unpacked and validated via [`extract_pcm_and_duration_from_audio()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/gateway_bridge.py#L33), returning rich metadata in `SpeechResult.metadata`.
-6. **Room 5 (Mastering & Verification)**:
-   - Queries `gateway.get_fleet_status()` for diagnostic reporting and quota telemetry without opening direct connections to `keys_inventory.db`.
+6. **Room 5 (Pro-Grade AI Vocal Mastering Workstation & Telemetry)**:
+   - Orchestrates vocal post-production via [`VocalDSPProcessor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py), Spotify Pedalboard C++ JUCE 4-band vocal parametric EQ (75Hz subsonic cut, 320Hz boxiness reduction, 3.2kHz presence lift), optical compression, and True Peak limiting ($\le -1.5\text{ dBTP}$), with seamless deterministic FFmpeg dual-pass linear loudnorm fallback (-19.0 LUFS vocal target).
+   - Forensic speech auditing via [`AudioQAAuditor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/qa_auditor.py) (energy VAD, speaking pace 75–240 WPM, dropouts/loops detection, MOS scoring), DeepFilterNet3 neural polish with selective $>45\text{dB}$ SNR auto-bypass, Matchering 2.0 reference spectrum matching ($\pm 3.0\text{dB}$ clamp), and `<0.2s` single-segment hot-patching via [`SingleSegmentHotPatcher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/hot_patcher.py).
+   - Chapter packaging and delivery via [`M4BBookPackager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/packager.py) and [`ChapterDeliveryEncoder`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/encoder.py) (192k AAC single pass, `-map_chapters 1` monotonic TOC).
+   - Diagnostic telemetry queries `gateway.get_fleet_status()` for fleet reporting and quota telemetry without opening direct connections to `keys_inventory.db`.
 
 ---
 
@@ -503,6 +506,8 @@ audiobook-factory/
 │   ├── adapters/                        # Room 3 Format Adapters (Audiobook & Podcast)
 │   ├── podcast/                         # Dedicated 2-Host Podcast Engine
 │   ├── tts/                             # Room 4 Speech synthesis & audio slicing
+│   ├── audio/                           # Room 5 Pro-Grade AI Vocal Mastering Workstation (v5.4)
+│   ├── mcp/                             # Audio Workstation & Mastering MCP Server
 │   ├── dialogue_editorial.py            # DE-01 - DE-07 micro-fades and endpoint snapping
 │   ├── mastering.py                     # Room 5 Two-pass linear loudnorm EBU R128
 │   ├── packaging/                       # ChapterMetadataGenerator & multi-format delivery
