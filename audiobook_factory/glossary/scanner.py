@@ -77,7 +77,7 @@ class ChapterLexicalScanner:
 
         # Regex matching 1 to 3 capitalized words, optionally with connective particles (of, de, van)
         matches = re.findall(
-            r"\b[A-Z][a-z]+(?:\s+(?:of|de|the|van|[A-Z][a-z]+)){0,2}\b",
+            r"\b[A-Z][a-z]+(?:-[A-Za-z]+)*(?:\s+(?:of|de|the|van|[A-Z][a-z]+(?:-[A-Za-z]+)*)){0,2}\b",
             text,
         )
 

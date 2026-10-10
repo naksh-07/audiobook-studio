@@ -369,6 +369,51 @@ class TestGlossarySubsystem(unittest.TestCase):
         )
         self.assertIsInstance(engine_res, list)
 
+    def test_07_classifier_unwrapped_list_recovery(self):
+        """Verifies that GlossaryClassifier safely parses unwrapped JSON lists without AttributeError."""
+        from audiobook_factory.glossary.classifier import GlossaryClassifier
+        from audiobook_factory.glossary.scanner import CandidateEntity
+
+        classifier = GlossaryClassifier()
+        candidates = [CandidateEntity(name="Jean-Luc", frequency=3)]
+
+        # Mock LLM returning a raw JSON list directly (not a dict with "characters")
+        def mock_llm_raw_list(prompt, **kwargs):
+            return [
+                {
+                    "english_name": "Jean-Luc",
+                    "hindi_name": "जीन-ल्यूक",
+                    "entity_type": "PROPER_NAME",
+                    "aliases": ["Captain"],
+                    "gender": "male",
+                }
+            ]
+
+        entities, locations, terminology = classifier.classify_candidates(
+            chapter_text="Captain Jean-Luc commanded the ship.",
+            candidates=candidates,
+            chapter_num=1,
+            call_llm_fn=mock_llm_raw_list,
+        )
+
+        self.assertEqual(len(entities), 1)
+        self.assertEqual(entities[0].english_name, "Jean-Luc")
+        self.assertEqual(entities[0].hindi_name, "जीन-ल्यूक")
+
+    def test_08_scanner_hyphenated_entities(self):
+        """Verifies that ChapterLexicalScanner detects hyphenated proper names as single entities."""
+        from audiobook_factory.glossary.scanner import ChapterLexicalScanner
+
+        scanner = ChapterLexicalScanner()
+        text = "Captain Jean-Luc Picard spoke with Silver-Falcon in the courtyard."
+
+        candidates = scanner.scan_chapter_text(text=text, min_frequency=1)
+        candidate_names = [c.name for c in candidates]
+
+        self.assertIn("Captain Jean-Luc Picard", candidate_names)
+        self.assertIn("Silver-Falcon", candidate_names)
+
 
 if __name__ == "__main__":
     unittest.main()
+

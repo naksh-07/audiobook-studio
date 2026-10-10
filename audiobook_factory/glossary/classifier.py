@@ -115,8 +115,8 @@ Output JSON strictly matching this schema:
             logger.warning(f"  [!] GlossaryClassifier LLM dispatch warning: {e}")
             raw_response = {}
 
-        data: Dict[str, Any] = {}
-        if isinstance(raw_response, dict):
+        data: Any = {}
+        if isinstance(raw_response, (dict, list)):
             data = raw_response
         elif isinstance(raw_response, str) and raw_response.strip():
             try:
@@ -125,22 +125,27 @@ Output JSON strictly matching this schema:
                 import json_repair
                 data = json_repair.loads(raw_response) if raw_response else {}
 
-        # Handle wrapped keys (e.g. {"data": {...}})
-        if "data" in data and isinstance(data["data"], dict):
-            data = data["data"]
+        chars_raw: List[Any] = []
+        terms_raw: Dict[str, Any] = {}
 
-        chars_raw = data.get("characters", [])
-        if not chars_raw:
-            for alt_key in ("entities", "candidates", "results"):
-                if isinstance(data.get(alt_key), list):
-                    chars_raw = data[alt_key]
-                    break
-
-        terms_raw = data.get("locations_and_terms", {})
-
-        # If LLM returned a list directly
         if isinstance(data, list):
+            # If LLM returned a list directly
             chars_raw = data
+        elif isinstance(data, dict):
+            # Handle wrapped keys (e.g. {"data": {...}})
+            if "data" in data and isinstance(data["data"], dict):
+                data = data["data"]
+
+            chars_raw = data.get("characters", [])
+            if not chars_raw:
+                for alt_key in ("entities", "candidates", "results"):
+                    if isinstance(data.get(alt_key), list):
+                        chars_raw = data[alt_key]
+                        break
+
+            terms_raw = data.get("locations_and_terms", {})
+            if not isinstance(terms_raw, dict):
+                terms_raw = {}
 
         entities: List[ChapterEntity] = []
         locations: Dict[str, str] = {}
