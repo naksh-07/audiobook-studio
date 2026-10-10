@@ -563,6 +563,7 @@ The legacy cinematic mix subcommands (`direct`, `render`, `bgm`, `stems`, `bank`
 ---
 
 ## 🔗 Related Documentation
+- [🖥️ Studio UI & Sidecar Extension Specification (Apple-Grade Minimalist Light)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_UI_AND_SIDECAR_SPECIFICATION.md)
 - [🎙️ TTS Platform Core Architecture Specification (Option C)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)
 - [🎙️ Podcast System Architecture](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/PODCAST_SYSTEM_ARCHITECTURE.md)
 - [🎭 Dramaturgy & Adaptation System](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/DRAMATURGY_AND_ADAPTATION_SYSTEM.md)

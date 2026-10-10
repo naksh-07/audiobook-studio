@@ -385,6 +385,21 @@ Phase 3 has been merged, audited by systems experts, hardened against ModelGatew
 
 ---
 
+## 5.9 Phase 7 Detailed Blueprint: Studio UI Workstation & DAG Orchestrator
+
+### 5.9.1 Architecture & Objectives
+1. **Studio UI & Sidecar Extension (Apple-Grade Minimalist Light)** ([`docs/STUDIO_UI_AND_SIDECAR_SPECIFICATION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_UI_AND_SIDECAR_SPECIFICATION.md)):
+   - **Hardware Footprint**: Zero-Build Native ESM, $\le 3.5\text{ MB}$ heap memory, $< 15\text{ KB}$ JS, zero external frontend dependencies.
+   - **Aesthetic**: Apple macOS Sonoma/Tahoe Human Interface Guidelines (frosted acrylic vibrancy `backdrop-filter: blur(24px)`, 0.5px hairline dividers, SF Pro typography, sliding segmented controls, warm studio amber audio telemetry).
+   - **High-Performance Audio Engine**: 120 FPS HTML5 Canvas 2D waveform player powered by pre-computed peak streaming (`/api/peaks` $\approx 1.6\text{ KB}$ JSON), completely bypassing browser PCM decoding memory spikes (< 250 KB overhead).
+   - **Sidecar Bridge**: Node.js `SidecarApp` running with built-in Sidecar SDK, bridged to Python engine (`audiobook_factory.api.studio_bridge`) and SQLite WAL `pipeline_ledger.db`.
+2. **Enterprise DAG Pipeline Orchestrator**:
+   - `DAGPipelineOrchestrator` & `DAGDiffReconciler` (`audiobook_factory/dag/`).
+   - SQLite WAL `pipeline_ledger.db` tracking stage lifecycle, artifacts, and gate audits.
+   - Modular CLI suite (`doctor`, `ingest`, `translate`, `screenplay`, `synth`, `master`, `package`).
+
+---
+
 ## 6. Forward Milestones Summary
 
 | Phase | Subsystem | Status | Target Test Baseline | Key Deliverable |

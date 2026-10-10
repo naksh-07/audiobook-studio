@@ -11,5 +11,6 @@
 - **Phase 6: Pro-Grade AI Vocal Mastering Workstation (MERGED, AUDITED & CERTIFIED)**:
   - Room 5 Vocal Mastering Core (`audiobook_factory/audio/`): C++ JUCE Pedalboard / FFmpeg dual-pass linear loudnorm (`-19 LUFS`, `$\le -1.5$ dBTP`), `AudioQAAuditor`, `NeuralVocalEnhancer` (with `HF_HUB_OFFLINE` sandbox), `ReferenceSpectrumMatcher` (pad-to-nfft STFT fix), `SingleSegmentHotPatcher`, `M4BBookPackager` (path traversal sanitized), 6 Audio MCP tools, and `dsp`, `qa-audit`, `enhance`, `match-ref` CLI.
   - Multi-Expert Triad Audit: Systems Architect (PASS), Security Auditor (PASS), Forensic Debugger (PASS). All 72 audio tests & 71 cross-system tests 100% green. Pushed to remote `main`.
-- **Next & Final Milestone**: Phase 7 Crown Jewel Enterprise DAG Orchestrator & Studio UI Panel (`origin/Voculs`).
+- **Next & Final Milestone**: Phase 7 Crown Jewel Enterprise DAG Orchestrator & Studio UI Panel (`origin/Voculs` on branch `plugin-ui`).
+  - **UI Workstation Spec**: [STUDIO_UI_AND_SIDECAR_SPECIFICATION.md](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_UI_AND_SIDECAR_SPECIFICATION.md) (Apple Minimalist Light, Zero-Build ESM, $\le 3.5\text{ MB}$ RAM, 120 FPS Canvas).
   - Blueprint: [phase_7_enterprise_dag_and_ui_merge_plan.md](file:///c:/Users/Suraj/.gemini/antigravity/brain/c8f802dc-e987-40e7-b404-94d619897200/phase_7_enterprise_dag_and_ui_merge_plan.md). Ready for execution upon resumption.

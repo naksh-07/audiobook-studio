@@ -428,6 +428,7 @@ All quality gates are fail-closed:
 
 For exhaustive technical guides, visit the [`docs/`](docs/) directory and subsystem manuals:
 - [🏛️ Option C Architecture Blueprint](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md)
+- [🖥️ Studio UI & Sidecar Extension Specification (Apple-Grade Minimalist Light)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_UI_AND_SIDECAR_SPECIFICATION.md)
 - [🎙️ Studio TTS Platform Core Specification (Option C)](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md)
 - [📚 Comprehensive API Reference Manual](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/API_REFERENCE.md)
 - [🎙️ Room 3.5: Studio Voice Casting & Acoustic Calibration Engine](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/STUDIO_VOICE_CASTING_AND_CALIBRATION.md)
