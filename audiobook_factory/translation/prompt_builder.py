@@ -21,7 +21,7 @@ RAW_UNRATED_DIRECTIVES = """### CORE DIRECTIVES - 11 GOLDEN INVARIANTS (RAW UNRA
 8. SOMATIC INTIMACY & EROTICA: Sensory touch, heat, skin friction, breath ('तपती कमर', 'पसलियों की लचक', 'कांपती उंगलियां', 'बेकाबू सांसें'). Strictly ban clinical biology words ('योनि', 'लिंग').
 9. VISCERAL COMBAT & GORE: Visceral strikes, blood spray, bone fractures ('लोहा हंसली की हड्डी चीरता हुआ सीने में धंस गया'). Use sharp, staccato clauses during fight scenes.
 10. ANTI-SANSKRITIZATION & NATURAL SPOKEN DIALOGUE: Ban stiff, textbook Sanskrit ('युवतियां' -> 'लड़कियां/औरतें'; 'दर्पण' -> 'आईना'). Use living spoken Hindustani of premium OTT drama and Audible originals.
-11. CANON ADHERENCE & ZERO CHATTER: Output ONLY translated Devanagari Markdown. Never include preambles, notes, or explanations."""
+11. CANON ADHERENCE & ZERO CHATTER: Output ONLY complete unabridged Devanagari Markdown. Never summarize, truncate, or include preambles, notes, or explanations."""
 
 
 CLASSIC_REVERENT_DIRECTIVES = """### CORE DIRECTIVES - DIGNIFIED HERITAGE & PATHOS:
@@ -30,7 +30,7 @@ CLASSIC_REVERENT_DIRECTIVES = """### CORE DIRECTIVES - DIGNIFIED HERITAGE & PATH
 3. ZERO MODERN SLURS / TAPORI VULGARITY: Street profanity ('गांड', 'लंड', etc.) and modern casual slang are strictly banned. Render emotional friction through formal verbal sparring and dignified sarcasm.
 4. SOCIAL HIERARCHY & HONORIFICS: Preserve traditional social relations and respectful pronouns ('आप', 'हुज़ूर', 'सरकार', 'श्रीमान') with absolute consistency.
 5. SENSORY ELEGANCE: Describe beauty, nature, sorrow, and longing with classical grace.
-6. CANON ADHERENCE & ZERO CHATTER: Output ONLY translated Devanagari Markdown. Never include conversational chatter."""
+6. CANON ADHERENCE & ZERO CHATTER: Output ONLY complete unabridged Devanagari Markdown. Never summarize, truncate, or include conversational chatter."""
 
 
 class DynamicPromptBuilder:
@@ -40,8 +40,9 @@ class DynamicPromptBuilder:
     def build_system_instruction(cls, tier: FidelityTier) -> str:
         base = (
             "You are a Master Literary Adapter and Dialogue Director for premier full-cast audio fiction. "
-            "Your task is adapting literary text into spoken, natural, rhythmically compelling Hindustani "
-            "in pristine Devanagari script for professional voice actors.\n\n"
+            "Your task is adapting dramatic scene text into spoken, natural, rhythmically compelling Hindustani "
+            "in pristine Devanagari script for professional voice actors. "
+            "Deliver a complete, unabridged localization of all dialogue and prose without summarizing or omitting any content.\n\n"
         )
         if tier == FidelityTier.RAW_UNRATED:
             return base + RAW_UNRATED_DIRECTIVES
@@ -58,7 +59,7 @@ class DynamicPromptBuilder:
         parts = []
 
         if request.source_title:
-            parts.append(f"### CHAPTER / SECTION: {request.source_title}")
+            parts.append(f"### SCENE / SECTION: {request.source_title}")
 
         if total_chunks > 1:
             parts.append(f"### CHUNK SEQUENCE: Part {chunk.index + 1} of {total_chunks}")
@@ -80,9 +81,9 @@ class DynamicPromptBuilder:
                 parts.append(f"Preceding Hindi: ...{chunk.preceding_target_context}")
             parts.append("CRITICAL: The above context is provided ONLY for pronoun resolution, narrative continuity, and character tone. Do NOT include it in your output.\n")
 
-        # Text to Translate
-        parts.append("### NEW TEXT TO TRANSLATE (OUTPUT PRISTINE DEVANAGARI MARKDOWN ONLY):")
+        # Text to Localize
+        parts.append("### SCENE MANUSCRIPT TO LOCALIZE (OUTPUT COMPLETE SPOKEN HINDUSTANI IN DEVANAGARI SCRIPT ONLY):")
         parts.append(chunk.text)
-        parts.append("\nEmit ONLY the Devanagari translation below:")
+        parts.append("\nEmit the full, unabridged Hindustani localization below:")
 
         return "\n".join(parts)

@@ -70,5 +70,5 @@ class TranslationResult(BaseModel):
 
 
 # Default Gemini model used for text translation if not resolved dynamically
-DEFAULT_TRANSLATION_MODEL: str = "gemini-2.5-flash"
+DEFAULT_TRANSLATION_MODEL: str = "gemini-3.8-flash"
 

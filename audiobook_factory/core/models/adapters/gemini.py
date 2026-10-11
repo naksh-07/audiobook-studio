@@ -154,8 +154,10 @@ class GeminiProviderAdapter(BaseProviderAdapter):
                 pass
             resp_headers = dict(e.headers.items()) if e.headers else {}
             raise ApiHttpError(status_code=e.code, error_body=error_body, headers=resp_headers) from e
-        except urllib.error.URLError as e:
-            raise ApiHttpError(status_code=503, error_body=str(e.reason)) from e
+        except (TimeoutError, urllib.error.URLError) as e:
+            err_msg = str(getattr(e, "reason", e))
+            status = 504 if ("timed out" in err_msg.lower() or isinstance(e, TimeoutError)) else 503
+            raise ApiHttpError(status_code=status, error_body=err_msg) from e
 
     def generate_text(
         self,
@@ -167,13 +169,14 @@ class GeminiProviderAdapter(BaseProviderAdapter):
         temperature: float = 0.7,
         max_output_tokens: Optional[int] = None,
         response_json: bool = False,
-        timeout: float = 60.0,
+        timeout: float = 180.0,
         **kwargs,
     ) -> GenerationResult:
         """Generates text using Google Gemini API."""
         clean_model = model.strip()
         url = f"{self.BASE_URL}/{clean_model}:generateContent"
         headers = get_stealth_sdk_headers(api_key, provider="gemini")
+        eff_timeout = float(kwargs.get("timeout") or timeout)
 
         payload = self.format_payload(
             model=clean_model,
@@ -187,7 +190,7 @@ class GeminiProviderAdapter(BaseProviderAdapter):
             **kwargs,
         )
 
-        resp = self._execute_http_post(url, payload, headers, timeout=timeout)
+        resp = self._execute_http_post(url, payload, headers, timeout=eff_timeout)
 
         # Parse text, thoughts, finish reason, and token usage
         candidates = resp.get("candidates", [])

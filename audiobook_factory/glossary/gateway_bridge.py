@@ -66,7 +66,7 @@ def execute_glossary_llm(
     # Filter legacy kwargs
     kwargs.pop("response_mime_type", None)
     kwargs.pop("return_raw_text", None)
-    retries = kwargs.pop("max_retries", 3)
+    retries = kwargs.pop("max_retries", 5)
 
     try:
         from audiobook_factory.core.models.gateway import get_model_gateway
@@ -83,6 +83,7 @@ def execute_glossary_llm(
             session_id=session_id or "glossary_session",
             user_id=user_id,
             max_retries=retries,
+            timeout=kwargs.pop("timeout", 180.0),
             **kwargs,
         )
         raw_text = (response.text or "").strip()

@@ -83,12 +83,13 @@ class OpenAICompatibleAdapter(BaseProviderAdapter):
         temperature: float = 0.7,
         max_output_tokens: Optional[int] = None,
         response_json: bool = False,
-        timeout: float = 60.0,
+        timeout: float = 180.0,
         **kwargs,
     ) -> GenerationResult:
         """Executes chat completion via OpenAI-compatible API."""
         clean_model = model.strip()
         headers = get_stealth_sdk_headers(api_key, provider=self.provider)
+        eff_timeout = float(kwargs.get("timeout") or timeout)
 
         payload = self.format_payload(
             model=clean_model,
@@ -105,7 +106,7 @@ class OpenAICompatibleAdapter(BaseProviderAdapter):
         req = urllib.request.Request(self.base_url, data=data, headers=headers, method="POST")
 
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as response:
+            with urllib.request.urlopen(req, timeout=eff_timeout) as response:
                 resp_bytes = response.read()
                 resp = json.loads(resp_bytes.decode("utf-8"))
         except json.JSONDecodeError as e:
@@ -118,8 +119,10 @@ class OpenAICompatibleAdapter(BaseProviderAdapter):
                 pass
             resp_headers = dict(e.headers.items()) if e.headers else {}
             raise ApiHttpError(status_code=e.code, error_body=error_body, headers=resp_headers) from e
-        except urllib.error.URLError as e:
-            raise ApiHttpError(status_code=503, error_body=str(e.reason)) from e
+        except (TimeoutError, urllib.error.URLError) as e:
+            err_msg = str(getattr(e, "reason", e))
+            status = 504 if ("timed out" in err_msg.lower() or isinstance(e, TimeoutError)) else 503
+            raise ApiHttpError(status_code=status, error_body=err_msg) from e
 
         choices = resp.get("choices", [])
         if not choices:

@@ -182,6 +182,10 @@ class ModelGateway:
                     f"(action: {norm_err.suggested_action})"
                 )
 
+                # Clear session affinity on any error so retries rotate to a fresh healthy key
+                if session_id:
+                    self.anti_ban_guard.affinity.clear_affinity(session_id)
+
                 # Handle suggested actions
                 if norm_err.suggested_action == "ROTATE_KEY":
                     if norm_err.category == "DAILY_QUOTA_EXHAUSTED":
@@ -204,15 +208,16 @@ class ModelGateway:
                         fast_mode=fast_mode,
                     )
                 elif norm_err.suggested_action == "COOL_DOWN":
+                    # Put current key on backoff (minimum 60s to allow provider sliding rate window to reset)
                     self.lease_manager.mark_temporary_backoff(
                         api_key_or_hash=plan.lease.key_hash,
-                        backoff_seconds=norm_err.wait_sec,
+                        backoff_seconds=max(norm_err.wait_sec, 60.0),
                         error_msg=norm_err.message,
                         model=plan.model_id,
                         provider=plan.provider,
                     )
-                    if not fast_mode and norm_err.wait_sec > 0:
-                        time.sleep(min(norm_err.wait_sec, 15.0))
+                    if not fast_mode:
+                        time.sleep(min(norm_err.wait_sec, 2.0))
                 elif not norm_err.is_retryable:
                     raise
 
@@ -309,6 +314,10 @@ class ModelGateway:
                     session_id=session_id,
                 )
 
+                # Clear session affinity on any error so retries rotate to a fresh healthy key
+                if session_id:
+                    self.anti_ban_guard.affinity.clear_affinity(session_id)
+
                 if norm_err.suggested_action == "ROTATE_KEY":
                     if norm_err.category == "DAILY_QUOTA_EXHAUSTED":
                         self.lease_manager.mark_daily_quota_exhausted(
@@ -329,15 +338,16 @@ class ModelGateway:
                         fast_mode=eff_fast_mode,
                     )
                 elif norm_err.suggested_action == "COOL_DOWN":
+                    # Put current key on backoff (minimum 60s to allow provider sliding rate window to reset)
                     self.lease_manager.mark_temporary_backoff(
                         api_key_or_hash=plan.lease.key_hash,
-                        backoff_seconds=norm_err.wait_sec,
+                        backoff_seconds=max(norm_err.wait_sec, 60.0),
                         error_msg=norm_err.message,
                         model=plan.model_id,
                         provider=plan.provider,
                     )
-                    if not eff_fast_mode and norm_err.wait_sec > 0:
-                        time.sleep(min(norm_err.wait_sec, 15.0))
+                    if not eff_fast_mode:
+                        time.sleep(min(norm_err.wait_sec, 2.0))
                 elif not norm_err.is_retryable:
                     raise
 

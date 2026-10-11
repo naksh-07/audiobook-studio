@@ -248,7 +248,7 @@ class CircuitBreaker:
     - HALF_OPEN: Cooldown expired. Allows a single canary request to test recovery.
     """
 
-    def __init__(self, failure_threshold: int = 2, cooldown_seconds: float = 30.0):
+    def __init__(self, failure_threshold: int = 5, cooldown_seconds: float = 30.0):
         self.failure_threshold = failure_threshold
         self.cooldown_seconds = cooldown_seconds
         self._lock = threading.Lock()

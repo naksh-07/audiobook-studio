@@ -109,24 +109,25 @@ class RequestRouter:
             if override_cap:
                 candidate_models.append(override_cap)
 
-        if not candidate_models:
-            # Query registry
-            primary = self.registry.resolve_best_model(
-                task=task,
-                preferred_provider=preferred_provider,
-                min_tier=min_tier,
-                modality=modality,
-            )
+        # Query registry for primary and fallbacks
+        primary = self.registry.resolve_best_model(
+            task=task,
+            preferred_provider=preferred_provider,
+            min_tier=min_tier,
+            modality=modality,
+        )
+        if primary and primary.model_id not in [c.model_id for c in candidate_models]:
             candidate_models.append(primary)
 
-            # Add fallbacks
-            all_matching = self.registry.filter_models(
-                min_tier=min_tier,
-                modality=modality,
-            )
-            for m in all_matching:
-                if m.model_id != primary.model_id:
-                    candidate_models.append(m)
+        # Add remaining fallbacks of matching tier and modality
+        all_matching = self.registry.filter_models(
+            min_tier=min_tier,
+            modality=modality,
+        )
+        existing_ids = {c.model_id for c in candidate_models}
+        for m in all_matching:
+            if m.model_id not in existing_ids:
+                candidate_models.append(m)
 
         # Iterate through candidates checking circuit breaker health
         last_error = None

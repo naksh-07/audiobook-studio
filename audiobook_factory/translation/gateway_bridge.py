@@ -59,7 +59,7 @@ def execute_translation_llm(
     task_name = getattr(task_type, "value", str(task_type)) if task_type else task
     kwargs.pop("response_mime_type", None)
     kwargs.pop("return_raw_text", None)
-    retries = kwargs.pop("max_retries", 3)
+    retries = kwargs.pop("max_retries", 5)
 
     try:
         from audiobook_factory.core.models.gateway import get_model_gateway
@@ -77,6 +77,7 @@ def execute_translation_llm(
             session_id=session_id or "translation_session",
             user_id=user_id,
             max_retries=retries,
+            timeout=kwargs.pop("timeout", 180.0),
             **kwargs,
         )
         raw_text = (response.text or "").strip()

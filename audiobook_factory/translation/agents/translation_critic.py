@@ -118,7 +118,14 @@ class TranslationQualityCritic:
         if is_valid:
             certified_text = cleaned
         else:
-            logger.warning(f"  [TranslationQualityCritic] Sanitizer notice: {reason}")
+            logger.error(f"  [TranslationQualityCritic] Critical validation failure for {block_title}: {reason}")
+            raise ValueError(f"Translation validation failed for {block_title}: {reason}")
+
+        # Guard against severe collapse / truncation
+        final_ratio = len(certified_text.split()) / max(1, src_words)
+        if final_ratio < 0.50:
+            logger.error(f"  [TranslationQualityCritic] Severe text collapse for {block_title}: ratio {final_ratio:.2f} < 0.50")
+            raise ValueError(f"Translation rejected due to severe text collapse in {block_title} (ratio {final_ratio:.2f} < 0.50)")
 
         # Literary register audit & substitutions
         _, certified_text, warnings = audit_literary_register(certified_text, apply_substitutions=True)
