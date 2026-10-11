@@ -23,6 +23,7 @@ PROJECTS_DIR = WORKSPACE_DIR / "audiobooks" / "projects"
 
 from audiobook_factory.cli.commands.pipeline import (
     cmd_extract,
+    cmd_research,
     cmd_translate,
     cmd_script,
     cmd_podcast,
@@ -74,6 +75,12 @@ def main():
     p_extract = subparsers.add_parser("extract", help="Extract and segment book file into clean Markdown chapters")
     p_extract.add_argument("file", help="Input book path (.epub, .pdf, .txt, .md)")
     p_extract.add_argument("--force-gate", action="store_true", help="Bypass Extraction Quality Gate REVIEW failure and force production")
+
+    # research (Room 1 Pre-Production Studio & Novel Researcher)
+    p_research = subparsers.add_parser("research", help="Run Room 1 Pre-Production Studio & Novel Researcher (Lore, Characters, Cast Lock)")
+    p_research.add_argument("book", help="Project book slug (folder name)")
+    p_research.add_argument("--force", action="store_true", help="Force overwrite of existing master state")
+    p_research.add_argument("--model", default=None, help="LLM model override for pre-production (default: gemini-3.8-flash)")
 
     # translate
     p_translate = subparsers.add_parser("translate", help="Translate extracted chapters into literary Hindi")
@@ -260,6 +267,7 @@ def main():
 
     cmds = {
         "extract": cmd_extract,
+        "research": cmd_research,
         "translate": cmd_translate,
         "script": cmd_script,
         "podcast": _handle_podcast,

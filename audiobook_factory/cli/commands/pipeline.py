@@ -21,6 +21,29 @@ def cmd_extract(args):
     print(f"\n[OK] Project created: '{meta['book_id']}' at {get_projects_dir() / meta['book_id']}")
 
 
+def cmd_research(args):
+    """Run Room 1: Pre-Production Studio & Novel Researcher."""
+    b_path = Path(args.book)
+    project_dir = b_path if (b_path.exists() and b_path.is_dir()) else (get_projects_dir() / args.book)
+    if not project_dir.exists():
+        raise FileNotFoundError(f"Project directory not found: {project_dir}")
+
+    force = getattr(args, "force", False)
+    model = getattr(args, "model", None)
+    from audiobook_factory.preproduction import run_preproduction
+
+    print(f"[*] Running Room 1 Pre-Production Studio for '{project_dir.name}'...", flush=True)
+    res = run_preproduction(project_dir=project_dir, force=force, model=model)
+    print(f"\n[OK] Pre-Production master state established for '{args.book}':")
+    print(f"     Status          : {res.get('status')}")
+    print(f"     Characters Count: {res.get('characters_count', 'N/A')}")
+    print(f"     Locations Count : {res.get('locations_count', 'N/A')}")
+    print(f"     Book Bible      : {res.get('book_bible')}")
+    print(f"     Cast Lock       : {res.get('cast_lock')}")
+    print(f"     Vocal Spaces    : {res.get('vocal_spaces')}")
+
+
+
 
 def _parse_chapters_arg(args) -> Optional[List[int]]:
     """Helper to parse --chapter and --chapters CLI arguments into a sorted list of chapter ints."""

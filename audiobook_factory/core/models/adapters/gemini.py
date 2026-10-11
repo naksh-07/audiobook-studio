@@ -111,6 +111,14 @@ class GeminiProviderAdapter(BaseProviderAdapter):
 
         payload["generationConfig"] = gen_config
 
+        # 5. Tools (Google Search Grounding, Function Calling, etc.)
+        tools = kwargs.get("tools")
+        if tools:
+            payload["tools"] = tools
+            # Note: Certain Gemini endpoints reject responseMimeType="application/json" when googleSearch tool is attached
+            if any("googleSearch" in t for t in tools if isinstance(t, dict)) and response_json:
+                gen_config.pop("responseMimeType", None)
+
         payload["safetySettings"] = [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
