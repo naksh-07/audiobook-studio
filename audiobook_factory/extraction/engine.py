@@ -13,7 +13,9 @@ from __future__ import annotations
 import os
 import re
 import json
+import html
 import shutil
+import zipfile
 import hashlib
 import time
 from pathlib import Path
@@ -78,8 +80,15 @@ class ExtractionEngine:
             raise FileNotFoundError(f"Input file not found: {input_file}")
 
         output_base_dir = Path(output_base_dir).resolve()
-        raw_slug = (book_id or input_file.stem).lower()
+        ext = input_file.suffix.lower()
+        if book_id:
+            raw_slug = str(book_id).lower()
+        else:
+            clean_stem = re.sub(r"\[.*?\]|\(.*?\)", "", input_file.stem).strip()
+            raw_slug = (clean_stem or input_file.stem).lower()
+
         book_slug = re.sub(r"[^\w\-]", "_", raw_slug).strip("_")
+        book_slug = re.sub(r"_+", "_", book_slug)
         if not book_slug:
             book_slug = "book"
         project_dir = output_base_dir / book_slug

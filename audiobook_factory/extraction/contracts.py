@@ -157,7 +157,14 @@ class CanonicalChapter(BaseModel):
             text = b.normalized_text.strip()
             if not text:
                 continue
+            if b.semantic_metadata.get("is_lead_heading"):
+                continue
             if b.type == "heading":
+                b_clean = text.strip().upper()
+                t_clean = self.title.strip().upper()
+                p_clean = (self.parent_chapter_title or "").strip().upper()
+                if b_clean in (t_clean, p_clean) or (p_clean and b_clean in (f"PART {t_clean}", f"CHAPTER {t_clean}")):
+                    continue
                 lvl = int(b.semantic_metadata.get("level", 2))
                 prefix = "#" * max(2, min(lvl, 6))
                 lines.append(f"{prefix} {text}")
@@ -172,7 +179,11 @@ class CanonicalChapter(BaseModel):
 
     def to_plain_text(self) -> str:
         """Projects canonical blocks into plain continuous text."""
-        return "\n\n".join(b.normalized_text.strip() for b in self.blocks if b.normalized_text.strip())
+        return "\n\n".join(
+            b.normalized_text.strip()
+            for b in self.blocks
+            if b.normalized_text.strip() and not b.semantic_metadata.get("is_lead_heading")
+        )
 
 
 class ExtractionQualityReport(BaseModel):

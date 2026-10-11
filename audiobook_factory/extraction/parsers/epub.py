@@ -214,6 +214,181 @@ def _safe_xml_fromstring(xml_bytes_or_str: bytes | str) -> ET.Element:
         return ET.fromstring(cleaned_xml.encode("utf-8"))
 
 
+class NavItem:
+    """Represents a hierarchical navigation item from NCX or EPUB 3 Nav."""
+    def __init__(
+        self,
+        label: str,
+        src: str,
+        parent_label: Optional[str] = None,
+        children: Optional[List["NavItem"]] = None,
+    ):
+        self.label = label
+        self.src = src
+        self.parent_label = parent_label
+        self.children = children or []
+
+    def __repr__(self) -> str:
+        return f"NavItem({self.label}, {self.src}, parent={self.parent_label}, children={len(self.children)})"
+
+
+def _parse_ncx_nav_tree(elem: ET.Element, opf_dir: str = "", parent_label: Optional[str] = None) -> List[NavItem]:
+    """Recursively parses EPUB 2 NCX navMap preserving parent-child hierarchy."""
+    items: List[NavItem] = []
+    for child in elem:
+        if child.tag.endswith("navPoint"):
+            lbl_elem = None
+            src_attr = None
+            for sub in child:
+                if sub.tag.endswith("navLabel"):
+                    for t in sub:
+                        if t.tag.endswith("text") and t.text and not lbl_elem:
+                            lbl_elem = html.unescape(t.text.strip())
+                elif sub.tag.endswith("content") and "src" in sub.attrib and not src_attr:
+                    src_attr = sub.attrib.get("src", "").strip()
+
+            if lbl_elem and src_attr:
+                if opf_dir and not src_attr.startswith(opf_dir):
+                    full_src = f"{opf_dir}/{src_attr}".replace("\\", "/").lstrip("/")
+                else:
+                    full_src = src_attr
+
+                child_navs = _parse_ncx_nav_tree(child, opf_dir=opf_dir, parent_label=lbl_elem)
+                item = NavItem(label=lbl_elem, src=full_src, parent_label=parent_label, children=child_navs)
+                items.append(item)
+    return items
+
+
+def _parse_epub3_nav_tree(elem: ET.Element, nav_base_dir: str = "", opf_dir: str = "", parent_label: Optional[str] = None) -> List[NavItem]:
+    """Recursively parses EPUB 3 HTML5 nav list preserving nested ol/li structures."""
+    items: List[NavItem] = []
+    for child in elem:
+        tag_lower = child.tag.lower().split("}")[-1]
+        if tag_lower in ("ol", "ul", "nav", "body", "html"):
+            items.extend(_parse_epub3_nav_tree(child, nav_base_dir=nav_base_dir, opf_dir=opf_dir, parent_label=parent_label))
+        elif tag_lower == "li":
+            a_elem = None
+            nested_list = None
+            for sub in child:
+                sub_tag = sub.tag.lower().split("}")[-1]
+                if sub_tag == "a" and not a_elem:
+                    a_elem = sub
+                elif sub_tag in ("ol", "ul") and not nested_list:
+                    nested_list = sub
+
+            if a_elem is not None:
+                href = a_elem.attrib.get("href", "").strip()
+                raw_text = "".join(a_elem.itertext()).strip()
+                clean_lbl = " ".join(html.unescape(raw_text).split())
+                if clean_lbl and href:
+                    if nav_base_dir and not href.startswith(nav_base_dir):
+                        full_src = f"{nav_base_dir}/{href}".replace("\\", "/").lstrip("/")
+                    elif opf_dir and not href.startswith(opf_dir):
+                        full_src = f"{opf_dir}/{href}".replace("\\", "/").lstrip("/")
+                    else:
+                        full_src = href.lstrip("/")
+
+                    child_navs = []
+                    if nested_list is not None:
+                        child_navs = _parse_epub3_nav_tree(nested_list, nav_base_dir=nav_base_dir, opf_dir=opf_dir, parent_label=clean_lbl)
+
+                    item = NavItem(label=clean_lbl, src=full_src, parent_label=parent_label, children=child_navs)
+                    items.append(item)
+    return items
+
+
+def _flatten_nav_tree(nodes: List[NavItem]) -> List[Tuple[str, str, Optional[str]]]:
+    """Flattens NavItem tree into linear chapter targets with parent context: (resolved_title, src, parent_title)."""
+    targets: List[Tuple[str, str, Optional[str]]] = []
+    for n in nodes:
+        clean_lbl = n.label.strip()
+        display_lbl = clean_lbl.title() if clean_lbl.isupper() and len(clean_lbl.split()) > 1 else clean_lbl
+
+        if not n.children:
+            title = display_lbl
+            p_display = None
+            if n.parent_label:
+                p_raw = n.parent_label.strip()
+                p_display = p_raw.title() if p_raw.isupper() and len(p_raw.split()) > 1 else p_raw
+                is_num = bool(re.match(r"^(?:[IVXLCDM]+|\d+)$", clean_lbl, re.IGNORECASE))
+                if is_num:
+                    title = f"{p_display} - Part {clean_lbl}"
+                elif clean_lbl.lower().startswith("part ") or clean_lbl.lower().startswith("chapter "):
+                    title = f"{p_display} - {clean_lbl}"
+                else:
+                    title = f"{p_display} - {clean_lbl}"
+            targets.append((title, n.src, p_display))
+        else:
+            first_child_src = n.children[0].src
+            p_display = clean_lbl.title() if clean_lbl.isupper() and len(clean_lbl.split()) > 1 else clean_lbl
+            if n.src != first_child_src:
+                intro_title = f"{p_display} - Introduction"
+                targets.append((intro_title, n.src, p_display))
+            targets.extend(_flatten_nav_tree(n.children))
+    return targets
+
+
+SKIP_NAV_PATTERNS = [
+    r"^title\s*page\b",
+    r"^welcome\b",
+    r"^also\s+by\b",
+    r"^(?:about|meet)\s+(?:the\s+)?(?:author|publisher|orbit|\w+\s+fiction)\b",
+    r"^orbit\s+newsletter\b",
+    r"^(?:newsletter|sign\s*up)\b",
+    r"^(?:table\s+of\s+)?contents\b",
+    r"^copyright\b",
+    r"^praise\s+for\b",
+    r"^preview\b",
+    r"^a\s+preview\s+of\b",
+    r"^extras\b",
+    r"^cover\b",
+]
+
+
+def _is_non_literary_frontmatter(title: str) -> bool:
+    """Detects commercial publishing frontmatter and marketing backmatter."""
+    clean = title.strip().lower()
+    return any(bool(re.search(pat, clean, re.IGNORECASE)) for pat in SKIP_NAV_PATTERNS)
+
+
+def _deduplicate_leading_headings(
+    blocks: List[CanonicalBlock],
+    resolved_title: str,
+    parent_title: Optional[str] = None,
+) -> Tuple[List[CanonicalBlock], int]:
+    """
+    Identifies leading blocks that merely state the chapter title, parent story title,
+    or part number. Marks their block.type as 'heading' and marks them with
+    semantic_metadata['is_lead_heading'] = True.
+    Returns: (blocks, keep_start_idx)
+    """
+    if not blocks:
+        return blocks, 0
+
+    t_clean = resolved_title.strip().upper()
+    p_clean = (parent_title or "").strip().upper()
+
+    part_match = re.search(r"Part\s+([IVXLCDM]+|\d+)", resolved_title, re.IGNORECASE)
+    part_roman = part_match.group(1).upper() if part_match else ""
+
+    keep_start_idx = 0
+    for idx in range(min(4, len(blocks))):
+        blk_text = blocks[idx].normalized_text.strip().upper()
+        matches = (
+            blk_text == p_clean
+            or blk_text == t_clean
+            or (part_roman and blk_text in (part_roman, f"PART {part_roman}", f"CHAPTER {part_roman}"))
+        )
+        if matches:
+            blocks[idx].type = "heading"
+            blocks[idx].semantic_metadata["is_lead_heading"] = True
+            keep_start_idx = idx + 1
+        else:
+            break
+
+    return blocks, keep_start_idx
+
+
 class ForensicEPUBParser:
     """
     Forensic structural parser for EPUB containers.
@@ -308,38 +483,45 @@ class ForensicEPUBParser:
                         spine_items.append(manifest[idref])
 
             # 5. Locate TOC navigation points (EPUB 3 Nav or EPUB 2 NCX)
-            nav_points: List[Tuple[str, str]] = []
+            nav_tree: List[NavItem] = []
 
             # 5A. Check EPUB 3 Navigation Document (HTML5 <nav epub:type="toc">)
             if epub3_nav_href and epub3_nav_href in zf.namelist():
                 try:
                     nav_html = zf.read(epub3_nav_href).decode("utf-8", errors="ignore")
-                    matches = re.findall(
-                        r'<a\s+(?:[^>]*?\s+)?href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
-                        nav_html,
-                        re.IGNORECASE | re.DOTALL,
-                    )
                     nav_base_dir = str(Path(epub3_nav_href).parent).replace("\\", "/")
                     if nav_base_dir == ".":
                         nav_base_dir = ""
 
-                    for href_val, raw_label in matches:
-                        clean_label = re.sub(r"<[^>]+>", "", raw_label).strip()
-                        clean_label = html.unescape(clean_label)
-                        clean_label = " ".join(clean_label.split())
-                        if clean_label and href_val:
-                            if nav_base_dir and not href_val.startswith(nav_base_dir):
-                                full_src = f"{nav_base_dir}/{href_val}".replace("\\", "/").lstrip("/")
-                            elif opf_dir and not href_val.startswith(opf_dir):
-                                full_src = f"{opf_dir}/{href_val}".replace("\\", "/").lstrip("/")
-                            else:
-                                full_src = href_val.lstrip("/")
-                            nav_points.append((clean_label, full_src))
+                    try:
+                        nav_root = _safe_xml_fromstring(nav_html)
+                        nav_tree = _parse_epub3_nav_tree(nav_root, nav_base_dir=nav_base_dir, opf_dir=opf_dir)
+                    except Exception:
+                        nav_tree = []
+
+                    if not nav_tree:
+                        matches = re.findall(
+                            r'<a\s+(?:[^>]*?\s+)?href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+                            nav_html,
+                            re.IGNORECASE | re.DOTALL,
+                        )
+                        for href_val, raw_label in matches:
+                            clean_label = re.sub(r"<[^>]+>", "", raw_label).strip()
+                            clean_label = html.unescape(clean_label)
+                            clean_label = " ".join(clean_label.split())
+                            if clean_label and href_val:
+                                if nav_base_dir and not href_val.startswith(nav_base_dir):
+                                    full_src = f"{nav_base_dir}/{href_val}".replace("\\", "/").lstrip("/")
+                                elif opf_dir and not href_val.startswith(opf_dir):
+                                    full_src = f"{opf_dir}/{href_val}".replace("\\", "/").lstrip("/")
+                                else:
+                                    full_src = href_val.lstrip("/")
+                                nav_tree.append(NavItem(label=clean_label, src=full_src))
                 except Exception:
-                    nav_points = []
+                    nav_tree = []
 
             # 5B. Fallback to EPUB 2 NCX (<navPoint>)
-            if not nav_points:
+            if not nav_tree:
                 if not toc_href:
                     for name in zf.namelist():
                         if name.endswith(".ncx"):
@@ -350,23 +532,19 @@ class ForensicEPUBParser:
                     try:
                         toc_xml = zf.read(toc_href).decode("utf-8", errors="ignore")
                         toc_root = _safe_xml_fromstring(toc_xml)
-                        for nav in toc_root.iter():
-                            if nav.tag.endswith("navPoint"):
-                                lbl_elem = None
-                                src_attr = None
-                                for child in nav.iter():
-                                    if child.tag.endswith("text") and child.text and not lbl_elem:
-                                        lbl_elem = html.unescape(child.text.strip())
-                                    elif child.tag.endswith("content") and "src" in child.attrib and not src_attr:
-                                        src_attr = child.attrib.get("src", "").strip()
-                                if lbl_elem and src_attr:
-                                    if opf_dir and not src_attr.startswith(opf_dir):
-                                        full_src = f"{opf_dir}/{src_attr}".replace("\\", "/").lstrip("/")
-                                    else:
-                                        full_src = src_attr
-                                    nav_points.append((lbl_elem, full_src))
+                        nav_map = None
+                        for c in toc_root.iter():
+                            if c.tag.endswith("navMap"):
+                                nav_map = c
+                                break
+                        if nav_map is not None:
+                            nav_tree = _parse_ncx_nav_tree(nav_map, opf_dir=opf_dir)
+                        else:
+                            nav_tree = _parse_ncx_nav_tree(toc_root, opf_dir=opf_dir)
                     except Exception:
-                        nav_points = []
+                        nav_tree = []
+
+            resolved_nav_targets = _flatten_nav_tree(nav_tree)
 
             # 6. Parse Content & Extract Blocks (Node-Level Isolation)
             # Parse each spine document individually to eliminate cross-document tag bleeding
@@ -390,7 +568,7 @@ class ForensicEPUBParser:
             chapters: List[CanonicalChapter] = []
             legacy_items: List[Dict[str, Any]] = []
 
-            if nav_points:
+            if resolved_nav_targets:
                 # Build unified ordered block list with spine coordinates
                 ordered_blocks_with_loc: List[Tuple[str, int, CanonicalBlock]] = []
                 for sf in spine_items:
@@ -398,8 +576,8 @@ class ForensicEPUBParser:
                         ordered_blocks_with_loc.append((sf, b_idx, blk))
 
                 # Resolve nav positions to exact block index in ordered_blocks_with_loc
-                nav_block_starts: List[Tuple[str, int, str]] = []
-                for lbl, src in nav_points:
+                nav_block_starts: List[Tuple[str, int, str, Optional[str]]] = []
+                for lbl, src, parent_lbl in resolved_nav_targets:
                     parts = src.split("#")
                     sf = parts[0]
                     anchor = parts[1] if len(parts) > 1 else ""
@@ -418,12 +596,10 @@ class ForensicEPUBParser:
                                 break
 
                     if match_idx is not None:
-                        nav_block_starts.append((lbl, match_idx, sf))
+                        nav_block_starts.append((lbl, match_idx, sf, parent_lbl))
 
-                skip_pattern = r"\b(?:extras|meet the author|preview|copyright|about the author|cover|toc)\b"
-
-                for i, (title, start_idx, spine_file) in enumerate(nav_block_starts):
-                    if re.search(skip_pattern, title, re.IGNORECASE):
+                for i, (title, start_idx, spine_file, parent_title) in enumerate(nav_block_starts):
+                    if _is_non_literary_frontmatter(title):
                         continue
                     end_idx = nav_block_starts[i + 1][1] if i + 1 < len(nav_block_starts) else len(ordered_blocks_with_loc)
                     chap_block_triples = ordered_blocks_with_loc[start_idx:end_idx]
@@ -431,8 +607,12 @@ class ForensicEPUBParser:
                     if not blocks:
                         continue
 
-                    # Generate chapter text from parsed blocks
-                    clean_text = "\n\n".join(b.normalized_text for b in blocks if b.normalized_text.strip())
+                    # Deduplicate leading headings so title is not repeated as body prose
+                    blocks, lead_heading_idx = _deduplicate_leading_headings(blocks, title, parent_title)
+                    body_blocks = blocks[lead_heading_idx:]
+
+                    # Generate chapter text from parsed body blocks
+                    clean_text = "\n\n".join(b.normalized_text for b in body_blocks if b.normalized_text.strip())
                     word_count = len(clean_text.split())
 
                     if word_count >= 5:
@@ -450,7 +630,7 @@ class ForensicEPUBParser:
                             is_production_chunk=False,
                             boundary_origin="toc_navigation",
                             literary_chapter_number=chap_num,
-                            parent_chapter_title=title,
+                            parent_chapter_title=parent_title or title,
                             chunk_index=1,
                             total_chunks_in_chapter=1,
                         )
@@ -464,7 +644,7 @@ class ForensicEPUBParser:
                             "is_production_chunk": False,
                             "boundary_origin": "toc_navigation",
                             "literary_chapter_number": chap_num,
-                            "parent_chapter_title": title,
+                            "parent_chapter_title": parent_title or title,
                             "chunk_index": 1,
                             "total_chunks": 1,
                             "source_location": spine_file,
@@ -484,8 +664,11 @@ class ForensicEPUBParser:
                         chap_num = len(chapters) + 1
                         has_heading = bool(blocks and blocks[0].type == "heading")
                         if has_heading:
+                            cand_title = blocks[0].normalized_text.strip()
+                            if _is_non_literary_frontmatter(cand_title):
+                                continue
                             lit_counter += 1
-                            title = blocks[0].normalized_text.strip()
+                            title = cand_title
                             unit_type = "literary_chapter"
                             is_lit = True
                             is_prod = False
