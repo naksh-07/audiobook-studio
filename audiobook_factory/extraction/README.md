@@ -199,10 +199,10 @@ Configured with universal `BLOCK_NONE` developer safety thresholds across harass
 The [`ForensicEPUBParser`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/parsers/epub.py#L225) processes digital `.epub` publications into authentic literary chapters using DOM-level element parsing and hierarchical navigation traversal:
 
 ### 7.1 Hierarchical Navigation Tree (`NavItem`)
-Many complex anthologies, fantasy novels, and epic collections (e.g., *The Witcher*, *A Song of Ice and Fire*) nest subchapters within parent story containers:
+Many complex anthologies, multi-part novels, and serialized collections nest subchapters within parent story containers:
 - **Tree Parsing**: Extracts nested `<navPoint>` elements (NCX) or `<ol>`/`<li>` structures (EPUB 3 Navigation Document) into recursive `NavItem` trees.
 - **Parent-Child Title Synthesis**: Preserves parent story identity when child subchapters share anchors or are titled with bare Roman numerals:
-  - If a child node is titled `"I"` and has parent `"The Bounds of Reason"`, the resolved title becomes `"The Bounds of Reason - Part I"`.
+  - If a child node is titled `"I"` and has parent `"Story Collection"`, the resolved title becomes `"Story Collection - Part I"`.
   - Leaf nodes with empty block slices (0 words) due to anchor collisions are gracefully resolved, eliminating dropped parent narratives.
 
 ### 7.2 Typographic Heading Promotion & Deduplication

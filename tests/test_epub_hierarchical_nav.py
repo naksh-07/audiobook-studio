@@ -57,7 +57,7 @@ def create_hierarchical_multi_story_epub(epub_path: Path) -> Path:
       <content src="front.xhtml#welcome"/>
     </navPoint>
     <navPoint id="np3" playOrder="3">
-      <navLabel><text>THE BOUNDS OF REASON</text></navLabel>
+      <navLabel><text>THE ANCIENT MOUNTAIN</text></navLabel>
       <content src="story1.xhtml#story1_start"/>
       <navPoint id="np4" playOrder="3">
         <navLabel><text>I</text></navLabel>
@@ -69,7 +69,7 @@ def create_hierarchical_multi_story_epub(epub_path: Path) -> Path:
       </navPoint>
     </navPoint>
     <navPoint id="np6" playOrder="5">
-      <navLabel><text>A SHARD OF ICE</text></navLabel>
+      <navLabel><text>THE FROZEN SHORE</text></navLabel>
       <content src="story2.xhtml#story2_start"/>
       <navPoint id="np7" playOrder="5">
         <navLabel><text>I</text></navLabel>
@@ -110,10 +110,10 @@ def create_hierarchical_multi_story_epub(epub_path: Path) -> Path:
 <html xmlns="http://www.w3.org/1999/xhtml">
 <body>
   <div id="story1_start">
-    <p><b>THE BOUNDS OF REASON</b></p>
+    <p><b>THE ANCIENT MOUNTAIN</b></p>
     <p><b>I</b></p>
     <p>He will not emerge from that cavern alive, the innkeeper warned solemnly.</p>
-    <p>Geralt adjusted his sword belt without a word and stared toward the mist-shrouded gorge.</p>
+    <p>The traveler adjusted his leather pack without a word and stared toward the mist-shrouded gorge.</p>
   </div>
   <div id="story1_part2">
     <p><b>II</b></p>
@@ -128,15 +128,15 @@ def create_hierarchical_multi_story_epub(epub_path: Path) -> Path:
 <html xmlns="http://www.w3.org/1999/xhtml">
 <body>
   <div id="story2_start">
-    <p><b>A SHARD OF ICE</b></p>
+    <p><b>THE FROZEN SHORE</b></p>
     <p><b>I</b></p>
-    <p>Snow fell quietly over the silent roofs of Aedd Gynvael.</p>
-    <p>The sorceress looked up from her scrying glass with eyes as cold as obsidian.</p>
+    <p>Snow fell quietly over the silent roofs of the harbor town.</p>
+    <p>The astronomer looked up from her glass with eyes as calm as midnight.</p>
   </div>
   <div id="story2_part2">
     <p><b>II</b></p>
-    <p>The duel was set for the hour before noon beside the ancient ruined fountain.</p>
-    <p>A circle of solemn townsfolk gathered along the frosted cobblestones.</p>
+    <p>The journey was set for the hour before noon beside the ancient stone gate.</p>
+    <p>A circle of solemn villagers gathered along the frosted cobblestones.</p>
   </div>
 </body>
 </html>"""
@@ -184,24 +184,24 @@ class TestHierarchicalEPUBExtraction(unittest.TestCase):
 
             # 3. Verify hierarchical titling and parent linkages
             ch1, ch2, ch3, ch4 = book.chapters
-            self.assertEqual(ch1.title, "The Bounds Of Reason - Part I")
-            self.assertEqual(ch1.parent_chapter_title, "The Bounds Of Reason")
+            self.assertEqual(ch1.title, "The Ancient Mountain - Part I")
+            self.assertEqual(ch1.parent_chapter_title, "The Ancient Mountain")
             self.assertEqual(ch1.boundary_origin, "toc_navigation")
 
-            self.assertEqual(ch2.title, "The Bounds Of Reason - Part II")
-            self.assertEqual(ch2.parent_chapter_title, "The Bounds Of Reason")
+            self.assertEqual(ch2.title, "The Ancient Mountain - Part II")
+            self.assertEqual(ch2.parent_chapter_title, "The Ancient Mountain")
 
-            self.assertEqual(ch3.title, "A Shard Of Ice - Part I")
-            self.assertEqual(ch3.parent_chapter_title, "A Shard Of Ice")
+            self.assertEqual(ch3.title, "The Frozen Shore - Part I")
+            self.assertEqual(ch3.parent_chapter_title, "The Frozen Shore")
 
-            self.assertEqual(ch4.title, "A Shard Of Ice - Part II")
-            self.assertEqual(ch4.parent_chapter_title, "A Shard Of Ice")
+            self.assertEqual(ch4.title, "The Frozen Shore - Part II")
+            self.assertEqual(ch4.parent_chapter_title, "The Frozen Shore")
 
             # 4. Verify heading deduplication in Markdown projection (zero title stuttering)
             ch1_md = ch1.to_markdown()
             lines = [line.strip() for line in ch1_md.splitlines() if line.strip()]
-            self.assertEqual(lines[0], "# The Bounds Of Reason - Part I")
-            # First narrative line must be the actual author prose, NOT duplicate "THE BOUNDS OF REASON" or "I"
+            self.assertEqual(lines[0], "# The Ancient Mountain - Part I")
+            # First narrative line must be the actual author prose, NOT duplicate "THE ANCIENT MOUNTAIN" or "I"
             self.assertIn("He will not emerge from that cavern alive", lines[1])
             self.assertNotIn("\nI\n", ch1_md)
 
