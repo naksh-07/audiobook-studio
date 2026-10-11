@@ -65,19 +65,32 @@ class ChapterLexicalScanner:
             return []
 
         # Build combined set of known names and terms to exclude
+        import unicodedata
+        def _strip_accents(s: str) -> str:
+            return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+
         active_known: Set[str] = set()
         if known_lexicon:
-            active_known.update(k.lower() for k in known_lexicon)
+            for k in known_lexicon:
+                active_known.add(k.lower())
+                active_known.add(_strip_accents(k).lower())
         if book_bible:
             for c_name, c_ent in book_bible.characters.items():
                 active_known.add(c_name.lower())
-                active_known.update(a.lower() for a in c_ent.aliases)
-            active_known.update(loc.lower() for loc in book_bible.locations.keys())
-            active_known.update(term.lower() for term in book_bible.terminology.keys())
+                active_known.add(_strip_accents(c_name).lower())
+                for a in c_ent.aliases:
+                    active_known.add(a.lower())
+                    active_known.add(_strip_accents(a).lower())
+            for loc in book_bible.locations.keys():
+                active_known.add(loc.lower())
+                active_known.add(_strip_accents(loc).lower())
+            for term in book_bible.terminology.keys():
+                active_known.add(term.lower())
+                active_known.add(_strip_accents(term).lower())
 
-        # Regex matching 1 to 3 capitalized words, optionally with connective particles (of, de, van)
+        # Regex matching 1 to 3 capitalized words, supporting European accents and connective particles
         matches = re.findall(
-            r"\b[A-Z][a-z]+(?:-[A-Za-z]+)*(?:\s+(?:of|de|the|van|[A-Z][a-z]+(?:-[A-Za-z]+)*)){0,2}\b",
+            r"\b[A-Z\u00C0-\u017F][a-z\u00C0-\u017F]+(?:-[A-Za-z\u00C0-\u017F]+)*(?:\s+(?:of|de|the|van|and|[A-Z\u00C0-\u017F][a-z\u00C0-\u017F]+(?:-[A-Za-z\u00C0-\u017F]+)*)){0,2}\b",
             text,
         )
 
@@ -92,7 +105,7 @@ class ChapterLexicalScanner:
 
             if m_clean in ENGLISH_NON_ENTITY_STOPWORDS:
                 continue
-            if m_clean.lower() in active_known:
+            if m_clean.lower() in active_known or _strip_accents(m_clean).lower() in active_known:
                 continue
             freq_map[m_clean] = freq_map.get(m_clean, 0) + 1
 

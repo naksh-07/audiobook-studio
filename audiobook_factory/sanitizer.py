@@ -419,6 +419,14 @@ def audit_literary_register(
             if apply_substitutions:
                 cleaned_text = re.sub(pattern, replacement, cleaned_text)
 
+    # Check and repair English article transliteration ("The" -> "द")
+    article_pattern = r"(?<![\u0900-\u097F])द\s+([\u0900-\u097F]+)"
+    if re.search(article_pattern, cleaned_text):
+        article_matches = re.findall(article_pattern, cleaned_text)
+        warnings.append(f"English article 'द' detected before '{article_matches[0]}' -> stripped")
+        if apply_substitutions:
+            cleaned_text = re.sub(article_pattern, r"\1", cleaned_text)
+
     # Check contextual register advisories (never mutated, informative note only)
     for pattern, advisory_desc in CONTEXTUAL_REGISTER_ADVISORIES.items():
         if re.search(pattern, cleaned_text):

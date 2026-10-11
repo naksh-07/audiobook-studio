@@ -89,31 +89,42 @@ class GlossaryManager:
             eng_name = d_ent.english_name
             hin_name = d_ent.hindi_name
 
-            # Check if this name matches an existing character or alias
+            # Check if this name matches an existing character or alias (accent-insensitive)
+            import unicodedata
+            def _strip(s: str) -> str:
+                return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn").lower()
+
             matched_key: Optional[str] = None
+            clean_eng = _strip(eng_name)
             for ex_name, ex_ent in active_bible.characters.items():
-                if ex_name.lower() == eng_name.lower() or eng_name.lower() in [a.lower() for a in ex_ent.aliases]:
+                ex_clean = _strip(ex_name)
+                ex_aliases_clean = [_strip(a) for a in ex_ent.aliases]
+                if clean_eng == ex_clean or clean_eng in ex_aliases_clean:
                     matched_key = ex_name
                     break
                 for alias in d_ent.aliases:
-                    if alias.lower() == ex_name.lower() or alias.lower() in [a.lower() for a in ex_ent.aliases]:
+                    al_clean = _strip(alias)
+                    if al_clean == ex_clean or al_clean in ex_aliases_clean:
                         matched_key = ex_name
                         break
+                if matched_key:
+                    break
 
             if matched_key:
-                # Character already known: unify new aliases
+                # Character already known: authoritative BookBible takes precedence over candidate classification
                 target_ent = active_bible.characters[matched_key]
+                if target_ent.hindi_name:
+                    d_ent.hindi_name = target_ent.hindi_name
+                d_ent.english_name = target_ent.english_name
+                d_ent.canonical_id = target_ent.canonical_id
                 current_aliases = set(target_ent.aliases)
                 for a in d_ent.aliases:
                     current_aliases.add(a)
                 if eng_name != matched_key:
                     current_aliases.add(eng_name)
-                if hin_name and hin_name != target_ent.hindi_name:
-                    current_aliases.add(hin_name)
                 target_ent.aliases = sorted(list(current_aliases))
                 # Update ChapterEntity with unified aliases
                 d_ent.aliases = target_ent.aliases
-                d_ent.canonical_id = target_ent.canonical_id
             else:
                 # Brand new character discovered: register in BookBible
                 new_book_ent = BookEntity(

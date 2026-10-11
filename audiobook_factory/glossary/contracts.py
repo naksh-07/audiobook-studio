@@ -91,13 +91,20 @@ class ChapterGlossary(BaseModel):
         # 2. Terminology
         glossary.update(self.terminology)
         # 3. Characters & Heraldic Monikers
+        import unicodedata
         for c_name, c_ent in self.entities.items():
             if c_ent.hindi_name:
                 glossary[c_name] = c_ent.hindi_name
+                norm_c = "".join(c for c in unicodedata.normalize("NFD", c_name) if unicodedata.category(c) != "Mn")
+                if norm_c and norm_c not in glossary:
+                    glossary[norm_c] = c_ent.hindi_name
                 # Also map aliases if they have clean mappings
                 for a in c_ent.aliases:
                     if a and a not in glossary:
                         glossary[a] = c_ent.hindi_name
+                        norm_a = "".join(c for c in unicodedata.normalize("NFD", a) if unicodedata.category(c) != "Mn")
+                        if norm_a and norm_a not in glossary:
+                            glossary[norm_a] = c_ent.hindi_name
         return glossary
 
     def to_scripting_roster(self, use_hindi: bool = True) -> Dict[str, Any]:

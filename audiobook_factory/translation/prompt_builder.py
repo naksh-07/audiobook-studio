@@ -21,7 +21,9 @@ RAW_UNRATED_DIRECTIVES = """### CORE DIRECTIVES - 11 GOLDEN INVARIANTS (RAW UNRA
 8. SOMATIC INTIMACY & EROTICA: Sensory touch, heat, skin friction, breath ('तपती कमर', 'पसलियों की लचक', 'कांपती उंगलियां', 'बेकाबू सांसें'). Strictly ban clinical biology words ('योनि', 'लिंग').
 9. VISCERAL COMBAT & GORE: Visceral strikes, blood spray, bone fractures ('लोहा हंसली की हड्डी चीरता हुआ सीने में धंस गया'). Use sharp, staccato clauses during fight scenes.
 10. ANTI-SANSKRITIZATION & NATURAL SPOKEN DIALOGUE: Ban stiff, textbook Sanskrit ('युवतियां' -> 'लड़कियां/औरतें'; 'दर्पण' -> 'आईना'). Use living spoken Hindustani of premium OTT drama and Audible originals.
-11. CANON ADHERENCE & ZERO CHATTER: Output ONLY complete unabridged Devanagari Markdown. Never summarize, truncate, or include preambles, notes, or explanations."""
+11. CANON ADHERENCE & ZERO CHATTER: Output ONLY complete unabridged Devanagari Markdown. Never summarize, truncate, or include preambles, notes, or explanations.
+12. ZERO ENGLISH ARTICLES IN DEVANAGARI: English articles ('The', 'A', 'An') do not exist in Hindi and MUST NEVER be transliterated as 'द' or 'ए'. Always strip leading articles completely before proper names, locations, and titles (e.g. 'The Golden Inn' -> 'गोल्डन इन', NEVER 'द गोल्डन इन'; 'The Butcher' -> 'कसाई', NEVER 'द कसाई').
+13. PHONETIC FIDELITY FOR BEASTS, ORDERS & PROPER NAMES: Transliterate mythical monster/beast species (dragon -> 'ड्रैगन', basilisk -> 'बैसिलिस्क', warlock -> 'वॉरलॉक') and titular orders/professions phonetically into Devanagari; NEVER invent literal compound calques. Pronounce foreign proper names phonetically (e.g. final 'a' as 'आ'/'या', e.g. Elena -> 'एलेना', Freya -> 'फ्रेया'); NEVER transliterate names as single English letter sounds (e.g. NEVER 'टी और वी') or common English nouns."""
 
 
 CLASSIC_REVERENT_DIRECTIVES = """### CORE DIRECTIVES - DIGNIFIED HERITAGE & PATHOS:
@@ -30,7 +32,9 @@ CLASSIC_REVERENT_DIRECTIVES = """### CORE DIRECTIVES - DIGNIFIED HERITAGE & PATH
 3. ZERO MODERN SLURS / TAPORI VULGARITY: Street profanity ('गांड', 'लंड', etc.) and modern casual slang are strictly banned. Render emotional friction through formal verbal sparring and dignified sarcasm.
 4. SOCIAL HIERARCHY & HONORIFICS: Preserve traditional social relations and respectful pronouns ('आप', 'हुज़ूर', 'सरकार', 'श्रीमान') with absolute consistency.
 5. SENSORY ELEGANCE: Describe beauty, nature, sorrow, and longing with classical grace.
-6. CANON ADHERENCE & ZERO CHATTER: Output ONLY complete unabridged Devanagari Markdown. Never summarize, truncate, or include conversational chatter."""
+6. CANON ADHERENCE & ZERO CHATTER: Output ONLY complete unabridged Devanagari Markdown. Never summarize, truncate, or include conversational chatter.
+7. ZERO ENGLISH ARTICLES IN DEVANAGARI: Strip leading English articles ('The', 'A', 'An'); never transliterate 'The' as 'द'.
+8. PHONETIC FIDELITY: Transliterate proper names, places, beast species, and titular orders phonetically into Devanagari without awkward calques."""
 
 
 class DynamicPromptBuilder:
