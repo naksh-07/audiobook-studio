@@ -22,5 +22,10 @@
   - CLI `research` command added and `ModelGateway` tools support enabled.
   - Room 1 Pre-Production verified on live project: 114k words scanned, 51 characters extracted, 52 cast locks allocated with 4D formants, and `book_dna.json` profiled.
   - `MetadataDoctor` audit: 7/7 checks PASS (Extraction, Source, Canon, Cast Lock, Glossary, Screenplay, Mastering).
+- **Pillar 2 Room 2 Translation Collective Verification (COMPLETED & CERTIFIED)**:
+  - Fixed `ModelGateway` session affinity key rotation during rate limit backoffs (`clear_affinity` + 60s window).
+  - Hardened dramatic script localization framing (`[CREATIVE SCRIPT LOCALIZATION & DRAMATURGY]`) preventing commercial book copyright refusal heuristics.
+  - Fail-closed validation in `TranslationQualityCritic` enforcing zero truncation / zero refusal.
+  - Chapter 1 (1,498 words) translated into unabridged literary Hindustani (`chapter_001_hi.md`, 9,647 characters, length ratio 1.29). 28/28 model & translation tests PASS.
 - **Grand Unification 100% Completed & Merged into Main**:
   - All 7 phases operational, audited, and production ready via CLI, Python API, and Antigravity UI.
