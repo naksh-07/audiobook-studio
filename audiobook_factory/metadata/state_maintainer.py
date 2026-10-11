@@ -110,9 +110,11 @@ class NovelStateMaintainer:
             if c_name in voice_registry:
                 v_cfg = voice_registry[c_name]
                 c_ent.assigned_voice = v_cfg.get("voice", "Aoede")
-                pitch_val = v_cfg.get("pitch", 1.0)
+                pitch_val = float(v_cfg.get("pitch", 1.0))
                 c_ent.pitch_shift_pct = round((pitch_val - 1.0) * 100.0, 2)
-                c_ent.tempo_scale = v_cfg.get("speed", 1.0)
+                c_ent.pitch_ratio = pitch_val
+                c_ent.tempo_scale = float(v_cfg.get("speed", 1.0))
+                c_ent.speed_ratio = float(v_cfg.get("speed", 1.0))
 
                 # Formant EQ representation if available
                 bass = v_cfg.get("bass_boost_db", 0.0)
@@ -301,12 +303,52 @@ class NovelStateMaintainer:
 
                 # Sync 4D acoustics
                 ent.assigned_voice = cast_cfg.get("voice", "Aoede")
-                pitch_val = cast_cfg.get("pitch", 1.0)
+                pitch_val = float(cast_cfg.get("pitch", 1.0))
                 ent.pitch_shift_pct = round((pitch_val - 1.0) * 100.0, 2)
-                ent.tempo_scale = cast_cfg.get("speed", 1.0)
+                ent.pitch_ratio = pitch_val
+                ent.tempo_scale = float(cast_cfg.get("speed", 1.0))
+                ent.speed_ratio = float(cast_cfg.get("speed", 1.0))
 
                 # Atomic save book_bible.json
                 active_bible.save(p_dir)
+
+                # Re-export projections (glossary.json, voice_registry.json, character_roster.json)
+                try:
+                    trans_dir = p_dir / "translation"
+                    trans_dir.mkdir(parents=True, exist_ok=True)
+                    glossary_proj = active_bible.export_legacy_glossary()
+                    with open(trans_dir / "glossary.json", "w", encoding="utf-8") as gf:
+                        json.dump(glossary_proj, gf, ensure_ascii=False, indent=2)
+
+                    vreg_path = p_dir / "voice_registry.json"
+                    vreg = json.loads(vreg_path.read_text(encoding="utf-8")) if vreg_path.exists() else {}
+                    vreg[speaker_name.strip()] = {
+                        "voice": ent.assigned_voice,
+                        "pitch": ent.pitch_ratio,
+                        "speed": ent.speed_ratio,
+                    }
+                    with open(vreg_path, "w", encoding="utf-8") as vf:
+                        json.dump(vreg, vf, ensure_ascii=False, indent=2)
+
+                    roster_path = p_dir / "character_roster.json"
+                    roster = json.loads(roster_path.read_text(encoding="utf-8")) if roster_path.exists() else {"characters": {}}
+                    if "characters" not in roster:
+                        roster["characters"] = {}
+                    sp_str = speaker_name.strip()
+                    roster["characters"][sp_str] = {
+                        "character_uuid": getattr(ent, "canonical_id", None) or sp_str.lower().replace(" ", "_"),
+                        "display_name": getattr(ent, "hindi_name", None) or ent.english_name or sp_str,
+                        "english_name": ent.english_name or sp_str,
+                        "gender": ent.gender or "neutral",
+                        "assigned_voice_id": ent.assigned_voice,
+                        "pitch_shift": ent.pitch_ratio,
+                        "speed_multiplier": ent.speed_ratio,
+                        "sociolect_trait": ent.sociolect_trait,
+                    }
+                    with open(roster_path, "w", encoding="utf-8") as rf:
+                        json.dump(roster, rf, ensure_ascii=False, indent=2)
+                except Exception as proj_err:
+                    logger.warning(f"  [!] Notice re-exporting projections: {proj_err}")
 
             return cast_cfg
 

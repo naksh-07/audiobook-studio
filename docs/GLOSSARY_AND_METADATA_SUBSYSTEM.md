@@ -285,6 +285,66 @@ chapter_glossary.save_to_file("audiobooks/projects/my_novel/glossary/chapter_003
 loaded_glossary = ChapterGlossary.load_from_file("audiobooks/projects/my_novel/glossary/chapter_003_glossary.json")
 ```
 
+### 4.5 `BookEntity` Schema Harmonization & Epistemic Canon (`book_bible.py`)
+
+At the core of the metadata subsystem is [`BookEntity`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py#L26), the authoritative schema for novel entities in [`BookBible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py). To ensure seamless interoperability between legacy dictionary structures, research DTOs, casting directors, and audio synthesis pipelines, `BookEntity` features comprehensive field harmonization via `@model_validator(mode="before")`:
+
+```python
+class BookEntity(BaseModel):
+    canonical_id: str = ""
+    english_name: str
+    hindi_name: str = ""
+    taxonomy: Literal["PROPER_NAME", "HERALDIC_MONIKER", "OCCUPATIONAL_ROLE"] = "PROPER_NAME"
+    aliases: List[str] = Field(default_factory=list)
+    category: str = "character"
+    gender: Optional[str] = None
+    is_child: bool = False
+    vocal_weight: str = "authoritative"
+    description: str = ""
+    first_appearance_chapter: int = 1
+    pronunciation_hint: str = ""
+    sociolect_archetype: Optional[str] = "NEUTRAL"
+    default_honorific_level: Optional[str] = "tum"
+    speech_quirks: str = ""
+    is_canonical: bool = True
+    confidence: float = 1.0
+    provenance: EpistemicProvenance = Field(default_factory=EpistemicProvenance)
+
+    # 4D Acoustic Voice Allocation Vector
+    assigned_voice: Optional[str] = None
+    pitch_shift_pct: float = 0.0   # e.g. +5.0%
+    pitch_ratio: float = 1.0       # e.g. 1.05
+    tempo_scale: float = 1.0       # e.g. 0.98
+    speed_ratio: float = 1.0       # e.g. 0.98
+    eq_formant: str = ""           # e.g. "equalizer=f=220:t=q:w=1.2:g=+2.0"
+```
+
+#### Smart Coercion & Property Bridges
+`BookEntity` implements automatic, loss-free coercion across heterogeneous caller schemas:
+- **Identifier Harmonization**: `canonical_name` automatically maps to `english_name`. Missing `canonical_id` auto-generates via `english_name.lower().replace(" ", "_")`.
+- **Lock State**: `locked` boolean maps to `is_canonical`.
+- **Sociolect & Honorifics**: `sociolect_trait` maps to `sociolect_archetype` (defaulting to `"NEUTRAL"`), and `recommended_pronoun_level` maps to `default_honorific_level` (defaulting to `"tum"`).
+- **Voice Assignment**: `assigned_voice` extracts seamlessly from `voice_id`, `voice`, `voice_persona`, or `assigned_voice_id`.
+- **Pitch Ratio & Percentage Coercion**:
+  - If given `pitch` or `pitch_ratio` (e.g. `1.05`), calculates `pitch_shift_pct = round((p_val - 1.0) * 100.0, 2)`.
+  - If given `pitch_shift_pct` (e.g. `5.0`), calculates `pitch_ratio = round(1.0 + (pct / 100.0), 3)`.
+  - If given `pitch_shift` in semitones or ratios, disambiguates by magnitude and synchronizes both representations.
+- **Speed & Tempo Harmonization**: Synchronizes `speed_ratio` and `tempo_scale` from `speed` or `speed_multiplier`.
+- **Backward-Compatible Property Accessors**: Re-exports `@property canonical_name`, `@property locked`, `@property sociolect_trait`, and `@property recommended_pronoun_level` for legacy tool compatibility.
+
+### 4.6 CastLock Single Source of Truth & Acoustic Separation (`cast_lock.json`)
+
+While `BookBible` manages character lore and narrative provenance, `cast_lock.json` serves as the **Supreme Single Source of Truth for vocal casting and acoustic formants**:
+
+1. **Supreme Voice Authority**:
+   Whenever a character's voice is registered in `cast_lock.json` with `locked: true`, its voice persona and acoustic overrides take absolute precedence over `book_bible.json`, `character_roster.json`, and `voice_registry.json`.
+2. **$\ge 4.0\%$ Pitch Separation Invariant**:
+   In large-cast novels where multiple ensemble characters share a base neural voice persona (e.g., two male baritones sharing `Charon`, or two females sharing `Aoede`), `NovelStateMaintainer` and `MetadataDoctor` enforce a mandatory minimum acoustic separation:
+   $$|\text{pitch\_ratio}_A - \text{pitch\_ratio}_B| \ge 0.040 \quad (\ge 4\%)$$
+   This acoustic distance ensures listeners can effortlessly distinguish co-speakers without introducing cartoonish frequency shifts.
+3. **Pitch Ratio Safety Clamping**:
+   All character pitch shifts are strictly bounded within $[0.85, 1.15]$ (clamped to $[0.70, 1.30]$ under extreme ensemble casting) to preserve authentic human resonance and prevent DSP artifacting.
+
 ---
 
 ## 5. Chapter Lexical Scanner & Zero-Token Fast-Path (`scanner.py`)
@@ -467,6 +527,51 @@ trans_map = GlossaryManager.export_for_translation(chapter_num=3, project_dir="p
 # Direct export for Room 3 Screenplay (returns {"characters": {...}})
 roster = GlossaryManager.export_for_scripting(chapter_num=3, project_dir="projects/novel", use_hindi=True)
 ```
+
+### 8.3 Two-Phase Atomic State Commit in `NovelStateMaintainer` (`state_maintainer.py`)
+
+Persistent state operations across novel pre-production, glossaries, and cast locking are governed by [`NovelStateMaintainer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/state_maintainer.py). To prevent partial write corruption, lock starvation, and desynchronization between interdependent artifacts (`book_dna.json`, `book_bible.json`, `vocal_spaces.json`, `sonic_bible.json`, `character_roster.json`, `voice_registry.json`, `cast_lock.json`, and `translation/glossary.json`), `NovelStateMaintainer` enforces the **NR-GATE-06 Two-Phase Staged Transactional Commit Protocol**:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                               NR-GATE-06 TRANSACTIONAL COMMIT PROTOCOL                           │
+│                                                                                                  │
+│  Thread Safety:  _STATE_LOCK = threading.RLock() (Guarantees atomic cross-room state mutability)  │
+│                                                                                                  │
+│  Phase 0: Staging -> Write all 8 target JSON payloads to temporary files:                        │
+│           target.with_suffix(".stage_{timestamp}.tmp")                                          │
+│  Phase 1: Backup  -> Snapshot all pre-existing target destination files:                         │
+│           target.with_suffix(".stage_{timestamp}.bak") via shutil.copy2                          │
+│  Phase 2: Swap    -> Atomically replace staged files into destinations using _atomic_replace()   │
+│                      with a 5-attempt retry loop and exponential backoff on Windows 11.          │
+│  Phase 3: Cleanup -> On transaction success, unlink all temporary .bak snapshot files.          │
+│                                                                                                  │
+│  ON FAILURE (Automated Rollback Phases A-D):                                                     │
+│  • Phase A: Restore all pre-existing targets from .bak snapshots via _atomic_replace()           │
+│  • Phase B: Unlink any newly created target files that had no previous backup                    │
+│  • Phase C: Unlink all staged .tmp files                                                         │
+│  • Phase D: Purge any leftover artifacts matching staging_id across project & translation dirs   │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Windows 11 File Locking Resilience
+On Windows workstations, background services like Windows Defender, search indexers, or audio preview handles can briefly lock files during renaming. `_atomic_replace()` executes an exponential backoff loop:
+
+```python
+def _atomic_replace(src: Path, dst: Path) -> None:
+    last_err: Optional[OSError] = None
+    for attempt in range(5):
+        try:
+            os.replace(src, dst)
+            return
+        except OSError as e:
+            last_err = e
+            time.sleep(0.015 * (2 ** attempt))
+    if last_err is not None:
+        raise OSError(f"Atomic replacement of {dst} failed after 5 retries: {last_err}") from last_err
+```
+
+This guarantees 0% partial write drift, eliminating `WinError 5` (Access Denied) and `WinError 32` (Sharing Violation) while preserving 100% transactional integrity across all master assets.
 
 ---
 

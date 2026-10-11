@@ -102,6 +102,15 @@ app.api('/api/voices', () => {
   return runPythonBridge('list-voices');
 }, 'GET');
 
+// GET /api/doctor?slug=...: Runs zero-token MetadataDoctor on project
+app.api('/api/doctor', (data) => {
+  const slug = data.slug;
+  if (!slug || typeof slug !== 'string' || !/^[a-zA-Z0-9_\-\.]+$/.test(slug)) {
+    return { error: 'Invalid or missing slug parameter' };
+  }
+  return runPythonBridge('doctor', ['--slug', slug]);
+}, 'GET');
+
 // LRU cache for audio peaks (max 50 waveforms)
 const PEAKS_CACHE = new Map();
 const MAX_PEAKS_CACHE_SIZE = 50;

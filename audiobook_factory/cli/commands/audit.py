@@ -9,11 +9,16 @@ from audiobook_factory.cli.context import get_projects_dir, get_workspace_dir
 from audiobook_factory.gate_auditor import audit_book_master, audit_chapter_gates, GateAuditError
 
 def cmd_audit_book(args):
-    """Executes Macro-Tier Gate 6 and 8-Pillar Studio Production Certification for a book project."""
+    """Executes Macro-Tier Gate 6, MetadataDoctor, and 8-Pillar Studio Production Certification for a book project."""
     target = Path(args.project_dir)
     project_dir = target if (target.exists() and target.is_dir()) else (get_projects_dir() / args.project_dir)
 
-    print(f"[*] Running Macro-Tier Gate 6 Master Audit on '{project_dir.name}'...")
+    # 1. Zero-Token Metadata Doctor
+    from audiobook_factory.metadata.doctor import MetadataDoctor
+    doc_report = MetadataDoctor.diagnose_project(project_dir)
+    print("\n" + doc_report.format_table())
+
+    print(f"\n[*] Running Macro-Tier Gate 6 Master Audit on '{project_dir.name}'...")
     report = audit_book_master(project_dir)
     print("\n" + "=" * 65)
     print(f"📘 MACRO BOOK GATE 6 VERDICT: {report['overall_status']}")
@@ -57,6 +62,26 @@ def cmd_audit_book(args):
     print("=" * 65)
 
     if not report['overall_passed'] or not cert.is_certified:
+        sys.exit(1)
+
+
+def cmd_doctor(args):
+    """Executes zero-token Pre-Flight Metadata Doctor forensic audit."""
+    from audiobook_factory.metadata.doctor import MetadataDoctor
+    target_str = getattr(args, "book", None) or getattr(args, "project_dir", None)
+    if not target_str:
+        print("[!] Missing book or project_dir argument", file=sys.stderr)
+        sys.exit(1)
+    target = Path(target_str)
+    project_dir = target if (target.exists() and target.is_dir()) else (get_projects_dir() / target_str)
+
+    if not project_dir.exists():
+        print(f"[!] Project directory not found: {project_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    doc_report = MetadataDoctor.diagnose_project(project_dir)
+    print("\n" + doc_report.format_table())
+    if not doc_report.is_healthy():
         sys.exit(1)
 
 

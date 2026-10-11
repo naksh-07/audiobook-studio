@@ -47,7 +47,9 @@ class BookEntity(BaseModel):
     # 4D Acoustic Voice Allocation
     assigned_voice: Optional[str] = None
     pitch_shift_pct: float = 0.0
+    pitch_ratio: float = 1.0
     tempo_scale: float = 1.0
+    speed_ratio: float = 1.0
     eq_formant: str = ""
 
     @model_validator(mode="before")
@@ -69,6 +71,49 @@ class BookEntity(BaseModel):
                 data["default_honorific_level"] = data.pop("recommended_pronoun_level") or "tum"
             if data.get("default_honorific_level") is None:
                 data["default_honorific_level"] = "tum"
+            
+            # Voice & Acoustic harmonization
+            if "assigned_voice" not in data:
+                for k in ("voice_id", "voice", "voice_persona", "assigned_voice_id"):
+                    if k in data and data[k]:
+                        data["assigned_voice"] = data[k]
+                        break
+            if "pitch" in data and "pitch_ratio" not in data:
+                try:
+                    p_val = float(data["pitch"])
+                    data["pitch_ratio"] = p_val
+                    if "pitch_shift_pct" not in data:
+                        data["pitch_shift_pct"] = round((p_val - 1.0) * 100.0, 2)
+                except (ValueError, TypeError):
+                    pass
+            elif "pitch_shift_pct" in data and "pitch_ratio" not in data:
+                try:
+                    pct = float(data["pitch_shift_pct"])
+                    data["pitch_ratio"] = round(1.0 + (pct / 100.0), 3)
+                except (ValueError, TypeError):
+                    pass
+            elif "pitch_shift" in data and "pitch_ratio" not in data:
+                try:
+                    ps_val = float(data["pitch_shift"])
+                    if 0.5 <= ps_val <= 2.0:
+                        data["pitch_ratio"] = ps_val
+                        if "pitch_shift_pct" not in data:
+                            data["pitch_shift_pct"] = round((ps_val - 1.0) * 100.0, 2)
+                    else:
+                        data["pitch_shift_pct"] = ps_val
+                        data["pitch_ratio"] = round(1.0 + (ps_val / 100.0), 3)
+                except (ValueError, TypeError):
+                    pass
+
+            for sk in ("speed", "speed_multiplier", "tempo_scale"):
+                if sk in data and "speed_ratio" not in data:
+                    try:
+                        s_val = float(data[sk])
+                        data["speed_ratio"] = s_val
+                        data["tempo_scale"] = s_val
+                        break
+                    except (ValueError, TypeError):
+                        pass
         return data
 
     @property
@@ -98,6 +143,26 @@ class BookEntity(BaseModel):
     @property
     def recommended_pronoun_level(self) -> str:
         return self.default_honorific_level or "tum"
+
+    @property
+    def voice_persona(self) -> str:
+        return self.assigned_voice or "Aoede"
+
+    @property
+    def voice_id(self) -> str:
+        return self.assigned_voice or "Aoede"
+
+    @property
+    def pitch(self) -> float:
+        return self.pitch_ratio
+
+    @property
+    def pitch_shift(self) -> float:
+        return self.pitch_shift_pct
+
+    @property
+    def speed(self) -> float:
+        return self.speed_ratio
 
 
 # Aliases for backward compatibility and clean architectural domain mapping
@@ -199,6 +264,28 @@ class BookBible(BaseModel):
     flagged_conflicts: List[FlaggedConflict] = Field(default_factory=list)
     candidate_entities: List[BookEntity] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_bible_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            data = dict(data)
+            entities = data.get("entities")
+            if isinstance(entities, dict):
+                for key in ("characters", "locations", "organizations", "creatures", "objects", "titles", "terminology"):
+                    if key in entities and (key not in data or not data[key]):
+                        data[key] = entities[key]
+
+            for key in ("locations", "organizations", "creatures", "objects", "titles", "terminology"):
+                if key in data and isinstance(data[key], dict):
+                    coerced_dict = {}
+                    for ent_k, ent_v in data[key].items():
+                        if isinstance(ent_v, dict):
+                            coerced_dict[ent_k] = ent_v.get("hindi_name") or ent_v.get("canonical_name") or ent_v.get("english_name") or ent_k
+                        else:
+                            coerced_dict[ent_k] = str(ent_v)
+                    data[key] = coerced_dict
+        return data
 
     def find_character(self, name: str) -> Optional[BookEntity]:
         """Looks up a canonical character entity by English name, Hindi name, or alias."""

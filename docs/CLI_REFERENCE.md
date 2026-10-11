@@ -30,6 +30,7 @@ python -m audiobook_factory.api.studio_bridge [SUBCOMMAND] [OPTIONS]
 | **[`script`](#3-screenplay--adaptation-scripting-script)** | Screenplay | `audiobook` / `podcast` | Generates screenplay scripts using `audiobook` or `podcast` format adapters. |
 | **[`package`](#4-multi-format-container-packaging-package)** | Delivery | `audiobook` / `podcast` / `both` | Assembles final deliverables: chapterized `.m4b` audiobook, `.m4a` podcast episodes, or both. |
 | **[`audit-book`](#5-full-book-macro-audit--8-pillar-certification-audit-book)** | QA (Macro) | Master Release | Executes Gate 6 master audit and the complete **8-Pillar Studio Production Certification Scorecard**. |
+| **[`doctor`](#5b-zero-token-pre-flight-metadata-doctor-doctor)** | QA (Pre-Flight) | Health Table | Runs zero-token Pre-Flight Metadata Doctor forensic audit (<50ms offline check across all 6 rooms). |
 | **[`audit`](#6-chapter-quality-audit-audit)** | QA (Chapter) | Chapter | Executes Multi-Gate Independent Verification (Gates 0, 1, 2, 2.5, 2.8, 5) on a single chapter. |
 | **[`produce`](#7-chapter-vocal-production-produce)** | Chapter / All | `audiobook` | Produces mastered vocal chapters with EBU R128 (-19 LUFS) and timeline ledger. |
 | **[`extract`](#8-universal-document-extraction-extract)** | Ingestion | Markdown | Ingests EPUB, PDF, TXT, or MD documents into clean Markdown chapters. |
@@ -162,6 +163,9 @@ audiobook-cli script <BOOK_SLUG> [OPTIONS]
 | `--chapters` | String | `None` | Comma-separated or range of chapters (e.g. `1-2`). |
 | `--overwrite` | Flag | `False` | Overwrite existing screenplay script files. |
 
+### JIT Pre-Production Auto-Resolution
+Before generating scripts, `cmd_script` verifies that `book_bible.json` and `cast_lock.json` exist in the target project directory. If either master asset is missing, it automatically executes Room 1 Pre-Production Just-In-Time (`run_preproduction(project_dir, force=False)`), extracting character taxonomies and locking non-colliding voice formants before building scripts.
+
 ### Examples
 ```bash
 # Script using AudiobookAdapter (Audible Flow Standard)
@@ -208,16 +212,39 @@ Executes Macro-Tier Gate 6 master audits and the complete **8-Pillar Studio Prod
 
 ```bash
 audiobook-cli audit-book <PROJECT_DIR_OR_SLUG>
+# or:
+python audiobook_cli.py audit-book <PROJECT_DIR_OR_SLUG>
 ```
+
+### Zero-Token Pre-Flight Metadata Doctor Integration
+Before initiating Gate 6 and the 8-pillar scoring harness, `cmd_audit_book` executes [`MetadataDoctor.diagnose_project()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/doctor.py) in $<50\text{ms}$ offline. The diagnostic table is rendered first to verify cross-room metadata consistency (extraction inventory, BookBible canon, CastLock acoustics and $\ge 4\%$ separation, translation glossary alignment, screenplay speaker coverage, and Mastering V2 ledgers) without consuming generative AI API tokens.
 
 ### Certification Scorecard Output
 ```text
+============================================================================
+  AUDIOBOOK STUDIO METADATA DOCTOR: SWORD_OF_DESTINY
+============================================================================
+  Overall Status : [OK] PASS (6/6 checks passed)
+----------------------------------------------------------------------------
+  CATEGORY       | STATUS | CHECK & DETAILS                                   
+----------------------------------------------------------------------------
+  extraction     | PASS   | Extraction Inventory: Found 11 chapter markdown files
+  extraction     | PASS   | Source Manifest: Source manifest verified on disk 
+  canon          | PASS   | Book Bible Canon: Canonical BookBible loaded (14 characters, 5 locations)
+  casting        | PASS   | Cast Lock & Voice SSOT: 14 cast locks verified (14 locked)
+  translation    | PASS   | Translation Glossary: glossary.json verified (14 proper nouns/honorifics)
+  screenplay     | PASS   | Screenplay Speaker Coverage: 100% speaker coverage verified across 11 chapter scripts
+  mastering      | PASS   | Mastering V2 Compliance: 11 Mastering V2 ledgers verified (-19 LUFS / EBU R128 target)
+============================================================================
+
+[*] Running Macro-Tier Gate 6 Master Audit on 'sword_of_destiny'...
+
 =================================================================
 📘 MACRO BOOK GATE 6 VERDICT: PASSED
 =================================================================
   Gate 6A (Voice Continuity):    PASSED
   Gate 6B (Loudness Continuity): PASSED (avg -19.0 LUFS)
-  Gate 6C (TOC Integrity):       PASSED (12 chapters)
+  Gate 6C (TOC Integrity):       PASSED (11 chapters)
   Gate 6D (Packaging Specs):     PASSED
 
 =================================================================
@@ -235,6 +262,52 @@ audiobook-cli audit-book <PROJECT_DIR_OR_SLUG>
   OVERALL SCORE: 100.0%  |  VERDICT: 🏆 CERTIFIED
 =================================================================
 ```
+
+---
+
+## 5b. Zero-Token Pre-Flight Metadata Doctor (`doctor`)
+
+Executes an offline, millisecond-fast ($<50\text{ms}$) forensic sanity audit across all 6 production rooms without consuming generative AI API tokens.
+
+```bash
+audiobook-cli doctor <BOOK_SLUG_OR_PATH>
+# or:
+python audiobook_cli.py doctor <BOOK_SLUG_OR_PATH>
+```
+
+### Positional Arguments
+- `BOOK_SLUG_OR_PATH`: Book slug (e.g., `my_novel`) or full path to the project directory.
+
+### Audited Pipeline Categories (All 6 Rooms)
+1. **Extraction (Room 0)**: Validates chapter markdown inventory in `extracted/`, checks `metadata.json` and `source_manifest.json`.
+2. **Book Bible Canon (Room 1)**: Validates `book_bible.json` schema, character count, and entity taxonomy consistency.
+3. **Cast Lock & Voice SSOT (Room 1)**: Validates `cast_lock.json`, audits pitch safety ratio bounds ($[0.85, 1.15]$), and verifies **$\ge 4.0\%$ pitch separation** across characters sharing a base voice persona.
+4. **Translation Glossary (Room 2)**: Verifies `translation/glossary.json` exists and matches proper noun mappings.
+5. **Screenplay Speaker Coverage (Room 3)**: Samples up to 10 chapter scripts in `scripts/`, extracting spoken dialogue lines to ensure **100% speaker coverage** across `cast_lock.json`, `book_bible.json`, and voice registries (0 unmapped speakers).
+6. **Mastering V2 Compliance (Room 5)**: Audits `mastered/*_mastering_ledger.json` files for EBU R128 compliance ($-19.0 \pm 1.0\text{ LUFS}$) and True Peak ceiling ($\le -1.4\text{ dBTP}$).
+
+### Diagnostic Health Table Output
+```text
+============================================================================
+  AUDIOBOOK STUDIO METADATA DOCTOR: SWORD_OF_DESTINY
+============================================================================
+  Overall Status : [OK] PASS (6/6 checks passed)
+----------------------------------------------------------------------------
+  CATEGORY       | STATUS | CHECK & DETAILS                                   
+----------------------------------------------------------------------------
+  extraction     | PASS   | Extraction Inventory: Found 11 chapter markdown files
+  extraction     | PASS   | Source Manifest: Source manifest verified on disk 
+  canon          | PASS   | Book Bible Canon: Canonical BookBible loaded (14 characters, 5 locations)
+  casting        | PASS   | Cast Lock & Voice SSOT: 14 cast locks verified (14 locked)
+  translation    | PASS   | Translation Glossary: glossary.json verified (14 proper nouns/honorifics)
+  screenplay     | PASS   | Screenplay Speaker Coverage: 100% speaker coverage verified across 11 chapter scripts
+  mastering      | PASS   | Mastering V2 Compliance: 11 Mastering V2 ledgers verified (-19 LUFS / EBU R128 target)
+============================================================================
+```
+
+### Exit Codes
+- `0`: All checks passed or non-critical warnings only (`doc_report.is_healthy() == True`).
+- `1`: Project not found or critical anomalies detected (e.g., pitch ratio out of bounds, unmapped speakers in screenplay scripts, True Peak breaches in mastered ledgers).
 
 ---
 
@@ -336,6 +409,9 @@ audiobook-cli translate <BOOK_SLUG> [OPTIONS]
 - `--chapter`: Specific chapter number to translate.
 - `--chapters`: Comma-separated or range of chapters (e.g. `1-3`).
 - `--force-gate`: Bypasses Gate T0–T15 scene certification failure.
+
+### JIT Pre-Production Auto-Resolution
+`cmd_translate` checks if `book_bible.json` and `cast_lock.json` exist in the target project directory. If either is missing, it automatically invokes Room 1 Pre-Production Just-In-Time (`run_preproduction(project_dir, force=False)`), ensuring world lore, character taxonomies, and translation glossaries are established before chapter translation begins.
 
 ### Standalone Decoupled CLI (Independent Subsystem)
 The translation engine can also be executed completely independently from the audiobook pipeline for standalone books, documents, or scripts:

@@ -365,9 +365,16 @@ function renderProjectUI(detail) {
   const sideTitle = $('sidebar-project-title');
   if (sideTitle) sideTitle.textContent = detail.title || detail.slug;
 
+  const totalSegments = detail.total_segments || (detail.segments_summary && detail.segments_summary.total) || 0;
   const sideInfo = $('sidebar-project-info');
   if (sideInfo) {
-    sideInfo.textContent = `${detail.total_segments || 0} Segments • -19.0 LUFS`;
+    sideInfo.textContent = `${totalSegments} Segments • -19.0 LUFS`;
+  }
+
+  // Sidebar chapter count
+  const sideChapterCount = $('sidebar-chapter-count');
+  if (sideChapterCount) {
+    sideChapterCount.textContent = String((detail.chapters || []).length);
   }
 
   // 5-Room DAG Stepper Sync
@@ -403,13 +410,43 @@ function renderDAGStepper(rooms) {
   elementIds.forEach((id, idx) => {
     const el = $(id);
     if (!el) return;
-    const roomState = rooms[roomKeys[idx]] || rooms[fallbackKeys[idx]] || 'queued';
+    const rawState = rooms[roomKeys[idx]] || rooms[fallbackKeys[idx]] || 'queued';
+    const st = (typeof rawState === 'object' && rawState !== null ? (rawState.status || '') : String(rawState)).toLowerCase();
+    const details = (typeof rawState === 'object' && rawState !== null ? rawState.details : null);
 
     el.classList.remove('completed', 'active');
-    if (roomState === 'completed') {
+
+    // Update header status icon/badge (top right of card)
+    const headerRight = el.children[0] ? el.children[0].children[1] : null;
+    const metricFooter = el.children[2] || el.lastElementChild;
+
+    if (st === 'completed' || st === 'passed' || st === 'ready') {
       el.classList.add('completed');
-    } else if (roomState === 'active') {
+      if (headerRight) {
+        headerRight.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--studio-green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+      }
+      if (metricFooter && details) {
+        metricFooter.textContent = details;
+        metricFooter.style.color = 'var(--studio-green)';
+      }
+    } else if (st === 'active' || st === 'in_progress' || st === 'running') {
       el.classList.add('active');
+      if (headerRight) {
+        headerRight.innerHTML = `<span style="display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 9999px; background: var(--studio-amber-light); color: var(--studio-amber-dark); font-size: 9px; font-weight: 700;">Active</span>`;
+      }
+      if (metricFooter && details) {
+        metricFooter.textContent = details;
+        metricFooter.style.color = 'var(--studio-amber-dark)';
+      }
+    } else {
+      if (headerRight) {
+        const label = st === 'queued' ? 'Queued' : (st ? st.charAt(0).toUpperCase() + st.slice(1) : 'Pending');
+        headerRight.innerHTML = `<span style="font-size: 10px; color: var(--text-muted);">${escapeHTML(label)}</span>`;
+      }
+      if (metricFooter && details) {
+        metricFooter.textContent = details;
+        metricFooter.style.color = 'var(--text-muted)';
+      }
     }
   });
 }
@@ -421,6 +458,9 @@ function renderVoiceRoster(roster) {
 
   const sidebarCount = $('sidebar-roster-count');
   if (sidebarCount) sidebarCount.textContent = String(roster.length || 0);
+
+  const rosterActiveCount = $('roster-active-performers-count');
+  if (rosterActiveCount) rosterActiveCount.textContent = `${roster.length || 0} Curated Voices`;
 
   if (roster.length === 0) {
     container.innerHTML = '<div style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 10px;">Zero characters assigned</div>';
@@ -482,6 +522,9 @@ function selectDialogueSegment(segment) {
   const turnEl = $('inspector-turn-id');
   if (turnEl) turnEl.textContent = `Turn ${turnId} • ${speaker}`;
 
+  const segTitleEl = $('waveform-segment-title');
+  if (segTitleEl) segTitleEl.textContent = `Take 01 • ${speaker} (Seg ${String(turnId).padStart(4, '0')})`;
+
   const directiveEl = $('inspector-directive');
   if (directiveEl) directiveEl.textContent = segment.directive || 'Calm, articulate audiobook narration';
 
@@ -490,6 +533,9 @@ function selectDialogueSegment(segment) {
 
   const textEl = $('inspector-hindi-text');
   if (textEl) textEl.textContent = `"${segment.text_content || '...'}"`;
+
+  const phoneticEl = $('inspector-phonetic-guide');
+  if (phoneticEl) phoneticEl.textContent = segment.spoken_text ? `[${segment.spoken_text}]` : '[Transliteration Valid • Gate 2 Pass]';
 
   const statusEl = $('inspector-segment-status');
   if (statusEl) {

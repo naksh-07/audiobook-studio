@@ -30,9 +30,10 @@ try:
     from audiobook_factory.cli.commands.audit import (
         cmd_audit_book,
         cmd_audit,
+        cmd_doctor,
     )
 except ImportError:
-    cmd_audit_book = cmd_audit = None
+    cmd_audit_book = cmd_audit = cmd_doctor = None
 
 try:
     from audiobook_factory.cli.commands.bank import (
@@ -65,6 +66,7 @@ __all__ = [
     "cmd_timeline",
     "cmd_audit_book",
     "cmd_audit",
+    "cmd_doctor",
     "cmd_bank",
     "cmd_keys",
 ]

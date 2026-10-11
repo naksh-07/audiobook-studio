@@ -22,6 +22,11 @@ from .state_maintainer import (
     NovelStateMaintainer,
     MasterPreProductionState,
 )
+from .doctor import (
+    MetadataDoctor,
+    MetadataDoctorReport,
+    DiagnosticCheck,
+)
 
 __all__ = [
     "BookBible",
@@ -34,4 +39,7 @@ __all__ = [
     "FlaggedConflict",
     "NovelStateMaintainer",
     "MasterPreProductionState",
+    "MetadataDoctor",
+    "MetadataDoctorReport",
+    "DiagnosticCheck",
 ]

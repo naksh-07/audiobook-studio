@@ -147,6 +147,15 @@ class PipelineOrchestrator:
                 ledger.set_meta("source_file", str(input_file))
 
             # -------------------------------------------------------------
+            # Stage 1.5: Pre-Production Studio & Novel Research (Room 1)
+            # -------------------------------------------------------------
+            with telemetry.stage_timer(run_id, "Pre-Production Studio", 1):
+                logger.info("\n[Stage 1.5/6] Room 1 Pre-Production: 100% Corpus Sweep, DeepSearch, and Voice Cast Lock...")
+                from audiobook_factory.preproduction import run_preproduction
+                pre_res = run_preproduction(project_dir=project_dir, force=False)
+                logger.info(f"  [+] Pre-Production complete (Status: {pre_res.get('status', 'LOCKED')})")
+
+            # -------------------------------------------------------------
             # Stage 2: Literary Translation (Sense-for-Sense Hindustani)
             # -------------------------------------------------------------
             if hindi:

@@ -45,10 +45,14 @@ Production compute is 100% focused on vocal clarity, multi-character acting nuan
 - **Pro-Grade AI Vocal Mastering Workstation (Room 5)**: High-performance C++ JUCE / Pedalboard DSP with 4-band vocal parametric EQ (75Hz subsonic cut, 320Hz boxiness reduction, 3.2kHz presence lift), optical vocal compression, and True-Peak limiting ($\le -1.5\text{ dBTP}$), with seamless deterministic FFmpeg dual-pass linear loudnorm fallback.
 - **Forensic Speech QA Auditor & AI Polish**: `AudioQAAuditor` (energy VAD, speaking pace 75–240 WPM, dropouts/loops detection, MOS scoring), DeepFilterNet3 neural polish with selective $>45\text{dB}$ SNR auto-bypass, Matchering 2.0 reference spectrum matching ($\pm 3.0\text{dB}$ clamp), and `<0.2s` single-segment hot-patching.
 - **8-Pillar Studio Production Certification Harness**: Autonomous, fail-closed verification across extraction, translation, dramaturgy, attribution, performance, loudness, spatial staging, and packaging.
+- **Two-Tier Decoupling Architecture**: Pure stateless room engines (Tier 1: `ExtractionEngine`, `translate_chapter`, `ScreenplayDramaturgyRoom`, `MasteringEngineV2`) decoupled from workflow orchestration and JIT pre-production auto-resolution (Tier 2).
+- **Domain-Scoped Metadata Architecture**: Anti-monolithic JSON invariant with dedicated SSOT artifacts (`cast_lock.json`, `book_bible.json`, `translation/glossary.json`, `mastered/*_mastering_ledger.json`) and dynamic, backward-compatible auto-projections (`character_roster.json`, `voice_registry.json`).
+- **Zero-Token Pre-Flight Metadata Doctor**: Millisecond-fast ($<50\text{ms}$) forensic sanity audit validating metadata across all 6 production rooms before consuming a single LLM API token.
+- **Mastering V2 Ledgers & Fast-Path Quality Gates**: Immutable chapter mastering ledgers, Gate 6A voice authority precedence (`cast_lock` $\rightarrow$ `book_bible` $\rightarrow$ `voice_registry`), and Gate 6B fast-path audit.
 
 ---
 
-## 🏗️ Option C Architecture: 5-Room Pure Vocals Pipeline
+## 🏗️ Option C Architecture: Two-Tier Decoupled 5-Room Pipeline
 
 ```mermaid
 flowchart TD
@@ -272,16 +276,27 @@ audiobook-cli package my_project --format podcast
 audiobook-cli package my_project --format both --cover "cover.jpg"
 ```
 
+### Zero-Token Pre-Flight Metadata Doctor (`doctor`)
+```bash
+# Run <50ms offline forensic audit across all 6 rooms (0 tokens consumed)
+audiobook-cli doctor my_project
+# or:
+python audiobook_cli.py doctor "audiobooks/projects/my_project"
+```
+
 ### Full-Book Master Audit & 8-Pillar Certification (`audit-book`)
 ```bash
-# Run Gate 6 master audit and complete 8-Pillar Studio Certification Scorecard
+# Runs Metadata Doctor pre-flight, Gate 6 master audit, and 8-Pillar Studio Certification Scorecard
 audiobook-cli audit-book my_project
 ```
 
-### Step-by-Step Modular Pipeline
+### Step-by-Step Modular Pipeline (with JIT Pre-Production Auto-Resolution)
+Downstream commands like `translate` and `script` automatically detect missing pre-production assets (`book_bible.json`, `cast_lock.json`) and execute Room 1 Pre-Production Just-In-Time:
 ```bash
 audiobook-cli extract "books/novel.epub"
+# Translates chapters (auto-runs Room 1 JIT if pre-production assets are not yet built):
 audiobook-cli translate my_project --model gemini-3.8-flash
+# Builds screenplay (auto-runs Room 1 JIT if pre-production assets are not yet built):
 audiobook-cli script my_project --hindi --dramatized --adapter audiobook
 audiobook-cli synthesize my_project --voice Aoede --workers 3
 audiobook-cli master my_project

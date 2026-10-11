@@ -11,8 +11,11 @@
 - **Phase 6: Pro-Grade AI Vocal Mastering Workstation (MERGED, AUDITED & CERTIFIED)**:
   - Room 5 Vocal Mastering Core (`audiobook_factory/audio/`): C++ JUCE Pedalboard / FFmpeg dual-pass linear loudnorm (`-19 LUFS`, `$\le -1.5$ dBTP`), `AudioQAAuditor`, `NeuralVocalEnhancer` (with `HF_HUB_OFFLINE` sandbox), `ReferenceSpectrumMatcher` (pad-to-nfft STFT fix), `SingleSegmentHotPatcher`, `M4BBookPackager` (path traversal sanitized), 6 Audio MCP tools, and `dsp`, `qa-audit`, `enhance`, `match-ref` CLI.
   - Multi-Expert Triad Audit: Systems Architect (PASS), Security Auditor (PASS), Forensic Debugger (PASS). All 72 audio tests & 71 cross-system tests 100% green. Pushed to remote `main`.
+- **Phase 7: Metadata Decoupling & Room 1 Autonomous Pipeline Wiring (COMPLETED & CERTIFIED)**:
+  - Harmonized `BookEntity` schema (`pitch_ratio`, `speed_ratio`, smart coercions), eliminating silos without monolithic JSON bloat.
+  - Room 1 Pre-Production Studio auto-wired into `PipelineOrchestrator` and JIT CLI commands. Full-novel glossary alignment.
+  - Implemented `<50ms` zero-token offline [`MetadataDoctor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/doctor.py) integrated into Gate 2.9, Gate 6, and `doctor` CLI.
+  - Mastering V2 disk ledgers persisted and integrated with Gate 6B. Antigravity UI Extension DAG stepper and bridge synced.
+  - Full regression: 72/72 tests passing green across pre-production, mastering, gates, and metadata doctor.
 - **Grand Unification 100% Completed & Merged into Main**:
-  - `plugin-ui` merged into `main` via merge commit `ac6641f`.
-  - All 7 Phases (Forensic Ingestion $\to$ Translation $\to$ Dramaturgy $\to$ 4D TTS $\to$ Vocal Mastering $\to$ Apple UI Workstation) fully operational, audited by Triad, and certified.
-  - Test baseline: 1,194/1,194 green passing tests (0 failures).
-  - Production ready for studio audiobook generation via CLI, Python API, or Antigravity UI Extension.
+  - `plugin-ui` merged into `main`. All 7 phases operational, audited, and production ready via CLI, Python API, and Antigravity UI.

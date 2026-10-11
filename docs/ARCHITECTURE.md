@@ -109,6 +109,76 @@ flowchart TD
 
 ---
 
+## 🏛️ Two-Tier Decoupling & Domain-Scoped Metadata Architecture
+
+The Audiobook Studio engine enforces a strict separation between pure compute engines, persistent domain truth, and orchestration automation:
+
+### 1. Two-Tier Decoupling Architecture
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   TWO-TIER DECOUPLING ARCHITECTURE                                │
+│                                                                                                  │
+│  TIER 1: PURE, STATELESS STANDALONE ROOM ENGINES (Zero Project State, Pure Transforms)           │
+│  • Room 0 / 1: ExtractionEngine (audiobook_factory.extraction.engine)                           │
+│    Document -> CanonicalBook AST + clean Markdown chapters. Pure functional transformation.      │
+│  • Room 2: translate_chapter / TranslationEngine (audiobook_factory.translation.engine)          │
+│    Prose in -> Devanagari Markdown out. Zero audio, screenplay, or project state imports.       │
+│  • Room 3: ScreenplayDramaturgyRoom (audiobook_factory.script.agents.script_room)                │
+│    5-pass dramaturgy core coordinating beat actioning, actor direction & Gate 2 attribution.    │
+│  • Room 5: MasteringEngineV2 (audiobook_factory.mastering_engine)                                │
+│    Audio stem in -> EBU R128 (-19 LUFS) vocal master + MasteringLedger JSON out.                 │
+│                                                                                                  │
+│  TIER 2: ORCHESTRATION & JIT RESOLUTION (Workflow Coordination, State Lifecycle & Auto-Healing) │
+│  • CLI Runners: audiobook_cli.py (auto, produce, translate, script, package, doctor)             │
+│  • Dialogue Runners: dialogue_runner.py & PodcastOrchestrator                                     │
+│  • JIT Pre-Production Auto-Resolution: Detects missing book_bible.json or cast_lock.json and     │
+│    runs Room 1 Pre-Production Just-In-Time before downstream execution.                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Tier 1 (Pure, Stateless Standalone Room Engines)**:
+  - [`ExtractionEngine`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/engine.py): Slices and normalizes raw digital books (`.epub`, `.pdf`, `.txt`, `.md`) into structured [`CanonicalBook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/extraction/contracts.py#L231) AST and pristine chapter Markdown without relying on downstream pipeline directories.
+  - [`translate_chapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/engine.py): Standalone, text-to-text literary Hindustani translation engine executing single-pass deliberation (`thinking_budget = 1024`, `temperature = 0.35`) and 0-token parity gate checks. Has **zero imports** from audio, speech synthesis, screenplay tagging, or hardware drivers.
+  - [`ScreenplayDramaturgyRoom`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/script/agents/script_room.py): Autonomous 5-pass multi-agent screenplay dramaturgy engine managing scene analysis, Stanislavski beat actioning, performance direction, and Gate 2 anti-swap dialogue attribution.
+  - [`MasteringEngineV2`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering_engine.py): Dedicated vocal mastering engine applying Kaiser sinc 48kHz / 24-bit resampling, two-pass linear EBU R128 (-19.0 LUFS) normalization, lookahead True Peak limiting ($\le -1.5\text{ dBTP}$), and formal cryptographic `MasteringLedger` generation.
+- **Tier 2 (Orchestration & JIT Resolution)**:
+  - Encapsulates pipeline DAG traversal, concurrent thread pooling, checkpoint recovery, and automated state synchronization across steps.
+  - **JIT Pre-Production Auto-Resolution**: When downstream commands such as `translate` or `script` are executed on an extracted project lacking pre-production master assets (`book_bible.json` and `cast_lock.json`), Tier 2 automatically executes Room 1 Pre-Production JIT via [`run_preproduction(project_dir, force=False)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/__init__.py). The 0-token lexical scanner, entity taxonomist, and vocal acoustic director establish canonical lore and collision-free voice locks transparently before downstream execution proceeds.
+
+---
+
+### 2. Domain-Scoped Metadata Architecture (The Anti-Monolithic JSON Invariant)
+The architecture explicitly bans the fragile anti-pattern of a monolithic multi-megabyte `metadata.json` or shared project dictionary. Storing all novel state, chapter metrics, casting, and audio telemetry in a single file causes write contention, data corruption during interrupted runs, and Git merge nightmares. Instead, Audiobook Studio partitions master state across **dedicated Single Source of Truth (SSOT) artifacts** with dynamic, backward-compatible auto-projections:
+
+| Domain Artifact | File Location | Authoritative Responsibility (SSOT) | Downstream Consumers |
+|---|---|---|---|
+| **Cast Lock** | `cast_lock.json` | Supreme voice casting authority: voice persona IDs, lock status, and 4D acoustic vector overrides (pitch ratio $[0.85, 1.15]$, speed ratio $[0.75, 1.30]$, EQ formants). | Room 3.5, Gate 2.8, Gate 2.9, Room 4 TTS, Gate 6A |
+| **Book Bible** | `book_bible.json` | World lore canon, entity taxonomies (`BookEntity`), locations, items, epistemic provenance (`CORPUS_EXTRACTED`, `WEB_VERIFIED`), and honorific pronoun rules (`aap`/`tum`/`tu`). | Room 1.5, Room 2 Translation, Room 3 Dramaturgy, Gate 6A |
+| **Translation Glossary** | `translation/glossary.json` | Deterministic Hindi term bindings, proper noun transliterations, and heraldic moniker phonetics (`PROPER_NAME` / `HERALDIC_MONIKER`). | Room 2 Translation Engine |
+| **Mastering Ledgers** | `mastered/*_mastering_ledger.json` | Chapter-level audio provenance: cryptographic stem hashes, measured loudness (`integrated_lufs`), True Peak (`true_peak_dbtp`), duration, and filter configs. | Gate 6B Fast-Path, Studio UI Sidecar, M4B Packaging |
+| **Character Roster (Projection)** | `character_roster.json` | *Backward-compatible auto-projection* from `BookBible` and `CastLock`. Re-generated dynamically by `NovelStateMaintainer` on each state commit. | Legacy test suites, legacy script parsers |
+| **Voice Registry (Projection)** | `voice_registry.json` | *Backward-compatible auto-projection* of actor voice mappings from `CastLock`. Re-generated dynamically by `NovelStateMaintainer`. | Legacy CLI tools, third-party inspect scripts |
+
+---
+
+### 3. Zero-Token Pre-Flight Metadata Doctor
+Implemented in [`audiobook_factory/metadata/doctor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/doctor.py), the **Metadata Doctor** is an offline, millisecond-fast ($<50\text{ms}$) forensic validator that audits decoupled metadata health across all 6 production rooms **before a single generative AI API token is consumed**:
+
+1. **Room 0 (Extraction)**: Validates chapter markdown inventory in `extracted/`, checks `source_manifest.json` and `metadata.json`, and verifies word count health.
+2. **Room 1 (Canon & Lore)**: Parses `book_bible.json` through Pydantic v2 [`BookBible`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/book_bible.py) validation, asserting character and location schema integrity.
+3. **Room 1 (Voice Casting SSOT)**: Validates `cast_lock.json`, audits pitch safety ratio bounds ($[0.85, 1.15]$), and verifies **$\ge 4.0\%$ pitch separation** across characters sharing a base voice persona to prevent vocal convergence.
+4. **Room 2 (Translation Glossary)**: Verifies `translation/glossary.json` integrity and aligns transliterated honorifics with source entities.
+5. **Room 3 (Screenplay Coverage)**: Samples up to 10 chapter scripts in `scripts/`, extracts all dialogue tokens, and ensures **100% speaker coverage** across `cast_lock.json`, `book_bible.json`, `character_roster.json`, and `voice_registry.json` (**0 unmapped dialogue speakers**).
+6. **Room 5 (Mastering V2 Ledgers)**: Scans all `mastered/*_mastering_ledger.json` files, verifying measured integrated loudness ($-19.0 \pm 1.0\text{ LUFS}$) and True Peak ceiling ($\le -1.4\text{ dBTP}$).
+
+The Metadata Doctor is integrated at multiple pipeline control points:
+- **CLI Command**: `python audiobook_cli.py doctor <book_slug_or_path>` (exits `0` on clean health, `1` on critical defects).
+- **Macro Audit Pre-Flight**: `python audiobook_cli.py audit-book <book>` runs the Doctor diagnosis first before initiating Gate 6.
+- **Gate 2.9 Pre-TTS Boundary**: Runs offline before LLM attribution evaluation to halt invalid scripts before burning API quota.
+- **Studio Panel Sidecar API**: `GET /api/doctor?slug=...` returns real-time diagnostic JSON and formatted health tables to the Webview UI.
+
+---
+
 ## 🏛️ The 5-Room Pure Vocals-Only Pipeline
 
 ### Room 1: Pre-Production World, Lore & Canonical State Studio
@@ -378,7 +448,18 @@ Room 5 constitutes the **Pro-Grade AI Vocal Mastering Workstation (Phase 6)**, e
    - **M4B Book Packager** ([`packager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/packager.py)): [`M4BBookPackager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/packager.py#L123) packages chapter deliverables into a single `.m4b` container with embedded cover art and `FFMETADATA1` monotonic TOC markers via 100% lossless container stream copying (`-c:a copy`).
    - **Podcast Delivery Track**: Broadcast Podcast mastering at **-16.0 LUFS** with **-1.0 dBTP** True Peak ceiling and stereo spatial staging (Host A at $-0.25$ Left, Host B at $+0.25$ Right) into AAC `.m4a` / `.mp3`.
 
-9. **Antigravity Audio MCP Server & Standalone CLI**:
+9. **Mastering V2 Ledger Persistence & Quality Gate Integration**:
+   - **Chapter Mastering Ledger (`MasteringLedger`)**: Implemented in [`audiobook_factory/mastering_contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering_contracts.py#L469). After mastering each chapter, [`MasteringEngineV2.master()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering_engine.py) persists an immutable disk ledger at `mastered/chapter_XXX_mastering_ledger.json`. The ledger records:
+     - Cryptographic stem hashes and input file provenance.
+     - EBU R128 compliance metrics: `integrated_lufs` (target $-19.0\text{ LUFS}$), `true_peak_dbtp` (ceiling $\le -1.5\text{ dBTP}$), loudness range (`lra`), and threshold.
+     - Limiter and filter settings applied during linear loudnorm pass 2.
+     - Precise chapter duration in seconds and sample counts.
+   - **Gate 6A Voice Authority Precedence**: When macro audit evaluates cross-chapter voice continuity ([`audit_gate6a_voice_continuity`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/album.py#L40)), voice authority resolves through a strict hierarchical precedence:
+     $$\text{cast\_lock.json (Supreme SSOT)} \longrightarrow \text{book\_bible.json} \longrightarrow \text{character\_roster.json} \ / \ \text{voice\_registry.json}$$
+     If a voice is locked in `cast_lock.json`, it overrides any conflicting lower-tier metadata, guaranteeing zero mid-novel actor drift.
+   - **Gate 6B MasteringLedger Fast-Path Audit**: When release verification evaluates loudness continuity ([`audit_gate6b_loudness_continuity`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/album.py#L172)), it searches for existing `chapter_XXX_mastering_ledger.json` files across candidate paths (`mastered/`, chapter root). If valid ledgers are present, the auditor directly ingests verified `integrated_lufs` and `true_peak_dbtp` values without executing redundant, expensive FFmpeg `ebur128` passes, falling back to FFmpeg only when ledgers are missing or corrupt.
+
+10. **Antigravity Audio MCP Server & Standalone CLI**:
    - **Audio MCP Server** ([`server.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mcp/server.py)): Exposes 6 standardized stdio JSON-RPC tools (`apply_vocal_dsp`, `audit_audio_quality`, `match_reference_spectrum`, `enhance_vocal_stem`, `measure_ebu_r128_loudness`, `audit_chapter_qa`) for autonomous agent operation.
    - **CLI Subcommands** ([`audio.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/cli/commands/audio.py)): Exposes `audiobook-cli dsp`, `qa-audit`, `enhance`, and `match-ref`.
 

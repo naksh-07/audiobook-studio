@@ -430,7 +430,10 @@ Gate 2.9 is the authoritative, fail-closed pre-synthesis gate guarding Room 4 sp
 - Raw Markdown fences (```` ```json ````) or LLM conversational meta-chatter read aloud by neural voices.
 - Out-of-bounds pitch or speed parameters producing robotic or cartoonish acoustic distortions.
 
-Gate 2.9 enforces a **Dual-Tier Hybrid Architecture**: Tier 1 executes ultra-fast deterministic regex, whitelist, and acoustic clamping in milliseconds at zero token cost, while Tier 2 executes an adversarial LLM attribution and dramaturgy audit powered by Gemini models across the 123+ API key pool.
+Gate 2.9 enforces a **Dual-Tier Hybrid Architecture with Zero-Token Metadata Pre-Flight**:
+- **Tier 0 (Zero-Token Metadata Doctor Pre-Flight)**: Before inspecting segments or consuming tokens, Gate 2.9 runs [`MetadataDoctor.diagnose_project(pdir)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/doctor.py) in $<50\text{ms}$ offline. If the project metadata fails (e.g., corrupt BookBible, violated acoustic bounds, unmapped script speakers), all errors are prepended as `[MetadataDoctor] {err}` and Gate 2.9 halts immediately before burning API quota.
+- **Tier 1 (Deterministic Fast-Path)**: Executes ultra-fast local regex, speaker whitelist, and acoustic parameter clamping in milliseconds at zero token cost.
+- **Tier 2 (Adversarial LLM Attribution & Dramaturgy Sanity Judge)**: Powered by Gemini models across the 123+ API key pool, evaluating contextual speaker turns and dramatic alignment.
 
 ```mermaid
 flowchart TD
@@ -438,6 +441,14 @@ flowchart TD
         Script["Raw Script Segments<br/>(scripts/chapter_XXX_hi_script.json or podcast_script.json)"]
         Context["Contextual Artifacts<br/>• character_roster.json / voice_registry.json<br/>• podcast_config.json / BookBible<br/>• Source Narrative (source_file / source_text)"]
     end
+
+    subgraph Tier0["🩺 Tier 0: Zero-Token Metadata Doctor Pre-Flight (<50ms Offline)"]
+        T0_Doc["MetadataDoctor.diagnose_project(pdir)<br/>• Extraction & Manifest Verification<br/>• BookBible Canon Schema Integrity<br/>• CastLock SSOT & >= 4% Acoustic Separation<br/>• Translation Glossary Alignment<br/>• Screenplay 100% Speaker Coverage<br/>• Mastering V2 EBU R128 Compliance"]
+    end
+
+    ScriptInput --> Tier0
+    Tier0 -->|doc_report.passed == False| FailTier0["🛑 Fail-Closed Abort<br/>[MetadataDoctor] Critical Anomalies<br/>Halt before LLM tokens consumed"]
+    Tier0 -->|doc_report.passed == True| Tier1
 
     subgraph Tier1["⚡ Tier 1: Deterministic Fast-Path Audit (Local 0-Token)"]
         direction TB
@@ -479,6 +490,7 @@ flowchart TD
 
 | Tier | Subsystem | Responsibility | Verification Mechanism | Failure Consequence |
 |---|---|---|---|---|
+| **Tier 0** | **Metadata Doctor Pre-Flight** | Cross-room metadata consistency | Executes [`MetadataDoctor.diagnose_project()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/metadata/doctor.py) in $<50\text{ms}$ offline before token consumption. Audits extraction, BookBible, CastLock $\ge 4\%$ pitch separation, translation glossary, screenplay coverage, and mastering ledgers. | Fatal `GateAuditError` halting synthesis before API dispatch. |
 | **Tier 1** | **Monotonic Indexing** | Segment index sequence | Asserts $index_i == i$ for all segments $1 \dots N$. | Fatal `GateAuditError`. |
 | **Tier 1** | **Speaker Whitelist** | Prevent hallucinated actors | Cross-references normalized speaker against `character_roster.json`, `voice_registry.json`, `podcast_config.json`, or default roles (`Narrator`, `Narration`, `Foley`, `Host_A`, `Host_B`). | Fatal `GateAuditError`. |
 | **Tier 1** | **Anti-Swap Gender Inflections** | Hindi grammatical gender match | Boundary-regex matching on Devanagari first-person verb inflections (`MALE_HINDI_INFLECTIONS` vs `FEMALE_HINDI_INFLECTIONS`). | Actionable warning for potential turn inversion. |
@@ -683,25 +695,44 @@ Gate 2.9 is integrated as a mandatory quality checkpoint across both pipeline pa
 
 ### Gate 6A: Voice Continuity Across Chapters
 - **Function**: `audit_gate6a_voice_continuity(project_dir: Path) -> AuditResult`
-- **Module**: [`audiobook_factory/gate_auditor.py`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/gate_auditor.py)
-- **Pipeline Stage**: Inline execution after screenplay generation across all chapters.
+- **Module**: [`audiobook_factory/gates/album.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/album.py) & [`audiobook_factory/gate_auditor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gate_auditor.py)
+- **Pipeline Stage**: Inline execution after screenplay generation across all chapters and during master release certification.
+- **Voice Authority Precedence Hierarchy**:
+  To prevent conflicting voice definitions between legacy catalogs and current casting bibles, `audit_gate6a_voice_continuity` constructs its canonical voice authority map using a strict hierarchical precedence order:
+  $$\text{cast\_lock.json (Supreme Authority)} \longrightarrow \text{book\_bible.json} \longrightarrow \text{character\_roster.json} \ / \ \text{voice\_registry.json}$$
+  1. `voice_registry.json` and `character_roster.json` provide baseline historical projections.
+  2. `book_bible.json` entity assignments (`assigned_voice`) take precedence over legacy registries.
+  3. `cast_lock.json` (`locks.items() -> lk.get("voice_id")`) is the **Supreme Single Source of Truth**, overwriting all lower tiers. If a character is locked in `cast_lock.json`, its voice assignment is universally immutable across all chapters.
 - **Audit Rules**:
-  - Maps every character that speaks across multiple chapters.
-  - Ensures the character has a persistent canonical voice assignment that does not mutate between Chapter 1, Chapter 2, etc.
-  - **Cast Lock Invariant (ADR-023)**: If `cast_lock.json` is present, verifies that character voice assignments strictly match locked voice IDs. Recasting requires explicit invalidation of affected chapter audio chunks.
-- **Fail Condition**: Returns `AuditResult(passed=False)` if a character changes voice mid-book without explicit recast invalidation.
+  - Maps every character that speaks across multiple chapters in `scripts/chapter_*_script.json`.
+  - Ensures the character has a persistent canonical voice assignment that does not mutate between chapters.
+  - Detects voice collisions where two distinct characters share conflicting configurations without $\ge 4\%$ acoustic separation.
+  - Recasting requires explicit invalidation of affected chapter audio chunks in `TakeBankManager`.
+- **Fail Condition**: Returns `AuditResult(passed=False)` if any multi-chapter character changes voice mid-book without explicit invalidation, or if a speaking character lacks a canonical voice assignment.
 
 ---
 
-### Gate 6B: Loudness Continuity & Metric Integrity (ADR-050)
-- **Function**: `audit_gate6b_loudness_continuity(chapter_files: List[Path], target_lufs: float = -19.0, max_variance: float = 1.0, strict: bool = False) -> AuditResult`
-- **Module**: [`audiobook_factory/gate_auditor.py`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/gate_auditor.py) & [`audiobook_factory/gates/album.py`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/gates/album.py)
+### Gate 6B: Loudness Continuity & Metric Integrity (ADR-050 & Mastering V2 Fast-Path)
+- **Function**: `audit_gate6b_loudness_continuity(chapter_files: List[Path], target_lufs: float = -19.0, max_variance: float = 1.0, strict: bool = False, true_peak_ceiling: float = -1.4) -> AuditResult`
+- **Module**: [`audiobook_factory/gates/album.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gates/album.py) & [`audiobook_factory/gate_auditor.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/gate_auditor.py)
+- **Pipeline Stage**: Executed on mastered chapter stems before M4B packaging and during 8-pillar certification.
+- **MasteringLedger Fast-Path Audit**:
+  - Rather than re-running slow, redundant FFmpeg `ebur128` measurement filter passes over multi-gigabyte audio stems, Gate 6B executes a fast-path audit using chapter mastering ledgers.
+  - Probes 5 candidate ledger locations per chapter:
+    - `{chapter_stem}_mastering_ledger.json` (sibling directory)
+    - `{stem_clean}_mastering_ledger.json`
+    - `mastered/{chapter_stem}_mastering_ledger.json`
+    - `mastered/{stem_clean}_mastering_ledger.json`
+    - `../mastered/{stem_clean}_mastering_ledger.json`
+  - If a valid [`MasteringLedger`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering_contracts.py#L469) exists, Gate 6B directly parses verified `integrated_lufs` and `true_peak_dbtp` values in sub-millisecond time.
+  - Falls back to an active FFmpeg `ebur128=framelog=verbose` filter pass only if the ledger is missing or unparseable.
 - **Audit Rules**:
-  - Probes all mastered chapter audio files via FFmpeg `ebur128`.
-  - Calculates inter-chapter variance: max deviation cannot exceed $1.0\text{ LU}$.
-  - **Metric Forgery Purge (ADR-050)**: Permanently removed legacy code that forged fake `-19.0 LUFS` and `-1.5 dBTP` metrics on corrupted or unprobeable files. Genuine probe errors are captured and recorded in the audit report.
-  - **Fail-Closed Execution**: When `strict=True`, any probe failure, corrupt file, or metric anomaly halts master release immediately.
-- **Fail Condition**: Fails closed if volume jumps noticeably ($> 1.0\text{ LU}$) between consecutive chapters, or if any chapter fails audio probe verification.
+  - Integrated loudness must be within $target\_lufs \pm max\_variance$ (standard $-19.0 \pm 1.0\text{ LUFS}$ for Audiobooks, $-16.0 \pm 1.0\text{ LUFS}$ for Podcasts).
+  - True Peak ceiling must not exceed $true\_peak\_ceiling$ (hard ceiling $\le -1.4\text{ dBTP}$).
+  - Inter-chapter variance: max loudness deviation across consecutive chapters cannot exceed $1.0\text{ LU}$.
+  - **Metric Forgery Purge (ADR-050)**: Code forging fake passing metrics is permanently purged; actual probe errors or out-of-spec metrics fail closed.
+  - When `strict=True`, any probe failure, corrupt file, or metric anomaly halts master release immediately.
+- **Fail Condition**: Fails closed if volume jumps noticeably ($> 1.0\text{ LU}$) between consecutive chapters, if True Peak breaches $\le -1.4\text{ dBTP}$, or if any chapter fails audio verification.
 
 ---
 

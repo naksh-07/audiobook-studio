@@ -178,8 +178,33 @@ def get_project_detail(slug: str) -> Dict[str, Any]:
         except Exception:
             pass
 
-    # Cast list
+    # Cast list & Voice Allocation
     characters = []
+    cast_lock_file = pdir / "cast_lock.json"
+    cast_locks = {}
+    if cast_lock_file.exists():
+        try:
+            with open(cast_lock_file, "r", encoding="utf-8") as f:
+                cl_data = json.load(f)
+                cast_locks = cl_data.get("locks", {})
+        except Exception:
+            pass
+
+    known_chars = {}
+    if bible_file.exists():
+        try:
+            with open(bible_file, "r", encoding="utf-8") as f:
+                bible_data = json.load(f)
+                bchars = bible_data.get("entities", {}).get("characters", {})
+                if not bchars:
+                    bchars = bible_data.get("characters") or bible_data.get("dramatis_personae") or {}
+                if isinstance(bchars, dict):
+                    for name, details in bchars.items():
+                        if isinstance(details, dict):
+                            known_chars[name] = details
+        except Exception:
+            pass
+
     if cast_file.exists():
         try:
             with open(cast_file, "r", encoding="utf-8") as f:
@@ -187,40 +212,73 @@ def get_project_detail(slug: str) -> Dict[str, Any]:
                 raw_cast = raw_data.get("characters", raw_data) if isinstance(raw_data, dict) else raw_data
                 if isinstance(raw_cast, dict):
                     for name, details in raw_cast.items():
-                        if isinstance(details, dict):
-                            voice = (
-                                details.get("assigned_voice_id")
-                                or details.get("voice_id")
-                                or details.get("voice", "Aoede")
-                            )
-                            characters.append({
-                                "name": details.get("display_name") or name,
-                                "voice": voice,
-                                "gender": details.get("gender", "unknown"),
-                                "dialect": details.get("dialect", "Standard"),
-                                "pitch_shift": details.get("pitch_shift", 0),
-                                "notes": details.get("notes", ""),
-                            })
-                        elif isinstance(details, str):
-                            characters.append({"name": name, "voice": details})
+                        if name not in known_chars:
+                            known_chars[name] = details if isinstance(details, dict) else {"assigned_voice": str(details)}
                 elif isinstance(raw_cast, list):
-                    characters = raw_cast
+                    for item in raw_cast:
+                        if isinstance(item, dict) and item.get("name"):
+                            if item["name"] not in known_chars:
+                                known_chars[item["name"]] = item
         except Exception:
             pass
-    elif bible_file.exists():
-        try:
-            with open(bible_file, "r", encoding="utf-8") as f:
-                bible_data = json.load(f)
-                cast_dict = bible_data.get("characters") or bible_data.get("dramatis_personae") or {}
-                for name, details in cast_dict.items():
-                    if isinstance(details, dict):
-                        characters.append({
-                            "name": name,
-                            "voice": details.get("voice_persona", "Aoede"),
-                            "archetype": details.get("archetype", ""),
-                        })
-        except Exception:
-            pass
+
+    for char_name, lk in cast_locks.items():
+        if isinstance(lk, dict) and char_name not in known_chars:
+            calib = lk.get("calibration_overrides", {})
+            pitch_val = calib.get("pitch", lk.get("pitch", 1.0))
+            speed_val = calib.get("speed", lk.get("speed", 1.0))
+            known_chars[char_name] = {
+                "assigned_voice": lk.get("voice_id", "Aoede"),
+                "locked": lk.get("locked", True),
+                "pitch_shift": lk.get("pitch_shift", round((pitch_val - 1.0) * 100, 2)),
+                "pitch_ratio": pitch_val,
+                "speed_ratio": speed_val,
+            }
+
+    for name, details in known_chars.items():
+        lk = cast_locks.get(name, {})
+        calib = lk.get("calibration_overrides", {}) if isinstance(lk, dict) else {}
+        voice = (
+            lk.get("voice_id")
+            or details.get("assigned_voice")
+            or details.get("assigned_voice_id")
+            or details.get("voice_id")
+            or details.get("voice_persona")
+            or details.get("voice", "Aoede")
+        )
+        pitch_shift = (
+            lk.get("pitch_shift")
+            if "pitch_shift" in lk
+            else details.get("pitch_shift", 0)
+        )
+        pitch_ratio = (
+            calib.get("pitch")
+            or lk.get("pitch")
+            or details.get("pitch_ratio")
+            or details.get("pitch")
+            or 1.0
+        )
+        speed_ratio = (
+            calib.get("speed")
+            or lk.get("speed")
+            or details.get("speed_ratio")
+            or details.get("speed")
+            or details.get("speed_multiplier")
+            or 1.0
+        )
+        is_locked = bool(lk.get("locked", False))
+
+        characters.append({
+            "name": details.get("display_name") or name,
+            "voice": voice,
+            "gender": details.get("gender", "unknown"),
+            "dialect": details.get("dialect", "Standard"),
+            "pitch_shift": pitch_shift,
+            "pitch_ratio": float(pitch_ratio),
+            "speed_ratio": float(speed_ratio),
+            "locked": is_locked,
+            "notes": details.get("notes", ""),
+        })
 
     # Chapters & Segment detail
     chapters = []
@@ -235,6 +293,19 @@ def get_project_detail(slug: str) -> Dict[str, Any]:
             c_cur.execute("SELECT chapter_num, title, word_count, scripted_status, mastered_status, m4a_path FROM chapters ORDER BY chapter_num")
             for row in c_cur.fetchall():
                 m4a_exists = bool(row["m4a_path"] and Path(row["m4a_path"]).exists())
+                c_idx = int(row['chapter_num'])
+                chap_stem_2 = f"chapter_{c_idx:02d}"
+                chap_stem_3 = f"chapter_{c_idx:03d}"
+                ledger_file = pdir / "mastered" / f"{chap_stem_2}_mastering_ledger.json"
+                if not ledger_file.exists():
+                    ledger_file = pdir / "mastered" / f"{chap_stem_3}_mastering_ledger.json"
+                ledger_data = None
+                if ledger_file.exists():
+                    try:
+                        with open(ledger_file, "r", encoding="utf-8") as lf:
+                            ledger_data = json.load(lf)
+                    except Exception:
+                        pass
                 chapters.append({
                     "chapter_num": row["chapter_num"],
                     "title": row["title"],
@@ -243,6 +314,7 @@ def get_project_detail(slug: str) -> Dict[str, Any]:
                     "mastered_status": row["mastered_status"],
                     "m4a_path": row["m4a_path"],
                     "m4a_exists": m4a_exists,
+                    "mastering_ledger": ledger_data,
                 })
 
             s_cur = conn.cursor()
@@ -360,6 +432,22 @@ def get_project_detail(slug: str) -> Dict[str, Any]:
                 active_audio = s["audio_path"]
                 break
 
+    # Metadata Doctor health summary
+    doctor_summary = None
+    try:
+        from audiobook_factory.metadata.doctor import MetadataDoctor
+        doc_report = MetadataDoctor.diagnose_project(pdir)
+        doctor_summary = {
+            "status": doc_report.status,
+            "overall_healthy": doc_report.is_healthy(),
+            "errors_count": len(doc_report.errors),
+            "warnings_count": len(doc_report.warnings),
+            "issues": (doc_report.errors + doc_report.warnings)[:5],
+            "failed_checks": [c.model_dump() for c in doc_report.checks if c.status != "PASS"],
+        }
+    except Exception:
+        pass
+
     return {
         "slug": slug,
         "title": meta_data.get("title", slug),
@@ -367,11 +455,13 @@ def get_project_detail(slug: str) -> Dict[str, Any]:
         "language": meta_data.get("target_language", "hi"),
         "chapters": chapters,
         "characters": characters,
+        "total_segments": segments_summary.get("total", 0),
         "segments_summary": segments_summary,
         "recent_segments": recent_segments,
         "pipeline_dag": pipeline_dag,
         "active_audio": active_audio,
         "media_files": media_files,
+        "doctor_summary": doctor_summary,
     }
 
 
@@ -504,10 +594,22 @@ def list_curated_voices() -> List[Dict[str, Any]]:
     ]
 
 
+def diagnose_project_bridge(slug: str) -> Dict[str, Any]:
+    """Runs zero-token MetadataDoctor diagnosis on project directory."""
+    from audiobook_factory.metadata.doctor import MetadataDoctor
+    pdir = PROJECTS_DIR / slug
+    if not pdir.exists() or not pdir.is_dir():
+        pdir = Path(slug)
+    if not pdir.exists() or not pdir.is_dir():
+        raise FileNotFoundError(f"Project not found: {slug}")
+    rep = MetadataDoctor.diagnose_project(pdir)
+    return rep.to_dict()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Audiobook Studio Bridge JSON API")
-    parser.add_argument("command", choices=["status", "list-projects", "project-detail", "list-voices", "peaks"])
-    parser.add_argument("--slug", help="Project slug for project-detail")
+    parser.add_argument("command", choices=["status", "list-projects", "project-detail", "list-voices", "peaks", "doctor"])
+    parser.add_argument("--slug", help="Project slug for project-detail or doctor")
     parser.add_argument("--path", help="Audio file path for peaks extraction")
     parser.add_argument("--points", type=int, default=400, help="Number of peak points (default: 400)")
 
@@ -522,6 +624,10 @@ def main():
             if not args.slug:
                 parser.error("--slug is required for project-detail")
             out = get_project_detail(args.slug)
+        elif args.command == "doctor":
+            if not args.slug:
+                parser.error("--slug is required for doctor")
+            out = diagnose_project_bridge(args.slug)
         elif args.command == "list-voices":
             out = list_curated_voices()
         elif args.command == "peaks":

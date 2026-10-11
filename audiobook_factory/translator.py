@@ -740,35 +740,45 @@ def translate_book_project(
     trans_dir.mkdir(parents=True, exist_ok=True)
     glossary_file = trans_dir / "glossary.json"
 
-    # Step 1: Load or generate glossary
+    # Step 1: Load or generate full-novel master glossary via Room 1 Pre-Production
     if glossary_file.exists():
         print(f"[*] Loading existing translation glossary: {glossary_file}", flush=True)
         with open(glossary_file, "r", encoding="utf-8") as f:
             glossary = json.load(f)
     else:
-        chap_files = sorted(extracted_dir.glob("chapter_*.md"))
-        if not chap_files:
-            chap_files = sorted(extracted_dir.glob("*.md"))
-        if not chap_files:
-            raise FileNotFoundError("No chapter markdown files found in extracted directory.")
+        print("[*] Translation glossary missing. Triggering Room 1 Pre-Production for full-novel sweep...", flush=True)
+        try:
+            from audiobook_factory.preproduction import run_preproduction
+            run_preproduction(project_dir=project_dir, force=False)
+        except Exception as pre_err:
+            logger.warning(f"  [!] Pre-production invocation notice: {pre_err}")
 
-        first_chap_file = chap_files[0]
-        for cf in chap_files:
-            try:
-                if len(cf.read_text(encoding="utf-8").split()) > 300:
-                    first_chap_file = cf
-                    break
-            except Exception:
-                pass
+        if glossary_file.exists():
+            with open(glossary_file, "r", encoding="utf-8") as f:
+                glossary = json.load(f)
+            print(f"[+] Loaded full-novel master glossary with {len(glossary.get('characters', []))} characters -> {glossary_file}", flush=True)
+        else:
+            chap_files = sorted(extracted_dir.glob("chapter_*.md")) or sorted(extracted_dir.glob("*.md"))
+            if not chap_files:
+                raise FileNotFoundError("No chapter markdown files found in extracted directory.")
 
-        with open(first_chap_file, "r", encoding="utf-8") as f:
-            first_chap_text = f.read()
+            first_chap_file = chap_files[0]
+            for cf in chap_files:
+                try:
+                    if len(cf.read_text(encoding="utf-8").split()) > 300:
+                        first_chap_file = cf
+                        break
+                except Exception:
+                    pass
 
-        print("[*] Generating Pass-1 Character & Honorifics Glossary via Gemini...", flush=True)
-        glossary = generate_book_glossary(first_chap_text, meta)
-        with open(glossary_file, "w", encoding="utf-8") as f:
-            json.dump(glossary, f, ensure_ascii=False, indent=2)
-        print(f"[+] Saved glossary with {len(glossary.get('characters', []))} characters -> {glossary_file}", flush=True)
+            with open(first_chap_file, "r", encoding="utf-8") as f:
+                first_chap_text = f.read()
+
+            print("[*] Generating fallback Character & Honorifics Glossary via Gemini...", flush=True)
+            glossary = generate_book_glossary(first_chap_text, meta)
+            with open(glossary_file, "w", encoding="utf-8") as f:
+                json.dump(glossary, f, ensure_ascii=False, indent=2)
+            print(f"[+] Saved fallback glossary with {len(glossary.get('characters', []))} characters -> {glossary_file}", flush=True)
 
     # Seed BookBible & MemoryStore 2.0 from project glossary
     try:

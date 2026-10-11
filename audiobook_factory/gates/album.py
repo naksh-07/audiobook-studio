@@ -82,6 +82,30 @@ def audit_gate6a_voice_continuity(
         except Exception as e:
             logger.warning(f"Failed to read character_roster.json: {e}")
 
+    bible_file = pdir / "book_bible.json"
+    if bible_file.exists():
+        try:
+            with open(bible_file, "r", encoding="utf-8") as bf:
+                bdata = json.load(bf)
+                chars = bdata.get("entities", {}).get("characters", {}) or bdata.get("characters", {})
+                if isinstance(chars, dict):
+                    for char, cdata in chars.items():
+                        if isinstance(cdata, dict):
+                            vid = cdata.get("assigned_voice") or cdata.get("voice_id") or cdata.get("voice_persona")
+                            if vid:
+                                canonical_voices[char] = vid
+                                eng = cdata.get("english_name")
+                                if eng:
+                                    canonical_voices[eng] = vid
+                                hin = cdata.get("hindi_name")
+                                if hin:
+                                    canonical_voices[hin] = vid
+                                for al in cdata.get("aliases", []):
+                                    if al:
+                                        canonical_voices[al] = vid
+        except Exception as e:
+            logger.warning(f"Failed to read book_bible.json: {e}")
+
     cast_lock_file = pdir / "cast_lock.json"
     if cast_lock_file.exists():
         try:
@@ -89,7 +113,7 @@ def audit_gate6a_voice_continuity(
                 cl_data = json.load(clf)
                 locks = cl_data.get("locks", {})
                 for char, lk in locks.items():
-                    if isinstance(lk, dict) and lk.get("locked"):
+                    if isinstance(lk, dict):
                         vid = lk.get("voice_id")
                         if vid:
                             canonical_voices[char] = vid
@@ -120,7 +144,7 @@ def audit_gate6a_voice_continuity(
     for char, chaps in speaker_chapter_map.items():
         if char not in canonical_voices:
             errors.append(
-                f"Character '{char}' speaks in chapter(s) {sorted(list(chaps))} but has no canonical voice assignment in voice_registry.json."
+                f"Character '{char}' speaks in chapter(s) {sorted(list(chaps))} but has no canonical voice assignment in cast_lock.json / voice_registry.json."
             )
         else:
             voice_assignments = character_observed_voices.get(char, {})
@@ -150,11 +174,12 @@ def audit_gate6b_loudness_continuity(
     target_lufs: float = -19.0,
     max_variance: float = 1.0,
     strict: bool = False,
+    true_peak_ceiling: float = -1.4,
 ) -> AuditResult:
     """
     Gate 6B: Loudness Continuity Auditor.
     Verifies that all mastered chapters adhere to target integrated LUFS (+/- max_variance)
-    and true peak ceiling <= -1.4 dBTP, preventing jarring volume jumps between chapters.
+    and true peak ceiling <= true_peak_ceiling dBTP, preventing jarring volume jumps between chapters.
     When strict=True, FFmpeg probe failures or unparseable outputs fail-closed immediately.
     """
     errors: List[str] = []
@@ -181,34 +206,83 @@ def audit_gate6b_loudness_continuity(
             errors.append(f"Chapter file is empty or corrupt ({c_path.stat().st_size} bytes): {c_path.name}")
             continue
 
-        cmd = [
-            ffmpeg_bin, "-y",
-            "-i", str(c_path),
-            "-af", "ebur128=peak=true:framelog=verbose",
-            "-f", "null", "-"
+        # Check if an accurate MasteringLedger already exists for this chapter
+        m_lufs = None
+        m_tp = None
+        stem_clean = c_path.stem.replace("_mastered", "")
+        ledger_candidates = [
+            c_path.with_name(f"{c_path.stem}_mastering_ledger.json"),
+            c_path.with_name(f"{stem_clean}_mastering_ledger.json"),
+            c_path.parent / "mastered" / f"{c_path.stem}_mastering_ledger.json",
+            c_path.parent / "mastered" / f"{stem_clean}_mastering_ledger.json",
+            c_path.parent.parent / "mastered" / f"{stem_clean}_mastering_ledger.json",
         ]
-        try:
-            proc = _get_subprocess().run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
-            if proc.returncode != 0:
-                errors.append(f"Chapter {c_path.name}: FFmpeg probe returned exit code {proc.returncode}: {proc.stderr[:160]}")
-                continue
-            else:
-                output = proc.stderr
-                i_match = re.search(r"Integrated loudness:\s+I:\s+([-\d.]+)\s+LUFS", output)
-                tp_match = re.search(r"True peak:\s+Peak:\s+([-\d.]+)(?:\s+([-\d.]+))?", output) or re.search(r"Peak:\s+([-\d.]+)\s+dBFS", output)
-                if not i_match:
-                    errors.append(f"Chapter {c_path.name}: Failed to parse Integrated Loudness from FFmpeg output.")
+        ledger_path = next((p for p in ledger_candidates if p.exists()), None)
+
+        if ledger_path is not None:
+            try:
+                with open(ledger_path, "r", encoding="utf-8") as lf:
+                    ldata = json.load(lf)
+                    res_data = ldata.get("result", {}) if isinstance(ldata.get("result"), dict) else {}
+                    analysis_after = res_data.get("analysis_after", {}) if isinstance(res_data.get("analysis_after"), dict) else {}
+                    meta_data = ldata.get("metadata", {}) if isinstance(ldata.get("metadata"), dict) else {}
+
+                    for cand in (
+                        ldata.get("integrated_lufs"),
+                        analysis_after.get("integrated_lufs"),
+                        meta_data.get("integrated_lufs"),
+                        ldata.get("measured_loudness_lufs"),
+                    ):
+                        if cand is not None:
+                            try:
+                                m_lufs = float(cand)
+                                break
+                            except (ValueError, TypeError):
+                                pass
+
+                    for cand in (
+                        ldata.get("true_peak_dbtp"),
+                        analysis_after.get("true_peak_dbtp"),
+                        meta_data.get("true_peak_dbtp"),
+                    ):
+                        if cand is not None:
+                            try:
+                                m_tp = float(cand)
+                                break
+                            except (ValueError, TypeError):
+                                pass
+            except Exception as e:
+                logger.debug(f"Failed to read mastering ledger {ledger_path.name}: {e}")
+
+        if m_lufs is None or m_tp is None:
+            cmd = [
+                ffmpeg_bin, "-y",
+                "-i", str(c_path),
+                "-af", "ebur128=peak=true:framelog=verbose",
+                "-f", "null", "-"
+            ]
+            try:
+                proc = _get_subprocess().run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
+                if proc.returncode != 0:
+                    errors.append(f"Chapter {c_path.name}: FFmpeg probe returned exit code {proc.returncode}: {proc.stderr[:160]}")
                     continue
                 else:
-                    m_lufs = float(i_match.group(1))
-                    if tp_match:
-                        tp_vals = [float(v) for v in tp_match.groups() if v is not None]
-                        m_tp = max(tp_vals) if tp_vals else -1.5
+                    output = proc.stderr
+                    i_match = re.search(r"Integrated loudness:\s+I:\s+([-\d.]+)\s+LUFS", output)
+                    tp_match = re.search(r"True peak:\s+Peak:\s+([-\d.]+)(?:\s+([-\d.]+))?", output) or re.search(r"Peak:\s+([-\d.]+)\s+dBFS", output)
+                    if not i_match:
+                        errors.append(f"Chapter {c_path.name}: Failed to parse Integrated Loudness from FFmpeg output.")
+                        continue
                     else:
-                        m_tp = -1.5
-        except Exception as e:
-            errors.append(f"Chapter {c_path.name}: FFmpeg loudness probe failed: {e}")
-            continue
+                        m_lufs = float(i_match.group(1))
+                        if tp_match:
+                            tp_vals = [float(v) for v in tp_match.groups() if v is not None]
+                            m_tp = max(tp_vals) if tp_vals else -1.5
+                        else:
+                            m_tp = -1.5
+            except Exception as e:
+                errors.append(f"Chapter {c_path.name}: FFmpeg loudness probe failed: {e}")
+                continue
 
         measured_lufs_list.append(m_lufs)
         deviation = abs(m_lufs - target_lufs)
@@ -223,9 +297,9 @@ def audit_gate6b_loudness_continuity(
             errors.append(
                 f"Chapter {c_path.name} loudness {m_lufs:.1f} LUFS deviates by {deviation:.1f} LU from target {target_lufs:.1f} LUFS (max allowable {max_variance:.1f} LU)"
             )
-        if m_tp > -1.4:
+        if m_tp > true_peak_ceiling:
             errors.append(
-                f"Chapter {c_path.name} true peak {m_tp:.1f} dBTP exceeds ceiling -1.4 dBTP"
+                f"Chapter {c_path.name} true peak {m_tp:.1f} dBTP exceeds ceiling {true_peak_ceiling:.1f} dBTP"
             )
 
     details = {

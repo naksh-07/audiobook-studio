@@ -37,6 +37,7 @@ from audiobook_factory.cli.commands.audio import (
 from audiobook_factory.cli.commands.audit import (
     cmd_audit_book,
     cmd_audit,
+    cmd_doctor,
 )
 from audiobook_factory.cli.commands.keys import (
     cmd_keys,
@@ -170,6 +171,10 @@ def main():
     p_audit.add_argument("book", help="Project book slug")
     p_audit.add_argument("--chapter", type=int, required=True, help="Chapter number to audit")
 
+    # doctor
+    p_doctor = subparsers.add_parser("doctor", help="Run zero-token Pre-Flight Metadata Doctor forensic audit")
+    p_doctor.add_argument("book", help="Project book slug or path")
+
     # keys
     p_keys = subparsers.add_parser("keys", help="Inspect and audit API key inventory, leases, and quota fleet status")
     p_keys.add_argument("keys_action", nargs="?", default="status", choices=["status", "list", "add", "sweep", "test", "audit", "reset"], help="Action: status, list, add, sweep, test, audit, reset (default: status)")
@@ -265,6 +270,7 @@ def main():
         "auto": cmd_auto,
         "audit": cmd_audit,
         "audit-book": cmd_audit_book,
+        "doctor": cmd_doctor,
         "keys": cmd_keys,
         "tts": _handle_tts,
         "dsp": cmd_dsp,

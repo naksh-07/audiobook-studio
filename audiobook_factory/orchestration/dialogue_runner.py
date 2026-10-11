@@ -116,6 +116,31 @@ def process_and_master_dialogue_stem(
             )
         lufs_val = master_res.analysis_after.integrated_lufs if master_res.analysis_after else -19.0
         tp_val = master_res.analysis_after.true_peak_dbtp if master_res.analysis_after else -2.0
+        lra_val = getattr(master_res.analysis_after, "loudness_range_lra", 4.0) if master_res.analysis_after else 4.0
+
+        # Persist chapter-level MasteringLedger for Gate 6B and UI telemetry
+        ledger_path = mastered_dir / f"{chap_stem}_mastering_ledger.json"
+        try:
+            from audiobook_factory.mastering_contracts import MasteringLedger
+            ledger = MasteringLedger(
+                chapter_id=chap_stem,
+                request=master_req,
+                result=master_res,
+                metadata={
+                    "chapter_num": chapter_num,
+                    "integrated_lufs": lufs_val,
+                    "true_peak_dbtp": tp_val,
+                    "loudness_range_lu": lra_val,
+                    "loudness_range_lra": lra_val,
+                    "target_lufs": -19.0,
+                    "true_peak_ceiling_dbtp": -2.0,
+                    "audio_file": str(vocal_wav),
+                },
+            )
+            ledger.save_to_disk(ledger_path)
+        except Exception as led_err:
+            logger.warning(f"  [!] Failed to persist mastering ledger for {chap_stem}: {led_err}")
+
         logger.info(
             f"[+] Dialogue Stem Mastered via MasteringEngineV2 for Chapter {chapter_num:02d} "
             f"(LUFS: {lufs_val:.2f}, TP: {tp_val} dBTP)"

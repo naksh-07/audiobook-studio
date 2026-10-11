@@ -302,6 +302,19 @@ class PreSynthesisGate:
             errors.append("Script is completely empty (0 segments). Cannot synthesize speech.")
             return cls._finalize_result(errors, warnings, details, strict)
 
+        # 0. Metadata Doctor pre-flight diagnosis (offline <50ms)
+        try:
+            from audiobook_factory.metadata.doctor import MetadataDoctor
+            doc_report = MetadataDoctor.diagnose_project(pdir)
+            if not doc_report.passed:
+                for err in doc_report.errors:
+                    errors.append(f"[MetadataDoctor] {err}")
+            for w in doc_report.warnings:
+                warnings.append(f"[MetadataDoctor] {w}")
+            details["metadata_doctor_passed"] = doc_report.passed
+        except Exception as e:
+            logger.debug(f"  [GATE 2.9] MetadataDoctor skipped: {e}")
+
         # 1. Resolve Roster, Voice Registry, and Genders
         allowed_speakers, gender_map, voice_registry = cls._resolve_catalogs(pdir, format_mode)
         details["registered_speakers_count"] = len(allowed_speakers)
@@ -585,6 +598,49 @@ class PreSynthesisGate:
                                 genders[cls._norm(name)] = g
             except Exception as e:
                 logger.warning(f"  [GATE 2.9] Could not load {reg_file.name}: {e}")
+
+        # 3. Load cast_lock.json (Room 1 Authoritative SSOT)
+        cast_lock_file = project_dir / "cast_lock.json"
+        if cast_lock_file.exists():
+            try:
+                with open(cast_lock_file, "r", encoding="utf-8") as clf:
+                    cl_data = json.load(clf)
+                locks = cl_data.get("locks", {})
+                if isinstance(locks, dict):
+                    for name, lk in locks.items():
+                        norm_n = cls._norm(name)
+                        allowed.add(norm_n)
+                        if isinstance(lk, dict):
+                            vid = lk.get("voice_id")
+                            calib = lk.get("calibration_overrides", {})
+                            p = float(calib.get("pitch", lk.get("pitch", 1.0)))
+                            s = float(calib.get("speed", lk.get("speed", 1.0)))
+                            if vid:
+                                entry = {"voice": vid, "pitch": p, "speed": s}
+                                registry[name] = entry
+                                registry[norm_n] = entry
+                            g = lk.get("gender")
+                            if g and isinstance(g, str):
+                                genders[norm_n] = g
+            except Exception as e:
+                logger.warning(f"  [GATE 2.9] Could not load {cast_lock_file.name}: {e}")
+
+        # 4. Load book_bible.json (Room 1 Canon & Entities)
+        bible_file = project_dir / "book_bible.json"
+        if bible_file.exists():
+            try:
+                with open(bible_file, "r", encoding="utf-8") as bf:
+                    bdata = json.load(bf)
+                bchars = bdata.get("entities", {}).get("characters", {})
+                if not bchars:
+                    bchars = bdata.get("characters", {})
+                if isinstance(bchars, dict):
+                    for name, meta in bchars.items():
+                        allowed.add(cls._norm(name))
+                        if isinstance(meta, dict):
+                            cls._add_character(name, meta, allowed, genders)
+            except Exception as e:
+                logger.warning(f"  [GATE 2.9] Could not load {bible_file.name}: {e}")
 
         # 3. Load podcast_config.json
         pod_file = project_dir / "podcast_config.json"
