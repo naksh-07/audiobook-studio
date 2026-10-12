@@ -464,17 +464,158 @@ with gateway.lease_session(task=TaskType.SCREENPLAY) as session:
 - [ ] Migrate logging to use deterministic public aliases (`key_a8f2`).
 
 ### Phase P1: Model Registry & Provider Adapters
-- [ ] Implement `ModelRegistry` with canonical metadata for all Gemini and alternative models.
-- [ ] Implement `GeminiProviderAdapter` with stealth SDK headers and thinkingConfig.
-- [ ] Implement `OpenAICompatibleAdapter` for Cerebras, Groq, and OpenRouter.
-- [ ] Wire `llm_client.py` and `tts/providers/gemini.py` to use `KeyLeaseManager`.
+- [x] Implement `ModelRegistry` with canonical metadata for all Gemini and alternative models.
+- [x] Implement `GeminiProviderAdapter` with stealth SDK headers and thinkingConfig.
+- [x] Implement `OpenAICompatibleAdapter` for Cerebras, Groq, and OpenRouter.
+- [x] Wire `llm_client.py` and `tts/providers/gemini.py` to use `KeyLeaseManager`.
 
 ### Phase P2: Gateway Facade & Backward Compatibility
-- [ ] Provide drop-in facades for `get_model_manager()` and `get_persistent_key_pool()` so zero existing code breaks.
-- [ ] Run full test suite:
+- [x] Provide drop-in facades for `get_model_manager()` and `get_persistent_key_pool()` so zero existing code breaks.
+- [x] Run full test suite:
   - `tests/test_model_manager_and_strict_halt.py`
   - `tests/test_universal_key_pool_and_guard_shield.py`
-- [ ] Add new multi-user concurrency tests simulating 10 parallel processes across 2 user IDs.
+  - `tests/test_key_quarantine_and_hang_defenses.py`
+  - `tests/test_key_lease_engine.py`
+  - `tests/test_key_adversarial_stress_and_coverage.py`
+- [x] Multi-user concurrency tests simulating 100 parallel threads under SQLite contention.
+
+---
+
+## 9. Key Quarantine Vault & Physical Segregation Architecture
+
+### 9.1 The Need for Physical Quarantine
+In a high-throughput fleet of 100+ free-tier API keys, keys will occasionally encounter permanent revocation or suspension from Google Cloud (HTTP 400 `API_KEY_INVALID`, HTTP 403 `CONSUMER_SUSPENDED`, `API_KEY_REVOKED`, etc.). 
+
+If invalid keys remain in the active `key_inventory` table with a temporary flag:
+1. Daily Pacific Midnight rollovers (`reset_all_for_today()`) would wipe the failure status and resurrect dead keys into active rotation.
+2. Background worker threads would continually lease dead keys, waste valuable rate-limit windows, and crash synthesis pipelines.
+3. Administrative resets (`keys reset`) would re-activate unusable credentials.
+
+To solve this, the **Key Quarantine Vault** ([`KeyQuarantineManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/quarantine.py)) enforces **Physical Vault Segregation**: dead keys are moved out of active inventory and into a dedicated `key_quarantine` table in SQLite (`audiobooks/key_pool_state.db`).
+
+### 9.2 Quarantine Table Schema & Data Contract
+
+```sql
+CREATE TABLE IF NOT EXISTS key_quarantine (
+    key_hash TEXT PRIMARY KEY,
+    encrypted_key TEXT NOT NULL,
+    key_alias TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'gemini',
+    error_code INTEGER,
+    quarantine_reason TEXT NOT NULL,
+    error_body_snippet TEXT,
+    quarantined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    quarantined_by TEXT NOT NULL,
+    is_permanent INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_quarantine_provider ON key_quarantine(provider);
+CREATE INDEX IF NOT EXISTS idx_quarantine_alias ON key_quarantine(key_alias);
+```
+
+### 9.3 Zero Zombie Resurrection Invariant
+The quarantine architecture enforces four strict guarantees that permanently prevent dead keys from re-entering active rotation:
+
+1. **Physical Segregation**: When a key is quarantined, it is deleted from `key_inventory` and `key_quota_ledger` inside an atomic transaction, leaving zero footprint in active routing.
+2. **Rollover Immunity**: `KeyLeaseManager.reset_all_for_today()` and `PersistentKeyPool._check_date_rollover()` query strictly `key_inventory` and `key_quota_ledger`. They possess zero access to `key_quarantine`.
+3. **Admin Reset Isolation**: `python audiobook_cli.py keys reset` updates only active inventory ledgers; quarantined keys remain locked in the vault.
+4. **Environment Ingestion Shield**: When workers start or reload environment variables (`register_keys()`, `PersistentKeyPool.get_key()`), `KeyQuarantineManager.is_quarantined()` is queried first. If an environment variable key is already in quarantine, ingestion is rejected.
+
+```text
+                  API Request Fails with Permanent Error
+                  (400 API_KEY_INVALID / 403 CONSUMER_SUSPENDED)
+                                    │
+                                    ▼
+                     PolicyEngine Classifies Error
+                     (Permanent API Key Ban Detected)
+                                    │
+                                    ▼
+                Atomic BEGIN IMMEDIATE SQLite Transaction
+                ┌─────────────────────────────────────────┐
+                │ 1. Insert into key_quarantine           │
+                │ 2. Revoke active lease in key_leases    │
+                │ 3. Delete row from key_inventory        │
+                │ 4. Delete row from key_quota_ledger     │
+                │ 5. Log audit event to key_audit_log     │
+                └─────────────────────────────────────────┘
+                                    │
+                                    ▼
+                Physical Isolation Complete (0% Resurrection)
+```
+
+### 9.4 Standalone Quarantine API
+
+The `KeyQuarantineManager` provides a clean, decoupled programmatic API:
+
+```python
+from audiobook_factory.core.models.quarantine import get_key_quarantine_manager
+
+q_mgr = get_key_quarantine_manager()
+
+# 1. Check isolation status
+if q_mgr.is_quarantined(key_str_or_hash):
+    ...
+
+# 2. Quarantine dead key with forensic diagnostic context
+q_mgr.quarantine_key(
+    key="AIzaSy...",
+    reason="API_KEY_INVALID: API key not valid",
+    error_code=400,
+    error_body="...",
+    quarantined_by="ModelGateway",
+)
+
+# 3. List and inspect
+records = q_mgr.list_quarantined(provider="gemini")
+rec = q_mgr.get_quarantined(alias="key_a162fd4b")
+
+# 4. Export and purge
+q_mgr.export_quarantined(Path("quarantined.json"), include_plaintext=False)
+purged_count = q_mgr.purge_keys(key_aliases_or_hashes=["key_a162fd4b"])
+
+# 5. Restore (manual operator override)
+q_mgr.restore_key("key_a162fd4b")
+```
+
+---
+
+## 10. Concurrency Hardening & Forensic Defenses (F-01 through F-06)
+
+Following rigorous adversarial QA auditing and 100-thread multi-process stress testing, six critical runtime defenses were codified into the Model & Key Control Plane:
+
+### F-01: Prompt Payload Echo Defense & Geolocation Cooldown
+- **Vulnerability**: Google API echoes back prompt snippets in HTTP 400 Bad Request error responses. Naive substring searches for `"invalid"`, `"forbidden"`, or `"suspended"` caused valid API keys to be permanently quarantined whenever dramatic scripts contained those words. Furthermore, HTTP 403 `USER_LOCATION_NOT_SUPPORTED` (common when VPNs flicker or routes shift) was previously misclassified as a permanent account suspension.
+- **Remediation**:
+  1. HTTP 400 error classification in [`policy_engine.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/policy_engine.py#L107-L135) and [`guard_shield.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/guard_shield.py#L260-L285) requires explicit API key error tokens: `API_KEY_INVALID`, `API_KEY_SERVICE_BLOCKED`, `API_KEY_REVOKED`, or regex `api key not valid`.
+  2. HTTP 403 `USER_LOCATION_NOT_SUPPORTED` is mapped to `LOCATION_UNSUPPORTED`, placing the key in a temporary 5-minute cooldown without burning the key.
+
+### F-02: Multi-Field Deterministic Key Lookup
+- **Vulnerability**: Legacy lookups differentiated keys and hashes using length heuristics (`len(id) in (12, 16)`). However, public key aliases generated by `KeyInventoryRecord.key_alias` are formatted as `key_XXXXXXXX` (exactly 12 characters). Passing an alias to quarantine or lease functions caused it to be treated as a legacy hash slice, resulting in silent lookup misses.
+- **Remediation**: Replaced length-based branching in [`quarantine.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/quarantine.py#L70-L130) with unified multi-field SQL:
+  ```sql
+  SELECT * FROM key_quarantine WHERE key_hash = ? OR key_alias = ? OR encrypted_key = ?
+  ```
+
+### F-03: Pre-Selection Housekeeping Transaction Isolation
+- **Vulnerability**: In [`lease_manager.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/lease_manager.py#L365-L390), stale lease sweeps and expired backoff clears were grouped inside the same transaction block as lease selection. When the key pool was temporarily exhausted, `acquire_lease()` raised `NoAvailableKeyError`, causing Python's `with conn:` context manager to rollback the entire transaction and discarding all housekeeping work.
+- **Remediation**: Housekeeping (dead PID sweeps + expired backoff clears) is executed and committed in its own isolated transaction prior to attempting lease candidate queries.
+
+### F-04: Fail-Safe Probe Lease Release
+- **Vulnerability**: In [`gateway.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py#L125-L138), a temporary probe lease was acquired to inspect capabilities before resolving an execution plan. If `resolve_plan()` threw an exception (e.g. unknown model tier or invalid task), the probe lease was leaked, leaving the key locked until TTL expiration.
+- **Remediation**: Wrapped `resolve_plan()` immediately with `try ... finally: lease_mgr.release_lease(probe_lease.lease_id)`, guaranteeing zero probe lease leakage.
+
+### F-05: Session Affinity Fallback Protection
+- **Vulnerability**: When an in-flight request on an affinity session failed and the router attempted fallback execution, secondary model resolution could clobber the primary session's affinity mapping in `SessionAffinityTracker`.
+- **Remediation**: Scoped affinity updates in `gateway.py` so secondary fallback branches do not overwrite existing caller affinity sessions.
+
+### F-06: Bidirectional State Mirroring & Ingestion Guards
+- **Vulnerability**: Legacy `PersistentKeyPool` (`key_quota_ledger`) and modern `KeyLeaseManager` (`key_inventory`) risked state drift if status updates were only applied to one table.
+- **Remediation**: `KeyLeaseManager.record_success()`, `mark_daily_quota_exhausted()`, and `mark_temporary_backoff()` maintain bidirectional mirroring to `key_quota_ledger` when present, ensuring both legacy and modern facades view identical key states.
+
+### Concurrency & Deadlock Boundaries
+- **SQLite Concurrency**: All database operations use Write-Ahead Logging (`PRAGMA journal_mode=WAL;`), synchronous normal (`PRAGMA synchronous=NORMAL;`), and a 30-second busy timeout (`PRAGMA busy_timeout=30000;`).
+- **Immediate Locking**: Critical state mutations (`renew_lease`, `release_lease`, `revoke_lease`, `quarantine_key`) initiate transactions using `BEGIN IMMEDIATE;`, guaranteeing exclusive write locks and eliminating `SQLITE_BUSY` deadlock cascades during multi-threaded contention.
+- **Workstation Scoping on Dead PID Sweeps**: On Windows 11 multi-user environments, `sweep_stale_and_dead_leases` scopes dead PID termination checks strictly to leases matching the local machine's `workstation_id`, preventing cross-machine PID collisions.
 
 ---
 *Document Authorized by Antigravity Studio Architecture Board.*

@@ -607,7 +607,7 @@ python audiobook_cli.py keys audit --limit 50
 ```
 
 #### G. Administrative Reset (`keys reset`)
-Performs an administrative reset of all keys and per-model quota ledgers in `audiobooks/keys_inventory.db` back to `ACTIVE` state:
+Performs an administrative reset of all keys and per-model quota ledgers in `audiobooks/key_pool_state.db` back to `ACTIVE` state:
 
 ```bash
 python audiobook_cli.py keys reset
@@ -616,6 +616,109 @@ python audiobook_cli.py keys reset
 **Output:**
 ```text
 [+] Success: All keys and model quota ledgers reset to ACTIVE state for today.
+```
+
+#### H. Key Quarantine Submodule (`keys quarantine`)
+Manages the isolated quarantine vault ([`KeyQuarantineManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/quarantine.py)) for permanently blocked, revoked, or suspended API keys. Quarantined keys are physically segregated into the `key_quarantine` table in `audiobooks/key_pool_state.db` and permanently excluded from active leasing, daily resets, and pool rollovers (guaranteeing zero zombie resurrection).
+
+```bash
+# General syntax:
+audiobook-cli keys quarantine [SUBACTION] [OPTIONS]
+# or:
+python audiobook_cli.py keys quarantine [SUBACTION] [OPTIONS]
+```
+
+##### 1. List Quarantined Keys (`list`)
+Displays all keys currently isolated in the quarantine vault, their provider, error code, quarantine reason, and isolation timestamp:
+
+```bash
+python audiobook_cli.py keys quarantine list
+```
+
+**Output:**
+```text
+============================================================================
+  AUDIOBOOK FACTORY - KEY QUARANTINE VAULT (PERMANENT ISOLATION)
+============================================================================
+  Total Quarantined Keys : 2
+  Status                 : ISOLATED (Physically excluded from active inventory)
+----------------------------------------------------------------------------
+  ALIAS          PROVIDER   CODE   REASON                   DATE QUARANTINED
+  ------------------------------------------------------------------------
+  key_a162fd4b   gemini     400    API_KEY_INVALID          2026-10-12 18:22
+  key_b00020da   gemini     403    CONSUMER_SUSPENDED       2026-10-12 18:35
+----------------------------------------------------------------------------
+  Commands:
+    Inspect : python audiobook_cli.py keys quarantine inspect --alias <ALIAS>
+    Purge   : python audiobook_cli.py keys quarantine purge --alias <ALIAS> [--all]
+    Export  : python audiobook_cli.py keys quarantine export --out ./quarantined.json
+    Restore : python audiobook_cli.py keys quarantine restore --alias <ALIAS>
+============================================================================
+```
+
+##### 2. Deep Inspect Quarantined Key (`inspect`)
+Displays forensic details for a specific quarantined key, including error snippet and root cause classification:
+
+```bash
+python audiobook_cli.py keys quarantine inspect --alias key_a162fd4b
+```
+
+**Output:**
+```text
+======================================================================
+  QUARANTINE RECORD: key_a162fd4b
+======================================================================
+  Key Hash         : a162fd4b72e1...
+  Provider         : gemini
+  HTTP Error Code  : 400
+  Quarantine Reason: API_KEY_INVALID: API key not valid. Please pass a valid API key.
+  Quarantined By   : ModelGateway
+  Quarantined At   : 2026-10-12 18:22:10
+  Permanent Block  : YES
+----------------------------------------------------------------------
+  Error Snippet:
+  {"error": {"code": 400, "message": "API key not valid. Please pass a valid API key.", "status": "INVALID_ARGUMENT"}}
+======================================================================
+```
+
+##### 3. Permanently Purge Keys (`purge`)
+Physically removes dead or revoked keys from the quarantine database. Can target a specific key alias or purge all quarantined records:
+
+```bash
+# Purge a specific key:
+python audiobook_cli.py keys quarantine purge --alias key_a162fd4b
+
+# Purge all quarantined keys:
+python audiobook_cli.py keys quarantine purge --all
+```
+
+**Output:**
+```text
+[+] Success: Permanently purged 1 key(s) from quarantine vault.
+```
+
+##### 4. Export Quarantined Keys (`export`)
+Exports all quarantined records into a JSON audit file for off-line compliance reporting or administrative review:
+
+```bash
+python audiobook_cli.py keys quarantine export --out ./quarantined_keys.json
+```
+
+**Output:**
+```text
+[+] Success: Exported 2 quarantined key records to './quarantined_keys.json'.
+```
+
+##### 5. Restore Key (`restore`)
+If a key was mistakenly quarantined (or re-enabled in the provider console), safely restores it from the quarantine vault back into the active inventory ledger:
+
+```bash
+python audiobook_cli.py keys quarantine restore --alias key_a162fd4b
+```
+
+**Output:**
+```text
+[+] Success: Key 'key_a162fd4b' restored to active inventory ledger.
 ```
 
 ---

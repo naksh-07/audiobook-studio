@@ -624,6 +624,19 @@ Protects large pools of free API keys (120+ keys) against edge mass-bans and bot
 - **Automatic Failover & Retry Loop**: Intercepts HTTP errors, classifies root causes via [`NormalizedApiError`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/policy_engine.py#L43), marks exhausted keys/models in SQLite, applies anti-correlation pauses, and retries seamlessly on alternative keys.
 - **Guaranteed Lease Release**: All operations employ `try ... finally` release blocks, ensuring 0% lease leaks under normal completion, rate limit backoff, or unexpected exceptions.
 
+#### 6. [`KeyQuarantineManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/quarantine.py) (Physical Isolation Vault & Anti-Resurrection Guard)
+- **Physical Vault Segregation**: Permanently blocked, revoked, or suspended API keys (HTTP 400 `API_KEY_INVALID`, HTTP 403 `CONSUMER_SUSPENDED`, `API_KEY_REVOKED`) are moved out of active inventory and into a dedicated `key_quarantine` table in SQLite (`audiobooks/key_pool_state.db`).
+- **Zero Zombie Resurrection**: Pacific Midnight rollovers (`reset_all_for_today()`), administrative resets (`keys reset`), and environment variable re-discovery checks (`is_quarantined()`) possess zero access to quarantined keys, preventing dead keys from ever resurrecting into active production loops.
+- **Forensic Classifications & Concurrency Hardening**: Implements defenses F-01 through F-06:
+  - F-01 prompt payload echo defense (distinguishing explicit API key errors from dramatic fiction dialogue words) and location-unsupported 403 cooldowns.
+  - F-02 multi-field deterministic SQL queries across `key_hash`, `key_alias`, and `encrypted_key`.
+  - F-03 decoupled pre-selection housekeeping transactions preventing dead PID rollback during pool starvation.
+  - F-04 fail-safe probe lease releases wrapped in `try ... finally`.
+  - F-05 session affinity preservation during fallback execution.
+  - F-06 bidirectional state synchronization across modern `key_inventory` and legacy `key_quota_ledger`.
+  - ACID concurrency with SQLite WAL mode, `busy_timeout = 30000`, `BEGIN IMMEDIATE;` locks, and workstation-scoped PID tracking (`workstation_id == my_ws`).
+- **Standalone Management CLI**: Supported via `audiobook-cli keys quarantine` subcommands (`list`, `inspect`, `purge`, `export`, `restore`).
+
 ---
 
 ### Downstream Pipeline Room Integration (Zero Boundary Leakage)
@@ -693,7 +706,7 @@ audiobook-factory/
 ├── plugin.json                          # Google Antigravity Plugin manifest
 ├── audiobook_factory/
 │   ├── core/                            # Shared Control Plane
-│   │   └── models/                      # ModelGateway, KeyLeaseManager, AntiBanGuard
+│   │   └── models/                      # ModelGateway, KeyLeaseManager, AntiBanGuard, KeyQuarantineManager
 │   ├── api/                             # Phase 7 Python Studio Bridge (studio_bridge.py)
 │   ├── extraction/                      # Pillar 1 Forensic Ingestion
 │   ├── preproduction/                   # Room 1 System 1 Stateless Novel Researcher
