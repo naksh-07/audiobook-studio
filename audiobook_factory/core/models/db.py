@@ -33,7 +33,7 @@ def get_db_connection(db_path: Optional[Path] = None, timeout: float = 30.0) -> 
 
     conn = sqlite3.connect(str(path), timeout=timeout)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000;")
+    conn.execute("PRAGMA busy_timeout = 30000;")
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("PRAGMA foreign_keys = ON;")
@@ -130,10 +130,27 @@ def init_db(db_path: Optional[Path] = None) -> None:
             );
         """)
 
+        # 5. Key Quarantine Vault (Physical Segregation of Permanently Banned/Invalid Keys)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS key_quarantine (
+                key_hash TEXT PRIMARY KEY,
+                key_alias TEXT NOT NULL UNIQUE,
+                encrypted_key TEXT NOT NULL,
+                provider TEXT NOT NULL DEFAULT 'gemini',
+                quarantine_reason TEXT NOT NULL,
+                error_code INTEGER NOT NULL,
+                error_body_snippet TEXT,
+                quarantined_by TEXT NOT NULL,
+                quarantined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_permanent INTEGER NOT NULL DEFAULT 1
+            );
+        """)
+
         # Indexes for Sub-Millisecond Reservation Lookups
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leases_active ON key_leases(key_hash, status, expires_at);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_leases_user ON key_leases(user_id, workload_type, status);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inventory_status ON key_inventory(provider, status, backoff_until);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_quarantine_provider ON key_quarantine(provider);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON key_audit_log(timestamp);")
 
         conn.commit()

@@ -35,7 +35,7 @@ To ensure transparent reasoning across all teams ("Hawa me kam nahi karenge"), t
 | • Flaw: Sliced into 1,600-word chunks, then ran 4 serial full-text LLM rewrites (Draft -> Cadence ->  |
 |   Idiom -> Critic). Rewrote already translated text repeatedly.                                       |
 | • Result: Recursive paraphrase drift, hallucinated idioms/curses, 300% output token waste, 29% word   |
-|   loss allowed without rollback. Patched with hardcoded Witcher regexes causing racial/colorist bias.  |
+|   loss allowed without rollback. Patched with hardcoded franchise regexes causing racial/colorist bias.|
 +-------------------------------------------------------------------------------------------------------+
                                                    ↓
 +-------------------------------------------------------------------------------------------------------+
@@ -92,7 +92,7 @@ flowchart TD
 ### 3.1 Strict Room 2 Boundary Rules
 
 1. **Strictly Text-to-Text**: Room 2 ingests raw English text and emits pristine Devanagari Markdown. It does not touch audio, speech engines, or timestamps.
-2. **Never Inject Screenplay Actor Tags**: Room 2 **NEVER** injects screenplay actor markers (such as `[GERALT]:` or JSON speaker attribution dictionaries). Dialogue parsing and speaker identification belong 100% to Room 3 (`audiobook_factory.script.script_builder`).
+2. **Never Inject Screenplay Actor Tags**: Room 2 **NEVER** injects screenplay actor markers (such as `[CHARACTER_A]:` or JSON speaker attribution dictionaries). Dialogue parsing and speaker identification belong 100% to Room 3 (`audiobook_factory.script.script_builder`).
 3. **Never Attempt Audio Take QA or Synthesis**: Room 2 **NEVER** attempts audio generation or audio take QA. Acoustic verification and speech synthesis belong strictly to Room 4.
 4. **Zero Forbidden Imports**: `audiobook_factory/translation/` strictly bans imports from:
    - `audiobook_factory.audio` and `audiobook_factory.audio_utils`
@@ -136,9 +136,33 @@ Replaces the 70% blind 6,000-character LLM judges with five zero-token determini
 5. **Zero Leaked Latin / Entity Spelling Gate**: Scans for untranslated English entity names and verifies exact Devanagari spellings.
 
 ### Pillar 5: Backward-Compatible Collective Integration
-[`MultiAgentTranslationCollective`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/translation/agents/collective.py) serves as the backwards-compatible facade:
+[`MultiAgentTranslationCollective`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/agents/collective.py) serves as the backwards-compatible facade:
 - **Default (`use_single_pass=True`)**: Calls `TranslationEngine` directly with `thinking_budget = 1024` and audits output via `quality_critic.audit_and_certify()`.
 - **Legacy Fallback (`use_single_pass=False`)**: Calls `translate_block_legacy()` executing the original 4-pass serial cascade (Draft $\rightarrow$ Cadence $\rightarrow$ Idiom $\rightarrow$ Critic).
+
+### Pillar 6: 2-Tier Dynamic Prompt & Directing Injection (DynamicPromptBuilder)
+To ensure the generative translation actor is deeply attuned to the novel's world, authorial register, and chapter stakes, translation prompts are assembled via [`DynamicPromptBuilder`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/prompt_builder.py):
+
+1. **System Instruction Tailoring (`build_system_instruction`)**:
+   - Signature: `build_system_instruction(tier: FidelityTier, playbook: Optional[ProductionPlaybook] = None) -> str`.
+   - Ingests novel-level [`ProductionPlaybook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L13). Injects `playbook.translation_system_prompt`, codifying tailored invariants, authentic spoken register, forbidden modern anachronisms, acceptable loanword policies, and zero English articles directives (`'The Golden Inn' -> 'गोल्डन इन'`, never `'द गोल्डन इन'`).
+   - If no playbook is supplied, dynamically falls back to standard `RAW_UNRATED_DIRECTIVES` or `CLASSIC_REVERENT_DIRECTIVES`.
+
+2. **Chapter Dramatic Steering Injection (`build_user_prompt`)**:
+   - Signature: `build_user_prompt(chunk: MacroChunk, request: TranslationRequest, total_chunks: int = 1, director_card: Optional[ChapterDirectorCard] = None) -> str`.
+   - Ingests chapter-level [`ChapterDirectorCard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L42). Injects `director_card.to_prompt_context()` as the lead block of the user prompt:
+     ```markdown
+     ### CHAPTER DRAMATIC STEERING (Chapter N: Scene Title):
+     - **Scene Atmosphere & Setting**: [Atmospheric mood and sensory setting]
+     - **Dramatic Tension**: [Trajectory of dramatic tension]
+     - **Pacing & Cadence**: [Rhythm and clause guidance]
+     - **Character Emotional Stances**: [Active character stances]
+     - **Sensory Anchors & Motifs**: [Concrete sensory details]
+     ```
+   - Informs Gemini Flash of the immediate emotional stakes and atmospheric tension of the scene *before* it processes the canonical entity glossary, preceding bilingual sliding context, and the scene manuscript.
+
+3. **JIT Project Auto-Resolution**:
+   - [`MultiAgentTranslationCollective`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/agents/collective.py) automatically inspects `CURRENT_PROJECT_DIR` for `production_playbook.json` and `metadata/chapters/chapter_XXX_director_card.json`, ensuring standalone CLI and batch execution inherit full 2-tier directing seamlessly.
 
 ---
 
@@ -147,7 +171,7 @@ Replaces the 70% blind 6,000-character LLM judges with five zero-token determini
 Recent adversarial audits identified edge cases in parity validation and module imports. The following hardening fixes have been incorporated:
 
 ### 5.1 Negation Double-Counting Separation
-In [`parity_gate.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/translation/parity_gate.py#L79-L88):
+In [`parity_gate.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/parity_gate.py#L79-L88):
 - **Problem**: When auditing Hindi negations, compound phrases (e.g. `कभी नहीं`, `कुछ नहीं`, `कोई नहीं`) were matched, and then a subsequent token scan matched single words (`नहीं`, `मत`, etc.). Consequently, compound phrases were counted twice, causing artificial negation inflation.
 - **Solution**: Compound patterns are matched, tallied, and **removed** from the text before single-token evaluation:
   ```python
@@ -165,7 +189,7 @@ In [`parity_gate.py`](file:///data/data/com.termux/files/home/audiobook-studio/a
   ```
 
 ### 5.2 Truncation Blind Spot Fail-Closed Logic
-In [`parity_gate.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/translation/parity_gate.py#L107-L111):
+In [`parity_gate.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/parity_gate.py#L107-L111):
 - **Problem**: Short passages with $> 2$ paragraphs could drop paragraphs without triggering a failure if the divergence was within a loose delta window.
 - **Solution**: The gate fails closed for any text containing more than 2 paragraphs, or whenever the paragraph delta exceeds 1:
   ```python
@@ -178,7 +202,7 @@ In [`parity_gate.py`](file:///data/data/com.termux/files/home/audiobook-studio/a
   ```
 
 ### 5.3 Purged `audio_utils` Import Leak
-In [`orchestrator.py`](file:///data/data/com.termux/files/home/audiobook-studio/audiobook_factory/translation/orchestrator.py#L22-L25):
+In [`orchestrator.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/orchestrator.py#L22-L25):
 - **Problem**: `orchestrator.py` previously imported atomic file replacement from `audiobook_factory.audio_utils`, creating a forbidden dependency on the audio module.
 - **Solution**: Replaced with standard library `os.replace`:
   ```python
@@ -219,6 +243,8 @@ class TranslationRequest(BaseModel):
     source_language: str = Field(default="en", description="Source ISO language code.")
     target_language: str = Field(default="hi", description="Target ISO language code.")
     temperature: float = Field(default=0.35, ge=0.0, le=1.0, description="Sampling temperature.")
+    playbook: Optional[Any] = Field(default=None, description="Optional ProductionPlaybook with novel-tailored prompt directives.")
+    director_card: Optional[Any] = Field(default=None, description="Optional ChapterDirectorCard with chapter scene atmosphere & stakes.")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Optional caller metadata.")
 
 
@@ -286,17 +312,35 @@ python -m audiobook_factory.translation.cli parity \
 ```python
 from audiobook_factory.translation.contracts import FidelityTier, TranslationRequest
 from audiobook_factory.translation.engine import TranslationEngine
+from audiobook_factory.contracts.playbook import ProductionPlaybook, ChapterDirectorCard
 
 # Initialize standalone engine
 engine = TranslationEngine(model_name="gemini-2.5-flash")
 
-# Configure request
+# Optional Tier 1 Master Playbook & Tier 2 Chapter Director Card
+playbook = ProductionPlaybook(
+    project_id="proj-epic-tale",
+    literary_tradition="HIGH_FANTASY",
+    regional_dialect_cadence="Epic Spoken Hindustani",
+    translation_system_prompt="### CUSTOM WORLD DIRECTIVES: Strip English articles, preserve heraldic monikers phonetically.",
+)
+
+director_card = ChapterDirectorCard(
+    chapter_num=4,
+    chapter_title="The Ancient Crypt",
+    scene_atmosphere="Claustrophobic, mossy stone corridor with dripping water.",
+    dramatic_tension="Simmering suspicion erupting into sudden combat.",
+)
+
+# Configure request with standalone contracts
 request = TranslationRequest(
     source_text="The sorceress turned slowly, eyes filled with cold rage. 'You know nothing of sacrifice.'",
     source_title="Chapter 4",
     tier=FidelityTier.RAW_UNRATED,
     thinking_budget=1024,
     temperature=0.35,
+    playbook=playbook,
+    director_card=director_card,
 )
 
 # Execute translation
@@ -313,8 +357,8 @@ print(f"Total Chunks: {result.total_chunks} | Elapsed: {result.elapsed_seconds}s
 
 | Anti-Pattern / Bug | Root Cause in Legacy Pipeline | Option D Hardened Solution |
 | :--- | :--- | :--- |
-| **"Three Jackdaws" Overfitting** | Hardcoded regex `तीन कौवे -> थ्री जैकडॉज` in `sanitizer.py`. | **Purged**. All monikers classified dynamically into `BookBible.proper_names`. Zero hardcoded novel names in codebase. |
-| **Racial / Colorist Calque Distortion** | Regex replacing `सुनहरी लड़की` with `गोरी-चिट्टी लड़की` in `sanitizer.py`. | **Purged**. Strict sense-for-sense translation without racial stereotyping or unsolicited complexion swaps. |
+| **Heraldic Moniker Overfitting** | Hardcoded regex substitutions in legacy `sanitizer.py`. | **Purged**. All monikers classified dynamically into `BookBible.proper_names`. Zero hardcoded novel names in codebase. |
+| **Racial / Colorist Calque Distortion** | Regex replacing descriptive adjectives with regional stereotypes in `sanitizer.py`. | **Purged**. Strict sense-for-sense translation without racial stereotyping or unsolicited complexion swaps. |
 | **Paraphrase Telephone Game** | 4 serial LLM rewrites in `MultiAgentTranslationCollective`. | **Eliminated**. Single-pass deliberative generation (`thinking_budget = 1024`, `temperature = 0.35`). |
 | **70% Blind Evaluator Sample** | `sample_stratified_text(6000)` discarding 80% of chapter in Gate 0. | **Replaced** with 100% full-text deterministic parity gates running locally at zero token cost. |
 | **Negation Double Counting** | Matching single token `नहीं` inside compound `कभी नहीं`. | **Fixed**. Compound patterns stripped from buffer before single tokens evaluated. |

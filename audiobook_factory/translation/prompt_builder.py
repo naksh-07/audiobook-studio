@@ -5,9 +5,10 @@ Assembles system directives, genre guidance, dynamic entity glossaries,
 and sliding bilingual context for Gemini Flash with internal deliberation.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from .contracts import FidelityTier, TranslationRequest
 from .chunker import MacroChunk
+
 
 
 RAW_UNRATED_DIRECTIVES = """### CORE DIRECTIVES - 11 GOLDEN INVARIANTS (RAW UNRATED ADULT FIDELITY):
@@ -41,13 +42,25 @@ class DynamicPromptBuilder:
     """Constructs tailored system instructions and user prompts for single-pass translation."""
 
     @classmethod
-    def build_system_instruction(cls, tier: FidelityTier) -> str:
+    def build_system_instruction(cls, tier: FidelityTier, playbook: Optional[Any] = None) -> str:
         base = (
             "You are a Master Literary Adapter and Dialogue Director for premier full-cast audio fiction. "
             "Your task is adapting dramatic scene text into spoken, natural, rhythmically compelling Hindustani "
             "in pristine Devanagari script for professional voice actors. "
             "Deliver a complete, unabridged localization of all dialogue and prose without summarizing or omitting any content.\n\n"
         )
+        cust_prompt = None
+        if isinstance(playbook, dict):
+            cust_prompt = playbook.get("translation_system_prompt")
+        elif hasattr(playbook, "translation_system_prompt"):
+            cust_prompt = getattr(playbook, "translation_system_prompt")
+
+        if cust_prompt and str(cust_prompt).strip():
+            custom_prompt = str(cust_prompt).strip()
+            if "You are a Master Literary Adapter" not in custom_prompt:
+                return base + custom_prompt
+            return custom_prompt
+
         if tier == FidelityTier.RAW_UNRATED:
             return base + RAW_UNRATED_DIRECTIVES
         else:
@@ -59,6 +72,7 @@ class DynamicPromptBuilder:
         chunk: MacroChunk,
         request: TranslationRequest,
         total_chunks: int = 1,
+        director_card: Optional[Any] = None,
     ) -> str:
         parts = []
 
@@ -67,6 +81,20 @@ class DynamicPromptBuilder:
 
         if total_chunks > 1:
             parts.append(f"### CHUNK SEQUENCE: Part {chunk.index + 1} of {total_chunks}")
+
+        # Chapter Dramatic Steering Card (if present)
+        eff_card = director_card or getattr(request, "director_card", None)
+        if eff_card:
+            if isinstance(eff_card, dict):
+                try:
+                    from audiobook_factory.contracts.playbook import ChapterDirectorCard
+                    eff_card = ChapterDirectorCard.model_validate(eff_card)
+                except Exception:
+                    pass
+            card_ctx = eff_card.to_prompt_context() if hasattr(eff_card, "to_prompt_context") else str(eff_card)
+            if card_ctx.strip():
+                parts.append(card_ctx)
+                parts.append("")
 
         # Dynamic Entity Glossary
         if request.dynamic_glossary:
@@ -91,3 +119,4 @@ class DynamicPromptBuilder:
         parts.append("\nEmit the full, unabridged Hindustani localization below:")
 
         return "\n".join(parts)
+

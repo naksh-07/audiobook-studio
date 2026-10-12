@@ -67,8 +67,11 @@ class MultiAgentTranslationCollective:
         preceding_context: str = "",
         adult_mode: bool = True,
         book_dna: Optional[Dict[str, Any]] = None,
+        playbook: Optional[Any] = None,
+        director_card: Optional[Any] = None,
         call_llm_fn: Optional[Callable[..., str]] = None,
         use_single_pass: bool = True,
+        **kwargs,
     ) -> str:
         """
         Translates an English text block into publication-grade Hindustani.
@@ -91,6 +94,28 @@ class MultiAgentTranslationCollective:
         logger.info(f"[*] [Translation Collective] Option D Single-Pass Translation for '{block_title}' ({words} words)...")
 
         eff_dna = book_dna or (glossary.get("book_dna") if isinstance(glossary, dict) else None)
+        eff_playbook = playbook or kwargs.get("playbook") or (glossary.get("playbook") if isinstance(glossary, dict) else None)
+        eff_card = director_card or kwargs.get("director_card") or (glossary.get("director_card") if isinstance(glossary, dict) else None)
+
+        # Auto-resolve from project dir if available
+        proj_dir_str = os.environ.get("CURRENT_PROJECT_DIR")
+        if proj_dir_str and Path(proj_dir_str).exists():
+            p_dir = Path(proj_dir_str)
+            if eff_playbook is None:
+                pb_file = p_dir / "production_playbook.json"
+                if pb_file.exists():
+                    try:
+                        from audiobook_factory.contracts.playbook import ProductionPlaybook
+                        eff_playbook = ProductionPlaybook.model_validate_json(pb_file.read_text(encoding="utf-8"))
+                    except Exception:
+                        pass
+            if eff_card is None:
+                m_ch = re.search(r"(\d+)", block_title or "")
+                if m_ch:
+                    ch_num = int(m_ch.group(1))
+                    from audiobook_factory.glossary.chapter_director import ChapterSteeringDirector
+                    eff_card = ChapterSteeringDirector.load_director_card(p_dir, ch_num)
+
         tier_str = str((eff_dna or {}).get("source_fidelity_tier", "")).upper()
         if "CLASSIC" in tier_str or "REVERENT" in tier_str or not adult_mode:
             tier = FidelityTier.CLASSIC_REVERENT
@@ -125,12 +150,15 @@ class MultiAgentTranslationCollective:
             dynamic_glossary=flat_glossary,
             thinking_budget=1024,
             temperature=0.35,
+            playbook=eff_playbook,
+            director_card=eff_card,
             metadata={
                 "preceding_context": preceding_context,
                 "adult_mode": adult_mode,
                 "book_dna": eff_dna or {},
             },
         )
+
 
         result = engine.translate(request)
         if not result.parity.passed_all_gates:

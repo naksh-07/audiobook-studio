@@ -61,6 +61,11 @@ from audiobook_factory.core.models.gateway import (
     ModelGateway,
     get_model_gateway,
 )
+from audiobook_factory.core.models.quarantine import (
+    KeyQuarantineManager,
+    QuarantinedKeyRecord,
+    get_key_quarantine_manager,
+)
 
 __all__ = [
     "get_db_connection",
@@ -108,6 +113,9 @@ __all__ = [
     "ExecutionPlan",
     "ModelGateway",
     "get_model_gateway",
+    "KeyQuarantineManager",
+    "QuarantinedKeyRecord",
+    "get_key_quarantine_manager",
 ]
 
 

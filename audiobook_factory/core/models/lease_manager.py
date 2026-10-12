@@ -209,6 +209,13 @@ class KeyLeaseManager:
                 if not clean_k:
                     continue
                 kh = _hash_key(clean_k)
+                # Ingestion Shield: Never register or re-activate quarantined keys
+                try:
+                    from audiobook_factory.core.models.quarantine import get_key_quarantine_manager
+                    if get_key_quarantine_manager(self.db_path).is_quarantined(kh):
+                        continue
+                except Exception:
+                    pass
                 ka = _alias_key(clean_k)
 
                 conn.execute("""
@@ -230,7 +237,7 @@ class KeyLeaseManager:
         today = self._today_str(provider)
         cursor = conn.execute("""
             UPDATE key_inventory
-            SET status = CASE WHEN status = 'EXHAUSTED_TODAY' THEN 'ACTIVE' ELSE status END,
+            SET status = CASE WHEN status IN ('EXHAUSTED_TODAY', 'TEMP_BACKOFF') THEN 'ACTIVE' ELSE status END,
                 exhausted_date = NULL,
                 total_calls_today = 0,
                 success_calls_today = 0,
@@ -243,7 +250,7 @@ class KeyLeaseManager:
 
         conn.execute("""
             UPDATE model_quota_ledger
-            SET status = CASE WHEN status = 'EXHAUSTED_TODAY' THEN 'ACTIVE' ELSE status END,
+            SET status = CASE WHEN status IN ('EXHAUSTED_TODAY', 'TEMP_BACKOFF') THEN 'ACTIVE' ELSE status END,
                 exhausted_date = NULL,
                 total_calls_today = 0,
                 success_calls_today = 0,
@@ -307,6 +314,10 @@ class KeyLeaseManager:
         Enforces 'One User = One Key per Workload' constraint.
         Raises KeyLeaseQuotaExceededError if user already holds an active lease for this workload.
         """
+        # System worker IDs or automated multi-threaded pipelines are exempt from 1-lease limit
+        if identity.user_id in ("tts_worker", "user_default", "system_worker", "admin"):
+            return
+
         row = conn.execute("""
             SELECT count(*) as count
             FROM key_leases
@@ -328,7 +339,7 @@ class KeyLeaseManager:
         workload_type: str = "text",
         provider: str = "gemini",
         identity: Optional[CallerIdentity] = None,
-        ttl_seconds: float = 60.0,
+        ttl_seconds: float = 180.0,
         model: Optional[str] = None,
         allow_multi_lease: bool = False,
         preferred_key_alias: Optional[str] = None,
@@ -362,17 +373,17 @@ class KeyLeaseManager:
             if not allow_multi_lease:
                 self._check_user_concurrency(conn, eff_identity, provider, max_allowed=1)
 
-            # 4. Clear expired temporary backoffs
+            # 4. Clear expired temporary backoffs (defensive against NULL timestamps)
             conn.execute("""
                 UPDATE key_inventory
                 SET status = 'ACTIVE', backoff_until = NULL
-                WHERE status = 'TEMP_BACKOFF' AND backoff_until <= ?;
+                WHERE status = 'TEMP_BACKOFF' AND (backoff_until IS NULL OR backoff_until <= ?);
             """, (now_ts,))
 
             conn.execute("""
                 UPDATE model_quota_ledger
                 SET status = 'ACTIVE', backoff_until = NULL
-                WHERE status = 'TEMP_BACKOFF' AND backoff_until <= ?;
+                WHERE status = 'TEMP_BACKOFF' AND (backoff_until IS NULL OR backoff_until <= ?);
             """, (now_ts,))
 
             # 5. Query candidate keys that are NOT currently leased
@@ -627,7 +638,7 @@ class KeyLeaseManager:
         error_msg: str,
         provider: str = "gemini",
     ) -> None:
-        """Marks a key as permanently INVALID."""
+        """Marks a key as permanently INVALID and transfers to quarantine vault."""
         kh = api_key_or_hash if len(api_key_or_hash) == 16 else _hash_key(api_key_or_hash)
         with self._lock, self._connection() as conn:
             conn.execute("""
@@ -635,7 +646,36 @@ class KeyLeaseManager:
                 SET status = 'INVALID'
                 WHERE key_hash = ?;
             """, (kh,))
+            # Sync to legacy table
+            try:
+                conn.execute("""
+                    UPDATE key_quota_ledger
+                    SET status = 'INVALID'
+                    WHERE key_hash = ?;
+                """, (kh,))
+                if len(kh) == 16:
+                    conn.execute("""
+                        UPDATE key_quota_ledger
+                        SET status = 'INVALID'
+                        WHERE key_hash = ?;
+                    """, (kh[:12],))
+            except sqlite3.OperationalError:
+                pass
             conn.commit()
+
+        # Delegate to KeyQuarantineManager for physical isolation
+        try:
+            from audiobook_factory.core.models.quarantine import get_key_quarantine_manager
+            get_key_quarantine_manager(self.db_path).quarantine_key(
+                api_key_or_hash=kh,
+                reason=error_msg,
+                error_code=403,
+                error_body=error_msg,
+                quarantined_by="LEASE_MANAGER",
+                provider=provider,
+            )
+        except Exception as q_err:
+            logger.warning(f"  [!] Failed to quarantine key in vault: {q_err}")
 
     def mark_temporary_backoff(
         self,
@@ -673,7 +713,7 @@ class KeyLeaseManager:
             conn.commit()
 
     def reset_all_for_today(self, provider: str = "gemini") -> None:
-        """Forces administrative reset of all keys and models back to ACTIVE state."""
+        """Forces administrative reset of all eligible keys and models back to ACTIVE state."""
         with self._lock, self._connection() as conn:
             conn.execute("""
                 UPDATE key_inventory
@@ -681,8 +721,18 @@ class KeyLeaseManager:
                     exhausted_date = NULL,
                     backoff_until = NULL,
                     failed_calls_today = 0
-                WHERE provider = ?;
+                WHERE provider = ? AND status != 'INVALID';
             """, (provider,))
+            try:
+                conn.execute("""
+                    UPDATE key_quota_ledger
+                    SET status = 'ACTIVE',
+                        exhausted_date = NULL,
+                        backoff_until = NULL
+                    WHERE provider = ? AND status != 'INVALID';
+                """, (provider,))
+            except sqlite3.OperationalError:
+                pass
             conn.execute("""
                 UPDATE model_quota_ledger
                 SET status = 'ACTIVE',
@@ -763,6 +813,10 @@ _LEASE_MANAGER_LOCK = threading.Lock()
 def get_key_lease_manager(db_path: Optional[Path] = None) -> KeyLeaseManager:
     """Returns process-wide KeyLeaseManager singleton."""
     global _LEASE_MANAGER_INSTANCE
+    if db_path is not None:
+        target_path = Path(db_path).resolve()
+        if _LEASE_MANAGER_INSTANCE is None or _LEASE_MANAGER_INSTANCE.db_path != target_path:
+            return KeyLeaseManager(db_path=target_path)
     if _LEASE_MANAGER_INSTANCE is None:
         with _LEASE_MANAGER_LOCK:
             if _LEASE_MANAGER_INSTANCE is None:

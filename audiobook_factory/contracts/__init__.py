@@ -88,6 +88,13 @@ from .album import (
     BookMasterManifest,
 )
 
+# 6B. Dynamic Production Playbook & Chapter Directing Schemas
+from .playbook import (
+    ProductionPlaybook,
+    ChapterDirectorCard,
+)
+
+
 # 7. Performance Realization Re-exports
 from audiobook_factory.performance.contracts import (
     PerformanceDirection,
@@ -228,7 +235,11 @@ __all__ = [
     "BookVoiceRoster",
     "GlobalLoreBible",
     "BookMasterManifest",
+    # Dynamic Playbook & Directing
+    "ProductionPlaybook",
+    "ChapterDirectorCard",
     # Performance
+
     "PerformanceDirection",
     "PerformanceProvenanceMode",
     "PerformancePriority",

@@ -34,6 +34,8 @@ class StanislavskiSubtextDirector:
         dramatic_context: str = "",
         is_hindi: bool = False,
         call_llm_fn: Optional[Callable[..., Any]] = None,
+        director_card: Optional[Any] = None,
+        playbook: Optional[Any] = None,
     ) -> List[Dict[str, Any]]:
         """Enriches segments with Stanislavski psychological subtext and acting directives."""
         if not segments:
@@ -42,18 +44,41 @@ class StanislavskiSubtextDirector:
         compact_turns = [
             {
                 "index": s.get("index", 1),
-                "speaker": s.get("speaker", "Narrator"),
+                "speaker": str(s.get("speaker") or "Narrator"),
                 "type": s.get("type", "narration"),
-                "text": s.get("text", "")[:300],
+                "text": str(s.get("text") or "")[:300],
             }
             for s in segments
         ]
+
+        # Dynamic scene & beat context from dramatic_plan or director_card
+        eff_context = dramatic_context
+        if not eff_context and director_card:
+            if isinstance(director_card, dict):
+                try:
+                    from audiobook_factory.contracts.playbook import ChapterDirectorCard
+                    director_card = ChapterDirectorCard.model_validate(director_card)
+                except Exception:
+                    pass
+            eff_context = director_card.to_prompt_context() if hasattr(director_card, "to_prompt_context") else str(director_card)
+        if not eff_context:
+            eff_context = "Standard narrative encounter."
+
+        playbook_guidance = ""
+        sc_prompt = None
+        if isinstance(playbook, dict):
+            sc_prompt = playbook.get("screenplay_system_prompt")
+        elif hasattr(playbook, "screenplay_system_prompt"):
+            sc_prompt = getattr(playbook, "screenplay_system_prompt")
+        if sc_prompt and str(sc_prompt).strip():
+            playbook_guidance = f"\n\nAuthorial Style & Dialogue Subtext Guidance:\n{str(sc_prompt).strip()}\n"
 
         sys_prompt = (
             get_dramatic_fiction_framing()
             + "You are an Academy-Award winning Audio Drama Director and Stanislavski Performance Coach.\n"
             "Enrich each dialogue turn with deep psychological subtext, transitive actioning verbs, "
             "concealed inner emotions, dynamic intensity headroom, and acting delivery style.\n\n"
+            + playbook_guidance +
             "Guidelines:\n"
             "- 'actioning': transitive dramatic intent verb (e.g. 'threaten', 'deflect', 'reassure', 'confess', 'probe', 'comfort', 'intimidate', 'negotiate', 'mock', 'persuade', 'seduce').\n"
             "- 'subtext': unsaid psychological motivation or truth beneath the spoken words.\n"
@@ -63,7 +88,8 @@ class StanislavskiSubtextDirector:
         )
 
         prompt = f"""{get_dramatic_fiction_framing()}Dramatic Scene & Beat Context:
-{dramatic_context if dramatic_context else "Standard narrative encounter."}
+{eff_context}
+
 
 Dialogue Turns to Direct (JSON):
 ```json
@@ -134,7 +160,8 @@ Output JSON: A list of objects matching by "index":
 
         # Narrator Transparency Invariant: Narrator is strictly calm and measured, zero melodrama
         for seg in segments:
-            if seg.get("speaker", "").strip().lower() in ("narrator", "narration", ""):
+            spk_name = str(seg.get("speaker") or "").strip().lower()
+            if spk_name in ("narrator", "narration", ""):
                 seg["actioning"] = "narrate"
                 seg["acting"] = {"delivery_style": "calm_authoritative"}
                 seg["intensity_level"] = "medium"

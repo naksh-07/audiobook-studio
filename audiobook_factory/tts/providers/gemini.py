@@ -79,10 +79,13 @@ def resolve_speech_metadata_style(
     emotion: str = "neutral",
     intensity: str = "medium",
     memory_vocal_constraint: Optional[str] = None,
+    narrator_tint: Optional[str] = None,
+    is_narrator: bool = False,
 ) -> str:
     """
-    Transforms Pydantic screenplay acting directives, emotion, and conservative Memory 2.0
-    physical vocal constraints into a concise natural language style descriptor for Gemini speechMetadata.style.
+    Transforms Pydantic screenplay acting directives, emotion, conservative Memory 2.0
+    physical vocal constraints, and chapter narrator tint into a concise natural language style
+    descriptor for Gemini speechMetadata.style.
     """
     descriptors = []
 
@@ -110,11 +113,19 @@ def resolve_speech_metadata_style(
         if constraint_str not in descriptors:
             descriptors.append(constraint_str)
 
+    if is_narrator and narrator_tint and str(narrator_tint).strip():
+        tint_clean = str(narrator_tint).strip().rstrip(".")
+        if tint_clean not in descriptors:
+            descriptors.append(tint_clean)
+
     if not descriptors:
+        if narrator_tint and str(narrator_tint).strip():
+            return f"{str(narrator_tint).strip().rstrip('.')}, articulate measured audiobook delivery"
         return "calm, steady, articulate, measured audiobook delivery"
 
     descriptors.append("grounded, natural spoken dialogue")
     return ", ".join(descriptors)
+
 
 
 def sanitize_spoken_text_and_extract_stage_directions(text: str) -> Tuple[str, List[str]]:
@@ -564,11 +575,15 @@ def synthesize_gemini_multispeaker_batch(
     for seg in batch.segments:
         # Prefer resolved spoken_text, falling back to literary text
         if hasattr(seg, "spoken_text") and seg.spoken_text:
-            raw_text = seg.spoken_text.strip()
+            raw_text = str(seg.spoken_text).strip()
         elif isinstance(seg, dict) and seg.get("spoken_text"):
-            raw_text = seg["spoken_text"].strip()
+            raw_text = str(seg["spoken_text"]).strip()
+        elif hasattr(seg, "text") and seg.text:
+            raw_text = str(seg.text).strip()
+        elif isinstance(seg, dict) and seg.get("text"):
+            raw_text = str(seg["text"]).strip()
         else:
-            raw_text = seg.text.strip() if hasattr(seg, "text") else seg.get("text", "").strip()
+            raw_text = ""
 
         clean_text, extracted_cues = sanitize_spoken_text_and_extract_stage_directions(raw_text)
         stripped = re.sub(r"^[^\w\d\u0900-\u097F]+|[^\w\d\u0900-\u097F]+$", "", clean_text)
@@ -577,13 +592,24 @@ def synthesize_gemini_multispeaker_batch(
         elif clean_text in NUMERAL_NORMALIZATION:
             clean_text = NUMERAL_NORMALIZATION[clean_text]
 
-        spk = seg.speaker if hasattr(seg, "speaker") else seg.get("speaker", "Narrator")
-        acting = getattr(seg, "acting", None) if hasattr(seg, "acting") else seg.get("acting")
-        emotion = getattr(seg, "emotion", "neutral") if hasattr(seg, "emotion") else seg.get("emotion", "neutral")
-        intensity = getattr(seg, "intensity_level", "medium") if hasattr(seg, "intensity_level") else seg.get("intensity_level", "medium")
-        mem_vc = getattr(seg, "memory_vocal_constraint", None) if hasattr(seg, "memory_vocal_constraint") else seg.get("memory_vocal_constraint")
+        raw_spk = getattr(seg, "speaker", None) if hasattr(seg, "speaker") else (seg.get("speaker") if isinstance(seg, dict) else "Narrator")
+        spk = str(raw_spk or "Narrator").strip() or "Narrator"
+        is_spk_narrator = spk.lower() in ("narrator", "narration", "")
+        acting = getattr(seg, "acting", None) if hasattr(seg, "acting") else (seg.get("acting") if isinstance(seg, dict) else None)
+        emotion = getattr(seg, "emotion", "neutral") if hasattr(seg, "emotion") else (seg.get("emotion", "neutral") if isinstance(seg, dict) else "neutral")
+        intensity = getattr(seg, "intensity_level", "medium") if hasattr(seg, "intensity_level") else (seg.get("intensity_level", "medium") if isinstance(seg, dict) else "medium")
+        mem_vc = getattr(seg, "memory_vocal_constraint", None) if hasattr(seg, "memory_vocal_constraint") else (seg.get("memory_vocal_constraint") if isinstance(seg, dict) else None)
+        n_tint = getattr(seg, "narrator_tint", None) if hasattr(seg, "narrator_tint") else (seg.get("narrator_tint") if isinstance(seg, dict) else None)
 
-        style_desc = resolve_speech_metadata_style(acting, emotion, intensity, memory_vocal_constraint=mem_vc)
+        style_desc = resolve_speech_metadata_style(
+            acting,
+            str(emotion or "neutral"),
+            str(intensity or "medium"),
+            memory_vocal_constraint=mem_vc,
+            narrator_tint=n_tint,
+            is_narrator=is_spk_narrator,
+        )
+
         if extracted_cues:
             cue_str = ", ".join(extracted_cues)
             if style_desc and style_desc.lower() not in ("neutral", "standard"):

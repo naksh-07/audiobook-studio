@@ -201,12 +201,6 @@ class ModelGateway:
                             error_msg=norm_err.message,
                             provider=plan.provider,
                         )
-                    # Shield 3: Enforce anti-correlation delay before switching keys
-                    self.anti_ban_guard.enforce_key_switch_cooldown(
-                        prev_key_alias=plan.key_alias,
-                        new_key_alias=f"{plan.key_alias}_next",
-                        fast_mode=fast_mode,
-                    )
                 elif norm_err.suggested_action == "COOL_DOWN":
                     # Put current key on backoff (minimum 60s to allow provider sliding rate window to reset)
                     self.lease_manager.mark_temporary_backoff(
@@ -332,11 +326,6 @@ class ModelGateway:
                             error_msg=norm_err.message,
                             provider=plan.provider,
                         )
-                    self.anti_ban_guard.enforce_key_switch_cooldown(
-                        prev_key_alias=plan.key_alias,
-                        new_key_alias=f"{plan.key_alias}_next",
-                        fast_mode=eff_fast_mode,
-                    )
                 elif norm_err.suggested_action == "COOL_DOWN":
                     # Put current key on backoff (minimum 60s to allow provider sliding rate window to reset)
                     self.lease_manager.mark_temporary_backoff(
@@ -370,6 +359,7 @@ class ModelGateway:
     ) -> Generator[str, None, None]:
         """
         Shield 2: Context manager holding sticky session affinity across a whole scene (8-15 segments).
+        Binds affinity to the chosen key and frees probe lease so subsequent inner requests can lease it.
         """
         identity = CallerIdentity(user_id=user_id, workload_type="text")
         plan = self.router.resolve_plan(
@@ -378,12 +368,13 @@ class ModelGateway:
             identity=identity,
         )
         self.anti_ban_guard.affinity.bind_affinity(session_id, plan.key_alias)
+        # Release the initial probe lease immediately so inner requests can lease the affinity key
+        self.lease_manager.release_lease(plan.lease.lease_id)
 
         try:
             yield plan.key_alias
         finally:
             self.anti_ban_guard.affinity.clear_affinity(session_id)
-            self.lease_manager.release_lease(plan.lease.lease_id)
 
     def get_fleet_status(self) -> Dict[str, Any]:
         """Returns comprehensive diagnostic summary of keys, models, and breakers."""

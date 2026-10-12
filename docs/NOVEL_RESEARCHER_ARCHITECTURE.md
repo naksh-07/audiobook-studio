@@ -75,6 +75,7 @@ flowchart TD
         LCS["LexicalCorpusScanner<br/><i>(Deterministic 0-Token Full Sweep)</i>"]
         NDS["NovelDeepSearchEngine<br/><i>(Google Search Grounding & Gate NR-GATE-02)</i>"]
         BDA["BookDNAAgent<br/><i>(Literary Tradition & Fidelity Profiler)</i>"]
+        PPSYN["ProductionPlaybookSynthesizer<br/><i>(Tier 1 Master Playbook Synthesizer)</i>"]
         DPA["DramatisPersonaeAgent<br/><i>(Sociolect Archetypes & Entity Taxonomy)</i>"]
         VAD["VocalAcousticDirector<br/><i>(Pure Vocals Room Impulse DSP)</i>"]
         PLD["PhoneticLexiconDramaturge<br/><i>(70/30 Devanagari Pronunciation)</i>"]
@@ -85,6 +86,7 @@ flowchart TD
         LCS -->|"LexicalCorpusIndex DTO"| PPS
         NDS -->|"DeepSearchNovelDossier DTO"| PPS
         BDA -->|"BookDNA Dict DTO"| PPS
+        PPSYN -->|"ProductionPlaybook DTO"| PPS
         DPA -->|"DramatisPersonae List DTO"| PPS
         VAD -->|"VocalSpacesManifest DTO"| PPS
         PLD -->|"PhoneticLexicon Dict DTO"| PPS
@@ -92,6 +94,7 @@ flowchart TD
         
         NDS -.->|"LLM via Bridge"| GB
         BDA -.->|"LLM via Bridge"| GB
+        PPSYN -.->|"LLM via Bridge"| GB
         DPA -.->|"LLM via Bridge"| GB
         VAD -.->|"LLM via Bridge"| GB
         PLD -.->|"LLM via Bridge"| GB
@@ -122,7 +125,8 @@ flowchart TD
         F5[("character_roster.json")]
         F6[("voice_registry.json")]
         F7[("cast_lock.json")]
-        F8[("translation/glossary.json")]
+        F8[("production_playbook.json")]
+        F9[("translation/glossary.json")]
     end
 
     PPS -->|"Passes In-Memory DTOs"| NSM
@@ -145,10 +149,10 @@ Located at [`audiobook_factory/preproduction/`](file:///c:/Users/Suraj/Documents
 - **UTF-8 Hardening (BUG-02):** Reads files with `errors="replace"` to prevent silent chapter drops from corrupted multibyte characters.
 - **Scanning Mechanics:**
   1. Title + Name patterns: `TITLE_HONORIFICS_PATTERN` matching honorific titles (`Lord`, `Lady`, `Captain`, `Doctor`, `Mr`, `Inspector`, `Alderman`, `Innkeeper`, `Duke`, etc.) followed by capitalized names.
-  2. Multi-word proper nouns: `MULTIWORD_PROPER_NOUN_PATTERN` matching compound names like *"Geralt of Rivia"*, *"Edna Pontellier"*.
-  3. Post-dialogue speakers: Regex matching patterns like `"... " said Geralt` and `"... " Geralt said`.
-  4. Pre-dialogue speakers: Regex matching `Geralt said, "..."` and `Said Geralt, "..."`.
-  5. Clause pre-dialogue speakers: Regex matching extended narrative clauses like `Elena drew her cloak tight and whispered, "..."`.
+  2. Multi-word proper nouns: `MULTIWORD_PROPER_NOUN_PATTERN` matching compound names like *"Lord Corwin"*, *"Lady Eleanor"*.
+  3. Post-dialogue speakers: Regex matching patterns like `"... " said Speaker` and `"... " Speaker said`.
+  4. Pre-dialogue speakers: Regex matching `Speaker said, "..."` and `Said Speaker, "..."`.
+  5. Clause pre-dialogue speakers: Regex matching extended narrative clauses like `Character A drew her cloak tight and whispered, "..."`.
   6. Paragraph co-occurrence tracking: Populates co-occurrence frequencies between characters sharing narrative paragraphs.
 - **Index Methods:**
   - `get_mention_count(name: str, aliases: Optional[List[str]] = None) -> int`: Returns total occurrences across name and all aliases.
@@ -181,7 +185,28 @@ Located at [`audiobook_factory/preproduction/`](file:///c:/Users/Suraj/Documents
   - `intimacy_intensity`: `NONE_OR_TENDER`, `ROMANTIC_SUBTEXT`, `SOMATIC_PASSION_RAW`, `RAW_EROTIC_REALISM`.
   - `regional_dialect_cadence`: Organic Hindustani dialect (Awadhi/Bhojpuri, Delhi/Lucknow Urdu, Rugged Frontier, Standard Spoken).
 
-### 3.4 [`DramatisPersonaeAgent`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/dramatis_personae_agent.py#L21)
+### 3.4 [`ProductionPlaybookSynthesizer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/playbook_synthesizer.py#L24)
+- **Role:** Tier 1 Novel-Level Master Prompt & Directing Playbook Synthesizer.
+- **Contract & Decoupling:** Fully decoupled standalone module taking verified literary DNA, Dossier, and metadata in, and returning a strongly typed [`ProductionPlaybook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L13) out with zero circular imports:
+  ```python
+  def synthesize_playbook(
+      self,
+      book_dna: Dict[str, Any],
+      book_dossier: Optional[Dict[str, Any]] = None,
+      book_metadata: Optional[Dict[str, Any]] = None,
+      call_llm_fn: Optional[Callable[..., Any]] = None,
+  ) -> ProductionPlaybook:
+  ```
+- **Synthesis Engine & Safety:** Dispatches via `execute_preproduction_llm()` with task `"extraction"`, max tokens `4096`, thinking budget `1024`, and `get_dramatic_fiction_framing()` under `BLOCK_NONE`.
+- **Calibrated Deterministic Heuristic Fallback (`_heuristic_fallback`):** If external LLM inference is unreachable, applies genre-calibrated deterministic rules across literary traditions:
+  - *Classic / Reverent Pathos*: Dignified, lyrical delivery (`"dignified, lyrical, reverent literary delivery with classical poise"`), formal honorific pronouns (`आप`, `हुज़ूर`, `सरकार`), sensory grace, strict modern profanity bans, zero English articles in Devanagari.
+  - *Medieval / Epic Fantasy*: Measured, resonant epic chronicler (`"measured, resonant, atmospheric epic narrator with steady authority and dramatic gravity"`), phonetic Devanagari transliteration for mythical beast species and titular orders, zero literal compound calques.
+  - *Gothic / Supernatural Horror*: Somber, eerie, shadowed delivery with delicate suspense and atmospheric chill.
+  - *Noir / Crime Thriller*: Cynical, grounded, sharp urban narrator with dry wit and rhythmic cadence.
+  - *Rural Realism*: Warm, evocative rural storyteller with authentic spoken pathos.
+- **Persisted SSOT:** Serialized directly to `production_playbook.json` at the project root for downstream consumption across Room 1.5, Room 2, Room 3, and Room 4.
+
+### 3.5 [`DramatisPersonaeAgent`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/dramatis_personae_agent.py#L21)
 - **Role:** Full-novel casting director and character profiling specialist.
 - **Capabilities:**
   - Extracts canonical Devanagari Hindi spellings.
@@ -189,7 +214,7 @@ Located at [`audiobook_factory/preproduction/`](file:///c:/Users/Suraj/Documents
   - Assigns baseline honorific pronouns (`aap`, `tum`, `tu`).
   - Defines vocal archetypes (`deep gravelly baritone`, `caustic alto`, `youthful tenor`, `weathered rustic bass`).
 
-### 3.5 [`VocalAcousticDirector`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/vocal_acoustic_director.py#L102)
+### 3.6 [`VocalAcousticDirector`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/vocal_acoustic_director.py#L102)
 - **Role:** Pure vocals-only acoustic environment designer, room impulse response modeler, and 4D parametric EQ formant filter builder.
 - **Vocals-Only Invariant:** Generates [`VocalSpacesManifest`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/vocal_acoustic_director.py#L71) containing [`VocalSpaceProfile`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/vocal_acoustic_director.py#L25) presets (`reverb_type`, `wet_mix`, `predelay_ms`, `decay_time_s`, `proximity_staging`, `high_shelf_damping_db`, `dominant_materials`).
 - **Hardening Defense (BUG-01):** Clamps pitch ratios to eliminate `ZeroDivisionError`:
@@ -205,19 +230,20 @@ Located at [`audiobook_factory/preproduction/`](file:///c:/Users/Suraj/Documents
   4. Parametric EQ Formant curves: `equalizer=f=220...`, `equalizer=f=3400...`, `equalizer=f=5000...`.
   5. Spatial room reverb: `aecho=0.95:{out_gain}:{predelay}:{decay}` + high-shelf air absorption damping.
 
-### 3.6 [`PhoneticLexiconDramaturge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/phonetic_lexicon_dramaturge.py#L20)
+### 3.7 [`PhoneticLexiconDramaturge`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/phonetic_lexicon_dramaturge.py#L20)
 - **Role:** World lexicographer and phonetic lore specialist.
 - **The 70/30 Pronunciation Invariant:** Proper names and geographic places preserve authentic source-language pronunciation transliterated phonetically into Devanagari script. Fictional concepts, weapons, and creature types receive evocative, cinematic Hindustani equivalents.
 
-### 3.7 [`SonicWorldArchitect`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/sonic_world_architect.py#L21)
+### 3.8 [`SonicWorldArchitect`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/sonic_world_architect.py#L21)
 - **Role:** Acoustic worldbuilding and legacy `sonic_bible.json` generation. Provides clean backward-compatibility projection without SFX/BGM pollution.
 
-### 3.8 [`PreProductionSupervisor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/preproduction_supervisor.py#L36)
+### 3.9 [`PreProductionSupervisor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/preproduction/preproduction_supervisor.py#L36)
 - **Role:** Room 1 coordinator and stateless showrunner.
 - **Lifecycle Flow:**
   - Step 0: Deterministic lexical corpus sweep (`LexicalCorpusScanner`).
   - Step 0A: Multi-angle web research (`NovelDeepSearchEngine`) with bidirectional grounding.
   - Step 0B: Universal literary DNA & register profiling (`BookDNAAgent`).
+  - Step 0C: Tailored novel production playbook synthesis (`ProductionPlaybookSynthesizer`), persisting `production_playbook.json`.
   - Step 1: Dramatis personae extraction (`DramatisPersonaeAgent`).
   - Step 2: Vocal room acoustics synthesis (`VocalAcousticDirector`).
   - Step 3: World lore & phonetic lexicon extraction (`PhoneticLexiconDramaturge`).

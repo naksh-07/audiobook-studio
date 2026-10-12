@@ -34,23 +34,36 @@ class PhysicalBlockingDirector:
         segments: List[Dict[str, Any]],
         dramatic_context: str = "",
         call_llm_fn: Optional[Callable[..., Any]] = None,
+        director_card: Optional[Any] = None,
     ) -> List[Dict[str, Any]]:
         """Directs physical blocking postures, proximity, and azimuth panning coordinates."""
         if not segments:
             return segments
 
         # Build speaker list to help LLM assign stable acoustic soundstage
-        speakers = sorted(list({s.get("speaker", "Narrator") for s in segments}))
+        speakers = sorted(list({str(s.get("speaker") or "Narrator") for s in segments}))
 
         compact_turns = [
             {
                 "index": s.get("index", 1),
-                "speaker": s.get("speaker", "Narrator"),
+                "speaker": str(s.get("speaker") or "Narrator"),
                 "type": s.get("type", "narration"),
-                "text": s.get("text", "")[:250],
+                "text": str(s.get("text") or "")[:250],
             }
             for s in segments
         ]
+
+        eff_context = dramatic_context
+        if not eff_context and director_card:
+            if isinstance(director_card, dict):
+                try:
+                    from audiobook_factory.contracts.playbook import ChapterDirectorCard
+                    director_card = ChapterDirectorCard.model_validate(director_card)
+                except Exception:
+                    pass
+            eff_context = director_card.to_prompt_context() if hasattr(director_card, "to_prompt_context") else str(director_card)
+        if not eff_context:
+            eff_context = "Standard narrative encounter."
 
         sys_prompt = (
             get_dramatic_fiction_framing()
@@ -69,7 +82,8 @@ class PhysicalBlockingDirector:
         )
 
         prompt = f"""{get_dramatic_fiction_framing()}Dramatic Scene Context:
-{dramatic_context if dramatic_context else "Standard narrative encounter."}
+{eff_context}
+
 
 Active Speakers in Scene: {json.dumps(speakers, ensure_ascii=False)}
 
@@ -136,10 +150,12 @@ Output JSON: A list of objects matching by "index":
                     seg.setdefault("spatial", {})
                     if "proximity" in sp:
                         seg["spatial"]["proximity"] = sp["proximity"]
-                    if "azimuth_pan" in sp:
-                        seg["spatial"]["pan"] = float(sp["azimuth_pan"])
-                    elif "pan" in sp:
-                        seg["spatial"]["pan"] = float(sp["pan"])
+                    raw_pan = sp.get("azimuth_pan") if "azimuth_pan" in sp else sp.get("pan")
+                    if raw_pan is not None:
+                        try:
+                            seg["spatial"]["pan"] = float(raw_pan)
+                        except (ValueError, TypeError):
+                            seg["spatial"]["pan"] = 0.0
                     if s.get("physical_blocking"):
                         seg["spatial"]["physical_blocking"] = s["physical_blocking"]
                 if s.get("acoustic_env"):

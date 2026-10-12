@@ -223,7 +223,34 @@ class GlossaryManager:
             chapter_glossary.save_to_file(art_file)
             logger.info(f"  [+] Chapter glossary persisted -> {art_file.name} ({chapter_glossary.total_entities} terms)")
 
+            # 6B. JIT Dynamic Chapter Steering Card Generation (Room 1.5)
+            try:
+                from audiobook_factory.glossary.chapter_director import ChapterSteeringDirector
+                card = ChapterSteeringDirector.load_director_card(p_dir, chapter_num)
+                if card is None or force_classification:
+                    pb = None
+                    pb_path = p_dir / "production_playbook.json"
+                    if pb_path.exists():
+                        try:
+                            from audiobook_factory.contracts.playbook import ProductionPlaybook
+                            pb = ProductionPlaybook.model_validate_json(pb_path.read_text(encoding="utf-8"))
+                        except Exception:
+                            pass
+                    director = ChapterSteeringDirector()
+                    card = director.direct_chapter(
+                        chapter_text=chapter_text,
+                        chapter_num=chapter_num,
+                        chapter_title=chap_slug,
+                        playbook=pb,
+                        call_llm_fn=call_llm_fn,
+                    )
+                    ChapterSteeringDirector.save_director_card(card, p_dir)
+                    logger.info(f"  [+] Chapter steering card persisted -> chapter_{chapter_num:03d}_director_card.json")
+            except Exception as e:
+                logger.warning(f"  [!] Notice during chapter director steering in GlossaryManager: {e}")
+
         return chapter_glossary
+
 
     @classmethod
     def get_chapter_glossary(

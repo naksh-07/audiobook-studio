@@ -54,6 +54,7 @@ class PreProductionSupervisor:
         """Executes one-time pre-production master pass for the novel."""
         p_dir = Path(project_dir).resolve()
         book_dna_path = p_dir / "book_dna.json"
+        playbook_path = p_dir / "production_playbook.json"
         book_bible_path = p_dir / "book_bible.json"
         sonic_bible_path = p_dir / "sonic_bible.json"
         vocal_spaces_path = p_dir / "vocal_spaces.json"
@@ -61,16 +62,18 @@ class PreProductionSupervisor:
         meta_path = p_dir / "metadata.json"
 
         # Check existing master state
-        if not force and book_dna_path.exists() and book_bible_path.exists() and (vocal_spaces_path.exists() or sonic_bible_path.exists()) and cast_lock_path.exists():
+        if not force and book_dna_path.exists() and playbook_path.exists() and book_bible_path.exists() and (vocal_spaces_path.exists() or sonic_bible_path.exists()) and cast_lock_path.exists():
             logger.info(f"[*] PreProductionSupervisor: Master novel state already locked for {p_dir.name}. Skipping.")
             return {
                 "status": "CACHED_LOCKED",
                 "book_dna": str(book_dna_path),
+                "production_playbook": str(playbook_path),
                 "book_bible": str(book_bible_path),
                 "sonic_bible": str(sonic_bible_path),
                 "vocal_spaces": str(vocal_spaces_path),
                 "cast_lock": str(cast_lock_path),
             }
+
 
         logger.info(f"[*] PreProductionSupervisor: Commencing One-Time Pre-Production Master Room for '{p_dir.name}'...")
 
@@ -170,26 +173,75 @@ class PreProductionSupervisor:
                 enable_web_research=(dossier is None),
             )
         # Synchronize with DeepSearch canonical findings
+        # Synchronize with DeepSearch canonical findings
         if dossier:
-            if dossier.literary_dna.tradition:
-                book_dna_data["literary_tradition"] = dossier.literary_dna.tradition
-            if dossier.literary_dna.source_fidelity_tier:
-                book_dna_data["source_fidelity_tier"] = dossier.literary_dna.source_fidelity_tier
-            if dossier.literary_dna.narrative_tone:
-                book_dna_data["world_atmosphere_summary"] = dossier.literary_dna.narrative_tone
-            if dossier.world_acoustics.banned_anachronisms:
-                book_dna_data["banned_anachronisms"] = dossier.world_acoustics.banned_anachronisms
-            if dossier.linguistic_dialect.acceptable_loanwords:
-                book_dna_data["acceptable_loanwords"] = dossier.linguistic_dialect.acceptable_loanwords
-            if dossier.musical_tradition.signature_instruments:
-                book_dna_data["musical_instruments"] = dossier.musical_tradition.signature_instruments
-            if dossier.literary_dna.historical_era:
-                book_dna_data["historical_era"] = dossier.literary_dna.historical_era
-            if dossier.linguistic_dialect.recommended_hindustani_register:
-                book_dna_data["regional_dialect_cadence"] = dossier.linguistic_dialect.recommended_hindustani_register
+            d_lit = getattr(dossier, "literary_dna", None) or (dossier.get("literary_dna") if isinstance(dossier, dict) else None)
+            d_acoustics = getattr(dossier, "world_acoustics", None) or (dossier.get("world_acoustics") if isinstance(dossier, dict) else None)
+            d_ling = getattr(dossier, "linguistic_dialect", None) or (dossier.get("linguistic_dialect") if isinstance(dossier, dict) else None)
+            d_music = getattr(dossier, "musical_tradition", None) or (dossier.get("musical_tradition") if isinstance(dossier, dict) else None)
+
+            if d_lit:
+                trad = getattr(d_lit, "tradition", None) or (d_lit.get("tradition") if isinstance(d_lit, dict) else None)
+                if trad:
+                    book_dna_data["literary_tradition"] = trad
+                tier = getattr(d_lit, "source_fidelity_tier", None) or (d_lit.get("source_fidelity_tier") if isinstance(d_lit, dict) else None)
+                if tier:
+                    book_dna_data["source_fidelity_tier"] = tier
+                tone = getattr(d_lit, "narrative_tone", None) or (d_lit.get("narrative_tone") if isinstance(d_lit, dict) else None)
+                if tone:
+                    book_dna_data["world_atmosphere_summary"] = tone
+                era = getattr(d_lit, "historical_era", None) or (d_lit.get("historical_era") if isinstance(d_lit, dict) else None)
+                if era:
+                    book_dna_data["historical_era"] = era
+
+            if d_acoustics:
+                banned = getattr(d_acoustics, "banned_anachronisms", None) or (d_acoustics.get("banned_anachronisms") if isinstance(d_acoustics, dict) else None)
+                if banned:
+                    book_dna_data["banned_anachronisms"] = banned
+
+            if d_ling:
+                loans = getattr(d_ling, "acceptable_loanwords", None) or (d_ling.get("acceptable_loanwords") if isinstance(d_ling, dict) else None)
+                if loans:
+                    book_dna_data["acceptable_loanwords"] = loans
+                reg = getattr(d_ling, "recommended_hindustani_register", None) or (d_ling.get("recommended_hindustani_register") if isinstance(d_ling, dict) else None)
+                if reg:
+                    book_dna_data["regional_dialect_cadence"] = reg
+
+            if d_music:
+                insts = getattr(d_music, "signature_instruments", None) or (d_music.get("signature_instruments") if isinstance(d_music, dict) else None)
+                if insts:
+                    book_dna_data["musical_instruments"] = insts
+
+        # 0C. Novel Production Playbook Synthesis
+        playbook = None
+        if playbook_path.exists() and not force:
+            try:
+                from audiobook_factory.contracts.playbook import ProductionPlaybook
+                playbook = ProductionPlaybook.model_validate_json(playbook_path.read_text(encoding="utf-8"))
+                logger.info("  [Room 1 Step 0C/5] Existing production_playbook.json verified on disk. Reusing.")
+            except Exception:
+                playbook = None
+
+        if playbook is None:
+            logger.info("  [Room 1 Step 0C/5] ProductionPlaybookSynthesizer synthesizing tailored playbook...")
+            from audiobook_factory.preproduction.playbook_synthesizer import ProductionPlaybookSynthesizer
+            syn = ProductionPlaybookSynthesizer(model=self.model)
+            d_dump = dossier.model_dump() if hasattr(dossier, "model_dump") else (dossier if isinstance(dossier, dict) else None)
+            playbook = syn.synthesize_playbook(
+                book_dna=book_dna_data,
+                book_dossier=d_dump,
+                book_metadata=book_metadata,
+                call_llm_fn=call_llm_fn,
+            )
+            import uuid
+            tmp_pb_path = p_dir / f"production_playbook.tmp.{os.getpid()}_{uuid.uuid4().hex[:6]}"
+            with open(tmp_pb_path, "w", encoding="utf-8") as f:
+                json.dump(playbook.model_dump(), f, ensure_ascii=False, indent=2)
+            os.replace(tmp_pb_path, playbook_path)
 
         # 1. Dramatis Personae Extraction (Guided by Book DNA & DeepSearch)
         logger.info("  [Room 1 Step 1/5] DramatisPersonaeAgent extracting character dossiers...")
+
         raw_chars = self.dramatis_personae_agent.extract_dramatis_personae(
             novel_text_sample=combined_sample,
             book_metadata=book_metadata,
@@ -368,11 +420,13 @@ class PreProductionSupervisor:
             "characters_count": len(bible.characters),
             "locations_count": len(bible.locations),
             "book_dna": str(book_dna_path),
+            "production_playbook": str(playbook_path),
             "book_bible": str(book_bible_path),
             "sonic_bible": str(sonic_bible_path),
             "vocal_spaces": str(vocal_spaces_path),
             "cast_lock": str(cast_lock_path),
         }
+
 
 
 def run_preproduction(project_dir: Path | str, force: bool = False, model: Optional[str] = None) -> Dict[str, Any]:

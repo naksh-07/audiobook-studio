@@ -113,13 +113,39 @@ class AudiobookAdapter(BaseScriptAdapter):
             else ""
         )
 
-        max_chunk_words = int(os.environ.get("SCREENPLAY_CHUNK_WORDS", "500"))
-        words_count = len(chapter_text.split())
+        # JIT Load Chapter Director Card and Production Playbook if available
+        eff_card = kwargs.get("director_card")
+        eff_playbook = kwargs.get("playbook")
+        proj_dir_str = os.environ.get("CURRENT_PROJECT_DIR")
+        if proj_dir_str and Path(proj_dir_str).exists():
+            p_dir = Path(proj_dir_str)
+            if eff_card is None:
+                try:
+                    from audiobook_factory.glossary.chapter_director import ChapterSteeringDirector
+                    eff_card = ChapterSteeringDirector.load_director_card(p_dir, chapter_num)
+                except Exception:
+                    pass
+            if eff_playbook is None:
+                pb_file = p_dir / "production_playbook.json"
+                if pb_file.exists():
+                    try:
+                        from audiobook_factory.contracts.playbook import ProductionPlaybook
+                        eff_playbook = ProductionPlaybook.model_validate_json(pb_file.read_text(encoding="utf-8"))
+                    except Exception:
+                        pass
 
-        if words_count <= max_chunk_words:
+        ch_text = chapter_text or ""
+        if not ch_text.strip():
+            return []
+
+        max_chunk_words = int(os.environ.get("SCREENPLAY_CHUNK_WORDS", "500"))
+        words_count = len(ch_text.split())
+
+        dramatic_scenes = getattr(dramatic_plan, "scenes", None) or []
+        if words_count <= max_chunk_words or not dramatic_plan:
             dramatic_context_str = ""
-            if dramatic_plan.scenes:
-                primary_scene = dramatic_plan.scenes[0]
+            if dramatic_scenes:
+                primary_scene = dramatic_scenes[0]
                 ctx_parts = [
                     f"Active Dramatic Scene: {primary_scene.scene_id} ({primary_scene.scene_type})",
                     f"Setting: {primary_scene.location} ({primary_scene.time_context})",
@@ -139,20 +165,23 @@ class AudiobookAdapter(BaseScriptAdapter):
                 dramatic_context_str = "\n".join(ctx_parts)
 
             raw_items = chunk_parser(
-                chunk_text=chapter_text,
+                chunk_text=ch_text,
                 preceding_context=memory_prompt_str,
                 is_hindi=is_hindi,
                 character_roster=character_roster,
                 api_key="",
                 model=model,
                 dramatic_context=dramatic_context_str,
+                director_card=eff_card,
+                playbook=eff_playbook,
             )
             if not raw_items:
                 logger.error("  [!] STRICT HALT: Screenplay LLM returned no segments. Refusing to degrade to flat narrator.")
                 raise LLMUnavailableError("Screenplay LLM returned empty segments. Production strictly halted.")
+
         else:
             chunks = BeatPlanner.slice_chapter_by_beats(
-                chapter_text=chapter_text,
+                chapter_text=ch_text,
                 dramatic_plan=dramatic_plan,
                 max_words=max_chunk_words,
             )
@@ -188,7 +217,10 @@ class AudiobookAdapter(BaseScriptAdapter):
                     api_key="",
                     model=model,
                     dramatic_context=chunk_dramatic_ctx,
+                    director_card=eff_card,
+                    playbook=eff_playbook,
                 )
+
                 if chunk_items:
                     raw_items.extend(chunk_items)
                     tail_lines = []

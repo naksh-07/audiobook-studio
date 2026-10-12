@@ -14,13 +14,14 @@ from typing import Any
 
 from audiobook_factory.core.models import (
     get_key_lease_manager,
+    get_key_quarantine_manager,
     get_db_connection,
     DEFAULT_DB_PATH,
 )
 
 
 def cmd_keys(args: Any) -> None:
-    """Dispatches 'keys' subcommands: status, list, add, sweep, test, audit, reset."""
+    """Dispatches 'keys' subcommands: status, list, add, sweep, test, audit, reset, quarantine."""
     action = getattr(args, "keys_action", "status")
     if action == "status":
         cmd_keys_status(args)
@@ -36,6 +37,8 @@ def cmd_keys(args: Any) -> None:
         cmd_keys_audit(args)
     elif action == "reset":
         cmd_keys_reset(args)
+    elif action == "quarantine":
+        cmd_keys_quarantine(args)
     else:
         cmd_keys_status(args)
 
@@ -175,4 +178,92 @@ def cmd_keys_test(args: Any) -> None:
     else:
         print(f"  Probe Status : DEGRADED (0 active keys available)")
     print("=" * 70 + "\n")
+
+
+def cmd_keys_quarantine(args: Any) -> None:
+    """Manages the quarantine vault for permanently blocked, revoked, or suspended keys."""
+    subaction = getattr(args, "quarantine_action", "list") or "list"
+    q_mgr = get_key_quarantine_manager()
+    provider = getattr(args, "provider", None)
+
+    if subaction == "list":
+        records = q_mgr.list_quarantined(provider=provider)
+        print("\n" + "=" * 76)
+        print("  AUDIOBOOK FACTORY - KEY QUARANTINE VAULT (PERMANENT ISOLATION)")
+        print("=" * 76)
+        print(f"  Total Quarantined Keys : {len(records)}")
+        print("  Status                 : ISOLATED (Physically excluded from active inventory)")
+        print("-" * 76)
+        if not records:
+            print("  No quarantined keys in vault. All keys are healthy or in standard inventory.")
+        else:
+            print(f"  {'ALIAS':<14} {'PROVIDER':<10} {'CODE':<6} {'REASON':<24} {'DATE QUARANTINED'}")
+            print("  " + "-" * 72)
+            for r in records:
+                q_date = str(r.quarantined_at)[:16]
+                reason = r.quarantine_reason[:23]
+                print(f"  {r.key_alias:<14} {r.provider:<10} {r.error_code:<6} {reason:<24} {q_date}")
+            print("-" * 76)
+            print("  Commands:")
+            print("    Inspect : python audiobook_cli.py keys quarantine inspect --alias <ALIAS>")
+            print("    Purge   : python audiobook_cli.py keys quarantine purge --alias <ALIAS> [--all]")
+            print("    Export  : python audiobook_cli.py keys quarantine export --out ./quarantined.json")
+            print("    Restore : python audiobook_cli.py keys quarantine restore --alias <ALIAS>")
+        print("=" * 76 + "\n")
+
+    elif subaction == "inspect":
+        alias = getattr(args, "alias", None)
+        if not alias:
+            print("[!] Error: Specify key alias to inspect via --alias <ALIAS>", file=sys.stderr)
+            return
+        rec = q_mgr.get_quarantined(alias)
+        if not rec:
+            print(f"[!] Error: Key '{alias}' not found in quarantine vault.", file=sys.stderr)
+            return
+        print("\n" + "=" * 70)
+        print(f"  QUARANTINE RECORD: {rec.key_alias}")
+        print("=" * 70)
+        print(f"  Key Hash         : {rec.key_hash}")
+        print(f"  Provider         : {rec.provider}")
+        print(f"  HTTP Error Code  : {rec.error_code}")
+        print(f"  Quarantine Reason: {rec.quarantine_reason}")
+        print(f"  Quarantined By   : {rec.quarantined_by}")
+        print(f"  Quarantined At   : {rec.quarantined_at}")
+        print(f"  Permanent Block  : {'YES' if rec.is_permanent else 'NO'}")
+        if rec.error_body_snippet:
+            print("-" * 70)
+            print("  Error Snippet:")
+            print(f"  {rec.error_body_snippet}")
+        print("=" * 70 + "\n")
+
+    elif subaction == "purge":
+        purge_all = getattr(args, "purge_all", False)
+        alias = getattr(args, "alias", None)
+        if not purge_all and not alias:
+            print("[!] Error: Specify --alias <ALIAS> or --all to permanently purge keys.", file=sys.stderr)
+            return
+        targets = [alias] if alias else None
+        reaped = q_mgr.purge_keys(key_aliases_or_hashes=targets, purge_all=purge_all, provider=provider)
+        print(f"\n[+] Success: Permanently purged {reaped} key(s) from quarantine vault.\n")
+
+    elif subaction == "export":
+        out_path = getattr(args, "out", None) or "quarantined_keys.json"
+        include_keys = getattr(args, "include_keys", False)
+        from pathlib import Path
+        count = q_mgr.export_quarantined(Path(out_path), include_plaintext=include_keys)
+        print(f"\n[+] Success: Exported {count} quarantined key records to '{out_path}'.\n")
+
+    elif subaction == "restore":
+        alias = getattr(args, "alias", None)
+        if not alias:
+            print("[!] Error: Specify key alias to restore via --alias <ALIAS>", file=sys.stderr)
+            return
+        ok = q_mgr.restore_key(alias)
+        if ok:
+            print(f"\n[+] Success: Key '{alias}' restored to active inventory ledger.\n")
+        else:
+            print(f"\n[!] Error: Key '{alias}' not found in quarantine vault.\n", file=sys.stderr)
+
+    else:
+        print(f"[!] Unknown quarantine action '{subaction}'. Choices: list, inspect, purge, export, restore", file=sys.stderr)
 

@@ -29,7 +29,10 @@ class TranslationRequest(BaseModel):
     source_language: str = Field(default="en", description="Source ISO language code.")
     target_language: str = Field(default="hi", description="Target ISO language code.")
     temperature: float = Field(default=0.35, ge=0.0, le=1.0, description="Sampling temperature.")
+    playbook: Optional[Any] = Field(default=None, description="Optional ProductionPlaybook with novel-tailored prompt directives.")
+    director_card: Optional[Any] = Field(default=None, description="Optional ChapterDirectorCard with chapter scene atmosphere & stakes.")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Optional caller metadata.")
+
 
 
 class ParagraphAlignment(BaseModel):

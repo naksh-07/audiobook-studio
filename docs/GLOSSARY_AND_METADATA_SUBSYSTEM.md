@@ -111,14 +111,19 @@ flowchart TD
         Assembler --> ChapGlossary["ChapterGlossary (Pydantic v2)<br/>• entities (ChapterEntity)<br/>• locations & terminology<br/>• version_hash (SHA-256)"]
         
         ChapGlossary --> DiskArtifact[("Disk Persistence<br/>glossary/chapter_XXX_glossary.json")]
+        RawChap & Assembler --> SteeringDir["ChapterSteeringDirector<br/>(Tier 2 Chapter Directing)"]
+        SteeringDir --> CardArtifact[("Card Persistence<br/>metadata/chapters/chapter_XXX_director_card.json")]
     end
 
     subgraph Downstream["🎬 Downstream Production Consumers"]
         direction TB
         ChapGlossary -->|"to_translation_glossary()<br/>Flat en -> hi Dictionary"| R2["Room 2: Translation Engine<br/>(TranslationRequest.dynamic_glossary)"]
+        CardArtifact -->|"to_prompt_context()<br/>Chapter Stakes & Atmosphere"| R2
         ChapGlossary -->|"to_scripting_roster()<br/>character_roster.json schema"| R3_A["Room 3: Screenplay Attribution<br/>(DialogueAttributionAuditor)"]
+        CardArtifact -->|"to_prompt_context()<br/>Stanislavski & Spatial Staging"| R3_A
         ChapGlossary -->|"to_dramaturgy_characters()<br/>Active Scene Cast List"| R3_B["Room 3: Scene Dramaturgy<br/>(Scene Segmentation)"]
         ChapGlossary -->|"discover_and_lock_character()<br/>cast_lock.json updates"| R4["Room 4: Voice Performance<br/>(4D Acoustic Formants)"]
+        CardArtifact -->|"narrator_vocal_tint<br/>speechMetadata.style"| R4
     end
 ```
 
@@ -479,6 +484,94 @@ All LLM operations in Room 1.5 route strictly through [`execute_glossary_llm()`]
 
 ---
 
+## 7.5 Tier 2 Chapter Steering Director (ChapterSteeringDirector & ChapterDirectorCard)
+
+Operating as Room 1.5's dynamic artistic director, [`ChapterSteeringDirector`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/chapter_director.py#L24) extracts chapter-level dramatic atmosphere, emotional stances, pacing cadence, and narrator vocal tints.
+
+### 1. Chapter Director Card Schema ([`ChapterDirectorCard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L42))
+Defined using Pydantic v2 in [`audiobook_factory/contracts/playbook.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py), this model serves as the chapter-level SSOT:
+
+```python
+class ChapterDirectorCard(BaseModel):
+    """Chapter-level dramatic steering card for dynamic room injection."""
+    chapter_num: int = Field(default=1, description="1-indexed chapter number")
+    chapter_title: str = Field(default="", description="Chapter title or heading")
+    scene_atmosphere: str = Field(
+        default="Standard narrative encounter.",
+        description="Atmospheric and emotional mood of the chapter."
+    )
+    dramatic_tension: str = Field(
+        default="steady narrative progression",
+        description="Dominant tension trajectory."
+    )
+    character_emotional_states: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Key character emotional stances in this specific chapter."
+    )
+    pacing_cadence: str = Field(
+        default="measured conversational with natural spoken pauses",
+        description="Rhythm and clause length guidance for translation and delivery."
+    )
+    narrator_vocal_tint: str = Field(
+        default="calm, observant, grounded delivery",
+        description="Atmospheric vocal tint for narrator segments in this chapter."
+    )
+    key_motifs_or_sensory_details: List[str] = Field(
+        default_factory=list,
+        description="Sensory details, weather, ambient props, or recurring motifs."
+    )
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+```
+
+#### Markdown Prompt Projection (`to_prompt_context()`)
+Formats the card into an actionable Markdown context block injected directly into LLM prompts in Room 2 (Translation) and Room 3 (Screenplay):
+```markdown
+### CHAPTER DRAMATIC STEERING (Chapter 3: The Cemetery):
+- **Scene Atmosphere & Setting**: Quiet cemetery at twilight; heavy mist and distant crows.
+- **Dramatic Tension**: Melancholic reflection interrupted by sudden ominous footsteps.
+- **Pacing & Cadence**: Slow, atmospheric phrasing building to alert tension.
+- **Character Emotional Stances**:
+  * Character A: Grief-stricken but acutely vigilant
+- **Narrator Delivery Demeanor**: hushed, solemn, expectant whisper
+- **Sensory Anchors & Motifs**: wet grass, carved marble, cold mist
+```
+
+### 2. Director Extraction Architecture ([`ChapterSteeringDirector`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/chapter_director.py#L24))
+- **Contract & Decoupling:** Fully decoupled standalone class taking chapter text, chapter number, and optional `ProductionPlaybook` in, returning `ChapterDirectorCard` out with zero circular imports:
+  ```python
+  def direct_chapter(
+      self,
+      chapter_text: str,
+      chapter_num: int = 1,
+      chapter_title: str = "",
+      playbook: Optional[ProductionPlaybook] = None,
+      call_llm_fn: Optional[Callable[..., Any]] = None,
+  ) -> ChapterDirectorCard:
+  ```
+- **Lightweight Text Sampling:** To minimize latency and token cost, chapters exceeding 1,200 words are stratified into head, middle, and climax segments (max ~6,000 characters total):
+  ```python
+  first_part = " ".join(words[:400])
+  mid_idx = len(words) // 2
+  mid_part = " ".join(words[mid_idx - 200 : mid_idx + 200])
+  last_part = " ".join(words[-400:])
+  sample = f"{first_part}\n\n[...]\n\n{mid_part}\n\n[...]\n\n{last_part}"
+  ```
+- **LLM Extraction & Safety:** Dispatches via `execute_glossary_llm()` with task `"extraction"`, max tokens `2048`, thinking budget `512`, and `get_dramatic_fiction_framing(title=f"Chapter {chapter_num}")` under `BLOCK_NONE`.
+- **Calibrated Deterministic Keyword Fallback (`_heuristic_fallback`):** If external LLM inference is unreachable, analyzes text signals and sentiment keywords across the chapter:
+  - *Combat Detection* (`sword`, `blade`, `blood`, `slash`, `attack`, `wound`): Generates high-stakes physical confrontation atmosphere, urgent pacing, and focused tension tint (`"focused, urgent, rhythmic tension with rapid clauses during action"`).
+  - *Suspense Detection* (`whisper`, `shadow`, `dark`, `silence`, `terror`, `fear`): Generates shadowed claustrophobic suspense, deliberate phrasing, and watchful dread tint (`"low, quiet, watchful dread with suppressed urgency"`).
+  - *Intimacy Detection* (`touch`, `embrace`, `skin`, `breath`, `desire`): Generates sensory intimacy, soft fluid cadence, and tender vocal tint (`"soft, understated, tender vocal delivery"`).
+  - *Grief Detection* (`tears`, `wept`, `sorrow`, `grave`, `corpse`, `mourn`): Generates somber melancholic reflection, slow resonant delivery, and solemn literary gravity tint (`"solemn, compassionate, resonant literary gravity"`).
+  - *Default Narrative*: Reverts to `playbook.narrator_master_demeanor` or `"calm, steady, articulate, measured delivery"`.
+
+### 3. Disk Persistence & Loading
+- **Persistence Path:** Atomically saved to `{project_dir}/metadata/chapters/chapter_{chapter_num:03d}_director_card.json`.
+- **Static Helpers:**
+  - [`ChapterSteeringDirector.save_director_card(card, project_dir)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/chapter_director.py#L199)
+  - [`ChapterSteeringDirector.load_director_card(project_dir, chapter_num)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/chapter_director.py#L210)
+
+---
+
 ## 8. Single-Pass Orchestration & State Synchronization (`manager.py`)
 
 The primary facade for Room 1.5 is [`GlossaryManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/manager.py). It orchestrates lexical scanning, classification, BookBible synchronization, and dynamic cast locking in a single pass.
@@ -514,6 +607,13 @@ def scan_and_sync_chapter(
 6. **Stage 6: Artifact Assembly & Persistence**:
    - Assembles the final [`ChapterGlossary`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/contracts.py) containing all entities active in this chapter.
    - Persists the artifact atomically to `{project_dir}/glossary/{chap_slug}_glossary.json`.
+7. **Stage 6B: JIT Dynamic Chapter Steering Card Generation (Room 1.5)**:
+   - Checks if `metadata/chapters/chapter_{chapter_num:03d}_director_card.json` exists via `ChapterSteeringDirector.load_director_card()`.
+   - If missing or `force_classification=True`:
+     - Loads `production_playbook.json` from `project_dir` if present.
+     - Invokes `ChapterSteeringDirector().direct_chapter(chapter_text, chapter_num, chap_slug, playbook=pb)`.
+     - Atomically persists the card to `metadata/chapters/chapter_{chapter_num:03d}_director_card.json`.
+     - Logs: `Chapter steering card persisted -> chapter_XXX_director_card.json`.
 
 ### 8.2 Production Convenience Methods
 

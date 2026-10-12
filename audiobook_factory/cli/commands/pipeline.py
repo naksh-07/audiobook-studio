@@ -41,6 +41,8 @@ def cmd_research(args):
     print(f"     Book Bible      : {res.get('book_bible')}")
     print(f"     Cast Lock       : {res.get('cast_lock')}")
     print(f"     Vocal Spaces    : {res.get('vocal_spaces')}")
+    print(f"     Playbook        : {res.get('production_playbook')}")
+
 
 
 

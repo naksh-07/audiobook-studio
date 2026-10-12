@@ -218,15 +218,71 @@ class BaseScriptAdapter(ABC):
 
 #### 1. Audiobook Adapter ([`AudiobookAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/adapters/audiobook.py))
 - **Audible Flow Standard**: 100% preservation of authorial prose.
-- **Prose-Lead Framing**: Dialogue split across narrative tags (`"No," said Geralt, "I will not leave."`) is unified into an unbroken character speech turn with em-dash lead-in (`"गेराल्ट ने इंकार किया— 'नहीं, मैं नहीं जाऊँगा।'"`) or clean speaker turn separation.
+- **Prose-Lead Framing**: Dialogue split across narrative tags (`"No," said Character A, "I will not leave."`) is unified into an unbroken character speech turn with em-dash lead-in (`"वक्ता ने इंकार किया— 'नहीं, मैं नहीं जाऊँगा।'"`) or clean speaker turn separation.
 - **Anti-Swap Dialogue Attribution Auditor**: Screenplay segments pass Gate 2 attribution audit, ensuring 0% speaker turn inversion ($A \leftrightarrow B$).
 - **Performance Bible Binding**: Automatically enriches character lines with pacing, restraint, and articulation guidelines.
 
 #### 2. Podcast Adapter ([`PodcastAdapter`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/adapters/podcast.py))
 - Consumes the `DramaticPlan` and invokes [`PodcastEpisodeGenerator`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/episode_generator.py).
-- Synthesizes dynamic 2-host conversational dialogue (Sameer & Priya in Hindustani, Alex & Maya in English).
+- Synthesizes dynamic 2-host conversational dialogue (Host A & Host B).
 - Applies [`SpokenBreathabilityTransformer`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/podcast/spoken_transformer.py) ($\le 22$ words per breath, 140ms pre-roll breath pauses).
 - Returns downstream screenplay-compatible segments tagged with `section_type`, `pan` ($-0.25$ Left / $+0.25$ Right), and `acoustic_env = "podcast_studio"`.
+
+---
+
+## 6B. Room 3 Dynamic Directing Injection (Stanislavski Subtext & Physical Staging)
+
+Prior to the 2-tier subsystem, Stanislavski subtext coaching and physical staging fell back to a generic static string (`"Standard narrative encounter."`) whenever explicit scene blueprints were absent. Room 3 now dynamically injects the **Tier 2 Chapter Director Card** ([`ChapterDirectorCard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L42)) and **Tier 1 Master Playbook** ([`ProductionPlaybook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L13)) across all dramaturgical agents:
+
+```mermaid
+flowchart LR
+    Card["ChapterDirectorCard<br/>(to_prompt_context())"] --> Staging["staging_enricher.py / ScriptRoom"]
+    Playbook["ProductionPlaybook<br/>(screenplay_system_prompt)"] --> Staging
+    Staging --> Stan["StanislavskiSubtextDirector<br/>(Subtext, Actioning Verbs, Intensity)"]
+    Staging --> Block["PhysicalBlockingDirector<br/>(Azimuth Pan, Proximity, Posture)"]
+    Stan & Block --> Enriched["Enriched Dialogue Segments<br/>(speechMetadata.style ready)"]
+```
+
+### 1. Stanislavski Subtext Director ([`StanislavskiSubtextDirector`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/script/agents/stanislavski_director.py))
+- **Method Signature**:
+  ```python
+  def direct_subtext(
+      self,
+      segments: List[Dict[str, Any]],
+      dramatic_context: str = "",
+      is_hindi: bool = False,
+      call_llm_fn: Optional[Callable[..., Any]] = None,
+      director_card: Optional[ChapterDirectorCard] = None,
+      playbook: Optional[ProductionPlaybook] = None,
+  ) -> List[Dict[str, Any]]:
+  ```
+- **Context Replacement**: Evaluates `dramatic_context`. If empty and `director_card` is provided, automatically assigns `eff_context = director_card.to_prompt_context()`.
+- **Authorial Style & Dialogue Subtext Guidance**: If `playbook.screenplay_system_prompt` is provided, appends tailored delivery rules directly into the system prompt:
+  ```markdown
+  Authorial Style & Dialogue Subtext Guidance:
+  {playbook.screenplay_system_prompt}
+  ```
+- **Output Enrichment**: Enriches every dialogue turn with transitive actioning verbs (`threaten`, `deflect`, `reassure`, `probe`), unsaid subtext, underlying concealed emotion, and calibrated intensity headroom (`low`, `medium`, `high`, `explosive`).
+
+### 2. Physical Blocking Director ([`PhysicalBlockingDirector`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/script/agents/physical_blocking_director.py))
+- **Method Signature**:
+  ```python
+  def direct_blocking(
+      self,
+      segments: List[Dict[str, Any]],
+      dramatic_context: str = "",
+      call_llm_fn: Optional[Callable[..., Any]] = None,
+      director_card: Optional[ChapterDirectorCard] = None,
+  ) -> List[Dict[str, Any]]:
+  ```
+- **Spatial Positioning Grounded in Chapter Atmosphere**: Replaces static `"Standard narrative encounter."` with `director_card.to_prompt_context()`, enabling the LLM to choreograph stereo azimuth pan ($-0.8$ to $+0.8$), proximity zones (`intimate_close`, `normal_room`, `distant`), physical posture (`sitting`, `standing`, `pacing`, `leaning_close`), and the specific acoustic environment matching the chapter's actual physical setting.
+
+### 3. Pipeline Wiring & Auto-Resolution
+- **[`AudiobookAdapter.adapt()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/adapters/audiobook.py#L120)**:
+  1. Inspects the project directory for `metadata/chapters/chapter_XXX_director_card.json` via [`ChapterSteeringDirector.load_director_card(p_dir, chapter_num)`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/glossary/chapter_director.py#L210).
+  2. Inspects `p_dir / "production_playbook.json"` for [`ProductionPlaybook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L13).
+  3. Forwards `director_card=eff_card` and `playbook=eff_playbook` directly into `staging_enricher.process_chunk()`.
+- **[`staging_enricher`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/script/staging_enricher.py#L157)** & **[`ScriptRoom`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/script/agents/script_room.py#L43)**: Transparently forward `director_card` and `playbook` into Pass 2A (Stanislavski subtext) and Pass 2B (physical blocking), ensuring zero loss of chapter atmospheric context.
 
 ---
 
@@ -263,14 +319,14 @@ scenes = SceneAnalyzer.segment_and_analyze_scenes(
     chapter_text=chapter_text,
     chapter_num=1,
     chapter_title="Chapter 1",
-    known_characters=["Geralt", "Jaskier"],
+    known_characters=["Character A", "Character B"],
 )
 
 # 3. Plan Atomic Dramatic Beats & SPU Alignment
 scenes = BeatPlanner.plan_chapter_beats(
     chapter_text=chapter_text,
     scenes=scenes,
-    known_characters=["Geralt", "Jaskier"],
+    known_characters=["Character A", "Character B"],
 )
 
 # 4. Serialize Immutable Dramatic AST

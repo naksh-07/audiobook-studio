@@ -36,9 +36,9 @@ def _enrich_performance_and_staging_llm(
     for s in segments:
         compact_turns.append({
             "index": s.get("index", 1),
-            "speaker": s.get("speaker", "Narrator"),
+            "speaker": str(s.get("speaker") or "Narrator"),
             "type": s.get("type", "narration"),
-            "text": s.get("text", "")[:300],
+            "text": str(s.get("text") or "")[:300],
         })
 
     sys_prompt = (
@@ -128,7 +128,8 @@ Output JSON: A list of objects where each object corresponds by "index" to the i
                 seg["acoustic_env"] = e["acoustic_env"]
 
         # Narrator Transparency Invariant: Narrator is strictly calm and measured, zero melodrama
-        if seg.get("speaker", "").strip().lower() in ("narrator", "narration", ""):
+        spk_name = str(seg.get("speaker") or "").strip().lower()
+        if spk_name in ("narrator", "narration", ""):
             seg["actioning"] = "narrate"
             seg["acting"] = {"delivery_style": "calm_authoritative"}
             seg["intensity_level"] = "medium"
@@ -154,6 +155,9 @@ def _parse_dramatized_chunk_llm(
     model: str = "",
     max_retries: int = 3,
     dramatic_context: str = "",
+    director_card: Optional[Any] = None,
+    playbook: Optional[Any] = None,
+    **kwargs,
 ) -> List[Dict[str, Any]]:
     """
     Room 3: Screenplay Dramaturgy & Spatial Staging Room.
@@ -171,9 +175,13 @@ def _parse_dramatized_chunk_llm(
             dramatic_context=dramatic_context,
             is_hindi=is_hindi,
             character_roster=character_roster,
+            call_llm_fn=kwargs.get("call_llm_fn"),
+            director_card=director_card,
+            playbook=playbook,
         )
         if turns:
             return turns
+
     except Exception as e:
         if isinstance(e, LLMUnavailableError):
             raise

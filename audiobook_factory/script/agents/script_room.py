@@ -40,6 +40,8 @@ class ScreenplayDramaturgyRoom:
         is_hindi: bool = False,
         character_roster: Optional[Dict[str, Any]] = None,
         call_llm_fn: Optional[Callable[..., Any]] = None,
+        director_card: Optional[Any] = None,
+        playbook: Optional[Any] = None,
     ) -> List[Dict[str, Any]]:
         """Processes a chunk through the 5-agent Screenplay Room."""
         # Pass 1: Turn Isolation
@@ -68,6 +70,8 @@ class ScreenplayDramaturgyRoom:
             dramatic_context=dramatic_context,
             is_hindi=is_hindi,
             call_llm_fn=call_llm_fn,
+            director_card=director_card,
+            playbook=playbook,
         )
 
         # Pass 2B: Physical Blocking & Azimuth Staging
@@ -75,7 +79,9 @@ class ScreenplayDramaturgyRoom:
             segments=directed_turns,
             dramatic_context=dramatic_context,
             call_llm_fn=call_llm_fn,
+            director_card=director_card,
         )
+
 
         # Pass 3: Consistency & Spatial Continuity Audit
         certified_turns, report = self.judge.audit_and_certify(

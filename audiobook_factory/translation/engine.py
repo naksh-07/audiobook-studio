@@ -104,8 +104,17 @@ class TranslationEngine:
                     " ".join(prev_words[-150:]) if len(prev_words) > 150 else prev_text
                 )
 
-            system_instruction = DynamicPromptBuilder.build_system_instruction(request.tier)
-            user_prompt = DynamicPromptBuilder.build_user_prompt(chunk, request, total_chunks=total_chunks)
+            system_instruction = DynamicPromptBuilder.build_system_instruction(
+                request.tier,
+                playbook=request.playbook,
+            )
+            user_prompt = DynamicPromptBuilder.build_user_prompt(
+                chunk,
+                request,
+                total_chunks=total_chunks,
+                director_card=request.director_card,
+            )
+
 
             chunk_output = self._call_llm(
                 user_prompt=user_prompt,

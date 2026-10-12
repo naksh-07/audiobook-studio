@@ -76,7 +76,7 @@ Content-Type: application/json
     {
       "parts": [
         {
-          "text": "The wind howled through the ruined towers of Kaer Morhen. <short pause> He knew they were coming.",
+          "text": "The wind howled through the ruined stone keep. <short pause> He knew they were coming.",
           "speechMetadata": {
             "style": "gravelly, somber, cinematic narrator cadence, close-mic proximity"
           }
@@ -110,7 +110,7 @@ Content-Type: application/json
 
 > [!CAUTION]
 > **API Structural Invariant**:
-> Attempting to pass multiple speakers in a single concatenated string (e.g., `"Geralt: ...\nCiri: ..."`) will immediately trigger:
+> Attempting to pass multiple speakers in a single concatenated string (e.g., `"Character A: ...\nCharacter B: ..."`) will immediately trigger:
 > `HTTP 400 Bad Request: "Multi-speaker generation requests must specify speaker names for each part in the contents."`
 > 
 > You **MUST** pass each character turn as an independent part object inside `contents[0].parts`, explicitly declaring `speechMetadata.speaker`. Furthermore, `multiSpeakerVoiceConfig` in `v1beta` currently requires **exactly 2 speakers** per API batch.
@@ -125,16 +125,16 @@ Content-Type: application/json
       "role": "user",
       "parts": [
         {
-          "text": "Run, Ciri! <gasp> Into the trees, now!",
+          "text": "Run, Character B! <gasp> Into the trees, now!",
           "speechMetadata": {
-            "speaker": "Geralt",
+            "speaker": "Character A",
             "style": "urgent commanding shout, raspy breath, high adrenaline"
           }
         },
         {
-          "text": "I won't leave you, Geralt! <sob> Look out behind you!",
+          "text": "I won't leave you, Character A! <sob> Look out behind you!",
           "speechMetadata": {
-            "speaker": "Ciri",
+            "speaker": "Character B",
             "style": "tearful defiant plea, cracking voice, terrified speed"
           }
         }
@@ -147,13 +147,13 @@ Content-Type: application/json
       "multiSpeakerVoiceConfig": {
         "speakerVoiceConfigs": [
           {
-            "speaker": "Geralt",
+            "speaker": "Character A",
             "voiceConfig": {
               "prebuiltVoiceConfig": { "voiceName": "Fenrir" }
             }
           },
           {
-            "speaker": "Ciri",
+            "speaker": "Character B",
             "voiceConfig": {
               "prebuiltVoiceConfig": { "voiceName": "Kore" }
             }
@@ -368,9 +368,9 @@ Sustained performance direction belongs exclusively in the `style` string of `sp
 
 ---
 
-### 3. Stage 3 & Memory 2.0 Integration (`resolve_speech_metadata_style`)
+### 3. Screenplay Directing & Dynamic Narrator Vocal Tinting (`resolve_speech_metadata_style`)
 
-In [`audiobook_factory/tts_dispatcher.py`](file:///c:/Users/Suraj/Documents/Antigravity/Audiobook/audiobook_factory/tts_dispatcher.py#L163-L203), screenplay acting directives, emotion tags, dynamic intensity, and Memory 2.0 physical vocal constraints are deterministically compiled into a unified natural language style string:
+Implemented in [`audiobook_factory/tts/providers/gemini.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py#L77), [`resolve_speech_metadata_style`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py#L77) transforms Pydantic screenplay acting directives, emotion tags, dynamic intensity, Memory 2.0 physical vocal constraints, and chapter-level narrator vocal tints into a concise natural language style descriptor for Gemini's `speechMetadata.style`:
 
 ```python
 def resolve_speech_metadata_style(
@@ -378,7 +378,14 @@ def resolve_speech_metadata_style(
     emotion: str = "neutral",
     intensity: str = "medium",
     memory_vocal_constraint: Optional[str] = None,
+    narrator_tint: Optional[str] = None,
+    is_narrator: bool = False,
 ) -> str:
+    """
+    Transforms Pydantic screenplay acting directives, emotion, conservative Memory 2.0
+    physical vocal constraints, and chapter narrator tint into a concise natural language style
+    descriptor for Gemini speechMetadata.style.
+    """
     descriptors = []
 
     style_val = getattr(acting, "delivery_style", None) if acting else None
@@ -396,7 +403,7 @@ def resolve_speech_metadata_style(
     elif intensity == "low":
         descriptors.append("subdued")
 
-    # Memory 2.0 Physical Vocal Constraint (e.g. "throat injury", "breathless running")
+    # Conservative physical vocal constraint from Memory 2.0 (e.g. "throat injury", "breathless running")
     eff_constraint = memory_vocal_constraint
     if not eff_constraint and isinstance(acting, dict):
         eff_constraint = acting.get("memory_vocal_constraint")
@@ -405,8 +412,25 @@ def resolve_speech_metadata_style(
         if constraint_str not in descriptors:
             descriptors.append(constraint_str)
 
-    return ", ".join(descriptors) if descriptors else "neutral"
+    # Dynamic Chapter Narrator Vocal Tinting (from ChapterDirectorCard)
+    if is_narrator and narrator_tint and str(narrator_tint).strip():
+        tint_clean = str(narrator_tint).strip().rstrip(".")
+        if tint_clean not in descriptors:
+            descriptors.append(tint_clean)
+
+    if not descriptors:
+        if narrator_tint and str(narrator_tint).strip():
+            return f"{str(narrator_tint).strip().rstrip('.')}, articulate measured audiobook delivery"
+        return "calm, steady, articulate, measured audiobook delivery"
+
+    descriptors.append("grounded, natural spoken dialogue")
+    return ", ".join(descriptors)
 ```
+
+#### Dynamic Narrator Tinting vs. Narrator Transparency Invariant
+- **The Balance**: The Narrator Transparency Invariant requires the lead narrator to remain transparent and unhistrionic, delivering steady measured prose. However, long-form audiobooks benefit from subtle atmospheric coloring matching chapter stakes (e.g., *"ominous, low, watchful dread"* during a tense confrontation vs. *"gentle, reflective, poignantly understated"* during a solemn scene).
+- **Automated Resolution**: During synthesis in [`GeminiTTSClient._synthesize_batch_multispeaker`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py#L599), the segment's `narrator_tint` (derived from [`ChapterDirectorCard.narrator_vocal_tint`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L64)) is passed into `resolve_speech_metadata_style(..., is_narrator=True)`.
+- **Zero Inline Leakage**: [`sanitize_spoken_text_and_extract_stage_directions()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py#L131) strips any bracketed directions (e.g., `[whispers]`, `[cold menace]`, `[धीमी आवाज में]`) from spoken text and folds them into `speechMetadata.style` so the synthesizer never speaks stage directions aloud.
 
 ---
 

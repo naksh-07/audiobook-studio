@@ -107,7 +107,7 @@ class PersistentKeyPool:
         """Transaction-safe connection context manager that always closes file handles."""
         conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA busy_timeout=5000;")
+        conn.execute("PRAGMA busy_timeout=30000;")
         try:
             with conn:
                 yield conn
@@ -178,7 +178,7 @@ class PersistentKeyPool:
 
     @staticmethod
     def _hash_key(api_key: str) -> str:
-        return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:12]
+        return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
 
     @staticmethod
     def _preview_key(api_key: str) -> str:
@@ -225,6 +225,13 @@ class PersistentKeyPool:
                 if not k:
                     continue
                 kh = self._hash_key(k)
+                # Ingestion Shield: Never register or re-activate quarantined keys
+                try:
+                    from audiobook_factory.core.models.quarantine import get_key_quarantine_manager
+                    if get_key_quarantine_manager(self.db_path).is_quarantined(kh):
+                        continue
+                except Exception:
+                    pass
                 kp = self._preview_key(k)
                 conn.execute("""
                     INSERT INTO key_quota_ledger (key_hash, key_preview, api_key, status, provider, last_reset_date)
@@ -241,7 +248,7 @@ class PersistentKeyPool:
         today = self._today_str(provider)
         cursor = conn.execute("""
             UPDATE key_quota_ledger
-            SET status = CASE WHEN status = 'EXHAUSTED_TODAY' THEN 'ACTIVE' ELSE status END,
+            SET status = CASE WHEN status IN ('EXHAUSTED_TODAY', 'TEMP_BACKOFF') THEN 'ACTIVE' ELSE status END,
                 exhausted_date = NULL,
                 total_calls_today = 0,
                 success_calls_today = 0,
@@ -256,7 +263,7 @@ class PersistentKeyPool:
         # Also reset model quota ledger
         conn.execute("""
             UPDATE model_quota_ledger
-            SET status = CASE WHEN status = 'EXHAUSTED_TODAY' THEN 'ACTIVE' ELSE status END,
+            SET status = CASE WHEN status IN ('EXHAUSTED_TODAY', 'TEMP_BACKOFF') THEN 'ACTIVE' ELSE status END,
                 exhausted_date = NULL,
                 total_calls_today = 0,
                 success_calls_today = 0,
@@ -273,7 +280,7 @@ class PersistentKeyPool:
             from audiobook_factory.logger import logger
             logger.info(f"  [DATE ROLLOVER] Midnight passed for {provider}! Reset {cursor.rowcount} API keys to ACTIVE for {today}.")
 
-    def get_key(self, service: str = "tts", provider: str = "gemini", model: Optional[str] = None) -> str:
+    def get_key(self, service: str = "tts", provider: str = "gemini", model: Optional[str] = None, max_wait_seconds: float = 60.0) -> str:
         """
         Retrieves the next eligible API key using round-robin rotation.
         Supports:
@@ -283,7 +290,11 @@ class PersistentKeyPool:
           If key is exhausted on model A (e.g. Gemini 2.5 Pro or TTS), it can still be chosen for model B!
         - Balances load by lowest in-flight concurrency, oldest last_used, and fewest calls today.
         """
+        start_time = time.time()
         while True:
+            if time.time() - start_time > max_wait_seconds:
+                raise ValueError(f"Timeout ({max_wait_seconds:.0f}s): All {provider.upper()} API keys are cooling down or exhausted.")
+
             today = self._today_str(provider)
             now_ts = datetime.now().isoformat()
             sleep_dur = 0.0
@@ -292,16 +303,16 @@ class PersistentKeyPool:
                 with self._connection() as conn:
                     self._check_date_rollover(conn, provider=provider)
 
-                    # Clear expired temporary backoffs
+                    # Clear expired temporary backoffs (defensive against NULL timestamps)
                     conn.execute("""
                         UPDATE key_quota_ledger
                         SET status = 'ACTIVE', backoff_until = NULL
-                        WHERE status = 'TEMP_BACKOFF' AND backoff_until <= ?;
+                        WHERE status = 'TEMP_BACKOFF' AND (backoff_until IS NULL OR backoff_until <= ?);
                     """, (now_ts,))
                     conn.execute("""
                         UPDATE model_quota_ledger
                         SET status = 'ACTIVE', backoff_until = NULL
-                        WHERE status = 'TEMP_BACKOFF' AND backoff_until <= ?;
+                        WHERE status = 'TEMP_BACKOFF' AND (backoff_until IS NULL OR backoff_until <= ?);
                     """, (now_ts,))
                     conn.commit()
 
@@ -416,17 +427,25 @@ class PersistentKeyPool:
 
                     if temp_backoff_keys:
                         first_exp = temp_backoff_keys[0]["backoff_until"]
-                        try:
-                            exp_dt = datetime.fromisoformat(first_exp)
-                            sleep_dur = max(1.0, min(20.0, (exp_dt - datetime.now()).total_seconds() + 0.5))
-                        except Exception:
-                            sleep_dur = 3.0
+                        if first_exp:
+                            try:
+                                exp_dt = datetime.fromisoformat(first_exp)
+                                sleep_dur = max(0.5, min(20.0, (exp_dt - datetime.now()).total_seconds() + 0.5))
+                            except Exception:
+                                sleep_dur = 1.0
+                        else:
+                            sleep_dur = 0.5
 
             if sleep_dur > 0:
+                elapsed = time.time() - start_time
+                remaining = max_wait_seconds - elapsed
+                if remaining <= 0:
+                    raise ValueError(f"Timeout ({max_wait_seconds:.0f}s): All {provider.upper()} API keys are cooling down or exhausted.")
+                actual_sleep = max(0.05, min(sleep_dur, remaining))
                 from audiobook_factory.logger import logger
                 target_desc = f"{model} ({provider})" if model else f"{service.upper()} ({provider})"
-                logger.info(f"  [KEY POOL] All active keys cooling down for {target_desc}. Waiting {sleep_dur:.1f}s...")
-                time.sleep(sleep_dur)
+                logger.info(f"  [KEY POOL] All active keys cooling down for {target_desc}. Waiting {actual_sleep:.1f}s...")
+                time.sleep(actual_sleep)
                 continue
 
             raise ValueError(f"No eligible {provider.upper()} API keys registered in key quota ledger.")
@@ -437,11 +456,17 @@ class PersistentKeyPool:
         Delegates transparently to KeyLeaseManager control plane when available on default DB."""
         if self.db_path == Path(DEFAULT_DB_PATH).resolve():
             try:
-                from audiobook_factory.core.models.lease_manager import get_key_lease_manager
+                from audiobook_factory.core.models.lease_manager import (
+                    get_key_lease_manager,
+                    AllKeysExhaustedTodayError,
+                    NoAvailableKeyError,
+                )
                 klm = get_key_lease_manager()
                 with klm.lease_key(workload_type=service, provider=provider, model=model, allow_multi_lease=True) as lease:
                     yield lease.api_key
                     return
+            except (AllKeysExhaustedTodayError, NoAvailableKeyError):
+                raise
             except Exception:
                 # Fallback to local table tracking
                 pass
@@ -590,7 +615,7 @@ class PersistentKeyPool:
             get_circuit_breaker().record_failure(provider, model, error_msg)
 
     def mark_invalid(self, api_key: str, error_msg: str, provider: str = "gemini"):
-        """Marks key as permanently invalid or disabled."""
+        """Marks key as permanently invalid or disabled and routes to quarantine vault."""
         from audiobook_factory.logger import logger
         kh = self._hash_key(api_key)
         kp = self._preview_key(api_key)
@@ -606,15 +631,30 @@ class PersistentKeyPool:
 
             logger.error(f"  [INVALID KEY] Key {kp} marked INVALID for {provider}: {error_msg[:100]}")
 
+        # Physical Quarantine Vault Isolation
+        try:
+            from audiobook_factory.core.models.quarantine import get_key_quarantine_manager
+            get_key_quarantine_manager(self.db_path).quarantine_key(
+                api_key_or_hash=api_key,
+                reason=error_msg,
+                error_code=403,
+                error_body=error_msg,
+                quarantined_by="KEY_POOL",
+                provider=provider,
+            )
+        except Exception as q_err:
+            logger.warning(f"  [!] Failed to mirror quarantine to vault: {q_err}")
+
     def reset_all_for_today(self):
-        """Force reset all keys and models back to ACTIVE state."""
+        """Force reset all non-invalid keys and models back to ACTIVE state."""
         with self.lock, self._connection() as conn:
             conn.execute("""
                 UPDATE key_quota_ledger
                 SET status = 'ACTIVE',
                     exhausted_date = NULL,
                     backoff_until = NULL,
-                    last_error = NULL;
+                    last_error = NULL
+                WHERE status != 'INVALID';
             """)
             conn.execute("""
                 UPDATE model_quota_ledger

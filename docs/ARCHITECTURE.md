@@ -21,18 +21,18 @@ The system strictly implements **Option C: Shared Understanding & Dramaturgy Cor
 flowchart TD
     subgraph Room1["🌍 Room 1: 2-System Pre-Production Architecture"]
         direction TB
-        RawBook["Raw Book (PDF / EPUB / TXT)"] --> S1["System 1: Novel Researcher Engine<br/><i>(Stateless Compute & Zero Disk I/O)</i><br/>• LexicalCorpusScanner (0-Token Full Sweep)<br/>• NovelDeepSearchEngine (Bidirectional Grounding)<br/>• BookDNAAgent + DramatisPersonaeAgent<br/>• VocalAcousticDirector (Room Impulse DSP)<br/>• PhoneticLexiconDramaturge (70/30 Devanagari)"]
+        RawBook["Raw Book (PDF / EPUB / TXT)"] --> S1["System 1: Novel Researcher Engine<br/><i>(Stateless Compute & Zero Disk I/O)</i><br/>• LexicalCorpusScanner (0-Token Full Sweep)<br/>• NovelDeepSearchEngine (Bidirectional Grounding)<br/>• BookDNAAgent + DramatisPersonaeAgent<br/>• ProductionPlaybookSynthesizer (Tier 1 Master Playbook)<br/>• VocalAcousticDirector (Room Impulse DSP)<br/>• PhoneticLexiconDramaturge (70/30 Devanagari)"]
         S1 -->|"Immutable Pydantic DTOs"| S2["System 2: Novel Metadata & State Maintainer<br/><i>(Canonical State Store & Atomic Persistence)</i><br/>• audiobook_factory/metadata/ (BookBible & NovelEntity)<br/>• NovelStateMaintainer (NR-GATE-06 Two-Phase Commit)<br/>• _STATE_LOCK (Thread Concurrency Protection)<br/>• Dynamic Character Locking (NR-GATE-03 Clamp [0.70, 1.30])"]
-        S2 --> MasterFiles[("Locked Master State<br/>book_dna.json | book_bible.json | cast_lock.json<br/>vocal_spaces.json | voice_registry.json")]
+        S2 --> MasterFiles[("Locked Master State<br/>book_dna.json | book_bible.json | cast_lock.json<br/>production_playbook.json | vocal_spaces.json")]
     end
 
     subgraph Room1_5["📚 Room 1.5: Standalone Chapter Glossary & Metadata Hub"]
-        MasterFiles --> GloMgr["GlossaryManager (audiobook_factory/glossary/)<br/>• ChapterLexicalScanner (0-Token Fast-Path Sweep)<br/>• GlossaryClassifier (Tri-Partite Entity Taxonomy)<br/>• Alias Unification & Dynamic Character Locking<br/>• Persistent Artifact: chapter_XXX_glossary.json"]
-        GloMgr --> Projections["Multi-Consumer Projections<br/>• to_translation_glossary() (Flat en -> hi Map)<br/>• to_scripting_roster() (Unified Alias Schema)<br/>• to_dramaturgy_characters() (Scene Cast List)"]
+        MasterFiles --> GloMgr["GlossaryManager (audiobook_factory/glossary/)<br/>• ChapterLexicalScanner (0-Token Fast-Path Sweep)<br/>• GlossaryClassifier (Tri-Partite Entity Taxonomy)<br/>• ChapterSteeringDirector (Tier 2 JIT Chapter Steering Card)<br/>• Persistent Artifacts: chapter_XXX_glossary.json<br/>  & metadata/chapters/chapter_XXX_director_card.json"]
+        GloMgr --> Projections["Multi-Consumer Projections<br/>• to_translation_glossary() (Flat en -> hi Map)<br/>• to_scripting_roster() (Unified Alias Schema)<br/>• to_dramaturgy_characters() (Scene Cast List)<br/>• to_prompt_context() (Markdown Steering Block)"]
     end
 
     subgraph Room2["🧠 Room 2: Standalone Literary Translation Engine (Option D)"]
-        Projections --> Collective["Decoupled Literary Translation Engine<br/>• Single-Pass Deliberative Generation (thinking_budget = 1024, temp = 0.35)<br/>• Bilingual Macro-Chunking (1,500 - 1,800w with Src + Tgt tail)<br/>• Fast Deterministic Parity Gate Matrix (0 LLM Tokens)<br/>• Tri-Partite Entity Partitioning (Zero Novel Hardcoding)<br/>• Strictly Text-to-Text: Pristine Devanagari Markdown Only"]
+        Projections --> Collective["Decoupled Literary Translation Engine<br/>• DynamicPromptBuilder (Playbook Invariants & Chapter Stakes)<br/>• Single-Pass Deliberative Generation (thinking_budget = 1024, temp = 0.35)<br/>• Bilingual Macro-Chunking (1,500 - 1,800w with Src + Tgt tail)<br/>• Fast Deterministic Parity Gate Matrix (0 LLM Tokens)<br/>• Tri-Partite Entity Partitioning (Zero Novel Hardcoding)<br/>• Strictly Text-to-Text: Pristine Devanagari Markdown Only"]
         Collective --> DualRule["Dual-Rule Invariant ('Nothing Above Source')<br/>Classic Reverent Pathos vs Raw Unrated Realism"]
     end
 
@@ -44,7 +44,7 @@ flowchart TD
     end
 
     subgraph Room3Adapters["🎙️ Room 3 Adapters: Specialized Scripting Adapters (adapters/)"]
-        DramAST -->|Audible Flow Standard| AudiobookAd["AudiobookAdapter (adapters/audiobook.py)<br/>• Prose-Lead Framing ('वक्ता ने पूछा—')<br/>• Unbroken Character Dialogue Turns<br/>• Transparent Measured Narration (0.32 temp)<br/>• Anti-Swap Dialogue Attribution (0% Inversion)"]
+        DramAST -->|Audible Flow Standard| AudiobookAd["AudiobookAdapter (adapters/audiobook.py)<br/>• Prose-Lead Framing ('वक्ता ने पूछा—')<br/>• Unbroken Character Dialogue Turns<br/>• StanislavskiSubtextDirector (Chapter Stakes)<br/>• PhysicalBlockingDirector (Spatial Staging)<br/>• Transparent Measured Narration (0.32 temp)<br/>• Anti-Swap Dialogue Attribution (0% Inversion)"]
         DramAST -->|Conversational Spoken-First| PodcastAd["PodcastAdapter (adapters/podcast.py)<br/>• 2-Host Dynamic (Inquisitive Driver <-> Domain Expert)<br/>• SpokenBreathabilityTransformer (<= 22 words, 140ms breath)<br/>• 5-Part Retention Arc (Cold Open to Show Outro)<br/>• Stereo Spatial Staging (-0.25 Left / +0.25 Right)"]
     end
 
@@ -156,6 +156,8 @@ The architecture explicitly bans the fragile anti-pattern of a monolithic multi-
 | **Book Bible** | `book_bible.json` | World lore canon, entity taxonomies (`BookEntity`), locations, items, epistemic provenance (`CORPUS_EXTRACTED`, `WEB_VERIFIED`), and honorific pronoun rules (`aap`/`tum`/`tu`). | Room 1.5, Room 2 Translation, Room 3 Dramaturgy, Gate 6A |
 | **Translation Glossary** | `translation/glossary.json` | Deterministic Hindi term bindings, proper noun transliterations, and heraldic moniker phonetics (`PROPER_NAME` / `HERALDIC_MONIKER`). | Room 2 Translation Engine |
 | **Mastering Ledgers** | `mastered/*_mastering_ledger.json` | Chapter-level audio provenance: cryptographic stem hashes, measured loudness (`integrated_lufs`), True Peak (`true_peak_dbtp`), duration, and filter configs. | Gate 6B Fast-Path, Studio UI Sidecar, M4B Packaging |
+| **Production Playbook** | `production_playbook.json` | Authoritative novel-level master prompt & artistic steering playbook: derived literary tradition, source fidelity tier (`RAW_UNRATED` / `CLASSIC_REVERENT`), regional Hindustani cadence, translation system invariants, screenplay delivery prompt, lead narrator master demeanor, banned anachronisms, and acceptable loanwords. | Room 1.5, Room 2 Translation, Room 3 Dramaturgy, Room 4 TTS |
+| **Chapter Director Card** | `metadata/chapters/chapter_XXX_director_card.json` | Chapter-specific dramatic steering card: atmospheric mood, tension trajectory, character emotional stances, pacing cadence, narrator vocal tint, and concrete sensory anchors (`to_prompt_context()`). | Room 2 Translation Engine, Room 3 Scripting & Staging, Room 4 TTS |
 | **Character Roster (Projection)** | `character_roster.json` | *Backward-compatible auto-projection* from `BookBible` and `CastLock`. Re-generated dynamically by `NovelStateMaintainer` on each state commit. | Legacy test suites, legacy script parsers |
 | **Voice Registry (Projection)** | `voice_registry.json` | *Backward-compatible auto-projection* of actor voice mappings from `CastLock`. Re-generated dynamically by `NovelStateMaintainer`. | Legacy CLI tools, third-party inspect scripts |
 
@@ -176,6 +178,63 @@ The Metadata Doctor is integrated at multiple pipeline control points:
 - **Macro Audit Pre-Flight**: `python audiobook_cli.py audit-book <book>` runs the Doctor diagnosis first before initiating Gate 6.
 - **Gate 2.9 Pre-TTS Boundary**: Runs offline before LLM attribution evaluation to halt invalid scripts before burning API quota.
 - **Studio Panel Sidecar API**: `GET /api/doctor?slug=...` returns real-time diagnostic JSON and formatted health tables to the Webview UI.
+
+---
+
+## 🎭 The 2-Tier Standalone Dynamic Prompt & Directing Subsystem
+
+To eliminate one-size-fits-all generic prompts, rigid village cliches, and static screenplay encounters, Audiobook Studio implements a **2-Tier Standalone Dynamic Prompt & Directing Subsystem**. This system strictly obeys the **Standalone "Input Leke Output Do" Principle**: each component is completely decoupled, takes strongly typed input contracts, and returns strongly typed output models with zero circular imports.
+
+```mermaid
+flowchart TD
+    subgraph Tier1["Tier 1: Novel-Level Master Steering (Room 1 Pre-Production)"]
+        DNA["Book DNA & Dossier<br/>(Literary Tradition, Dialect Cadence)"] --> Syn["ProductionPlaybookSynthesizer<br/>(audiobook_factory/preproduction/playbook_synthesizer.py)"]
+        Syn -->|"Pure Transform"| Playbook["ProductionPlaybook<br/>(production_playbook.json)"]
+    end
+
+    subgraph Tier2["Tier 2: Chapter-Level Dramatic Steering (Room 1.5 Glossary & Metadata Hub)"]
+        ChapText["Raw Chapter Text"] & Playbook --> Dir["ChapterSteeringDirector<br/>(audiobook_factory/glossary/chapter_director.py)"]
+        Dir -->|"Pure Transform"| Card["ChapterDirectorCard<br/>(metadata/chapters/chapter_XXX_director_card.json)"]
+    end
+
+    subgraph Downstream["Downstream Multi-Room Dynamic Injection"]
+        direction TB
+        Playbook & Card --> R2["Room 2: Translation Engine<br/>• DynamicPromptBuilder.build_system_instruction(tier, playbook)<br/>• DynamicPromptBuilder.build_user_prompt(chunk, request, total, card)"]
+        Playbook & Card --> R3["Room 3: Screenplay Dramaturgy<br/>• StanislavskiSubtextDirector (scene atmosphere & stakes)<br/>• PhysicalBlockingDirector (spatial acoustics & coordinates)"]
+        Card --> R4["Room 4: Studio TTS Platform Core<br/>• resolve_speech_metadata_style(..., narrator_tint, is_narrator=True)"]
+    end
+
+    Tier1 --> Tier2
+    Tier2 --> Downstream
+```
+
+### 1. Data Contracts ([`audiobook_factory/contracts/playbook.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py))
+
+Defined with Pydantic v2 in [`audiobook_factory/contracts/playbook.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py), these models serve as the zero-dependency interchange schemas:
+
+1. **[`ProductionPlaybook`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L13)** (Novel-Level SSOT):
+   - `project_id: str`: Canonical project ID (e.g. `proj-novel`).
+   - `literary_tradition: str`: Derived authorial and world tradition (e.g. `HIGH_FANTASY`, `GOTHIC_HORROR`, `NOIR_THRILLER`, `CLASSICAL_HERITAGE`).
+   - `source_fidelity_tier: str`: Master fidelity tier (`RAW_UNRATED`, `CLASSIC_REVERENT`, `DRAMATIC_MODERN`).
+   - `regional_dialect_cadence: str`: Derived spoken Hindustani register.
+   - `world_atmosphere_summary: str`: World atmosphere and tone overview.
+   - `translation_system_prompt: str`: Authoritative, custom multi-paragraph system prompt for Gemini Flash containing novel-specific invariants, register rules, and loanword policies.
+   - `screenplay_system_prompt: str`: Authorial style and psychological subtext directives.
+   - `narrator_master_demeanor: str`: Base vocal delivery demeanor for the lead narrator (e.g. *"measured, somber, atmospheric chronicler"*).
+   - `banned_anachronisms: List[str]`: Anachronistic terms forbidden in this fictional universe.
+   - `acceptable_loanwords: List[str]`: Permitted vocabulary loanwords.
+   - `proverb_style: str`: Idiom transposition philosophy (e.g. *"sense-for-sense cultural equivalent"*).
+
+2. **[`ChapterDirectorCard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L42)** (Chapter-Level SSOT):
+   - `chapter_num: int`: 1-indexed chapter number.
+   - `chapter_title: str`: Chapter title or slug.
+   - `scene_atmosphere: str`: Atmospheric setting and emotional mood of this chapter.
+   - `dramatic_tension: str`: Trajectory of dramatic tension (e.g. *"simmering suspicion building to sudden violent climax"*).
+   - `character_emotional_states: Dict[str, str]`: Mapping of character names to their psychological stances in this chapter.
+   - `pacing_cadence: str`: Rhythm and clause guidance (e.g. *"measured conversational with natural spoken pauses"*).
+   - `narrator_vocal_tint: str`: Atmospheric vocal tint for lead narrator segments in this chapter.
+   - `key_motifs_or_sensory_details: List[str]`: Tangible sensory anchors, ambient props, or weather motifs.
+   - `to_prompt_context() -> str`: Formats the card into a structured Markdown block injected into LLM prompts.
 
 ---
 
@@ -248,7 +307,7 @@ Room 1.5 is the decoupled, single-pass per-chapter lexical analysis, entity disc
    - [`MultiAgentTranslationCollective.translate_block()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/agents/collective.py#L62-L149) defaults to [`TranslationEngine`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/engine.py#L30-L134) (`use_single_pass=True`), while preserving [`translate_block_legacy()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/translation/agents/collective.py#L150-L241) as an explicit backward-compatible fallback (`use_single_pass=False`).
 3. **Separation of Concerns & Strict Boundary Contracts**:
    - **Strictly Text-to-Text**: Room 2 emits pristine Devanagari Markdown only.
-   - **No Screenplay Actor Tags**: Room 2 **NEVER** injects screenplay actor markers (such as `[GERALT]:`, `[JASKIER]:` or JSON attribution). Dialogue parsing and speaker identification belong 100% to Room 3 (`script_builder.py`).
+   - **No Screenplay Actor Tags**: Room 2 **NEVER** injects screenplay actor markers (such as `[CHARACTER_A]:`, `[CHARACTER_B]:` or JSON attribution). Dialogue parsing and speaker identification belong 100% to Room 3 (`script_builder.py`).
    - **No Audio Take QA or Synthesis**: Room 2 **NEVER** performs audio take evaluation, acoustic checks, or speech synthesis. All audio operations belong strictly downstream to Room 4.
    - **Zero Forbidden Imports**: Zero imports of `audio`, `tts`, `screenplay`, `cinematic`, or audio hardware drivers in `audiobook_factory/translation/`.
 4. **Adversarial Audit Hardening**:
@@ -346,7 +405,7 @@ Gate 2.9 stands as the authoritative, fail-closed verification boundary position
      - *Sequential Monotonicity*: Enforces $index_1 < index_2 < index_3$ starting at 1.
      - *Speaker Whitelist*: Verifies that every speaker token resolves in `character_roster.json`, `voice_registry.json`, `podcast_config.json`, or canonical defaults (`Narrator`, `Host_A`, `Host_B`).
      - *Anti-Swap Gender Inflection*: Checks Hindi grammatical first-person verb inflections (`रहा हूँ` / `करूँगा` vs `रही हूँ` / `करूँगी`) against roster character genders to catch gender-discordant speaker turn inversions.
-     - *Speech Verb Co-Reference*: Matches dialogue attribution against preceding narrator tags (e.g. *Geralt said: ...* must be attributed to Geralt, not Renfri).
+     - *Speech Verb Co-Reference*: Matches dialogue attribution against preceding narrator tags (e.g. *Character A said: ...* must be attributed to Character A, not Character B).
      - *Anti-Swallow Dialogue Guard*: Flags quotation marks in `Narrator` lines accompanied by speech verbs (`कहा`, `बोला`, `said`, `asked`).
      - *Acoustic Parameter Clamping*: Pitch shift clamped to $[0.65, 1.35]$ (ratio) or $[-12.0, 12.0]$ (semitones for podcast); speed multiplier clamped to $[0.75, 1.30]$; asserts non-null, assigned `voice_id`.
      - *Text Hygiene*: Blocks raw Markdown code fences (```` ```json ````) and unstripped conversational LLM preambles (*"Here is the script..."*).

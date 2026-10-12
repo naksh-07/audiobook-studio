@@ -184,7 +184,12 @@ def main():
 
     # keys
     p_keys = subparsers.add_parser("keys", help="Inspect and audit API key inventory, leases, and quota fleet status")
-    p_keys.add_argument("keys_action", nargs="?", default="status", choices=["status", "list", "add", "sweep", "test", "audit", "reset"], help="Action: status, list, add, sweep, test, audit, reset (default: status)")
+    p_keys.add_argument("keys_action", nargs="?", default="status", choices=["status", "list", "add", "sweep", "test", "audit", "reset", "quarantine"], help="Action: status, list, add, sweep, test, audit, reset, quarantine (default: status)")
+    p_keys.add_argument("quarantine_action", nargs="?", default="list", choices=["list", "inspect", "purge", "export", "restore"], help="Quarantine subaction (when keys_action=quarantine): list, inspect, purge, export, restore")
+    p_keys.add_argument("--alias", default=None, help="Key alias for quarantine inspect/purge/restore")
+    p_keys.add_argument("--out", default=None, help="Export output path (used with quarantine export)")
+    p_keys.add_argument("--all", action="store_true", dest="purge_all", help="Purge all quarantined keys (used with quarantine purge)")
+    p_keys.add_argument("--include-keys", action="store_true", dest="include_keys", help="Include raw keys in export")
     p_keys.add_argument("--provider", default="gemini", help="Provider filter (default: gemini)")
     p_keys.add_argument("--limit", type=int, default=25, help="Number of audit log records to display (default: 25)")
     p_keys.add_argument("--key", default=None, help="API key to register (used with 'add')")

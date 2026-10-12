@@ -22,10 +22,18 @@
   - CLI `research` command added and `ModelGateway` tools support enabled.
   - Room 1 Pre-Production verified on live project: 114k words scanned, 51 characters extracted, 52 cast locks allocated with 4D formants, and `book_dna.json` profiled.
   - `MetadataDoctor` audit: 7/7 checks PASS (Extraction, Source, Canon, Cast Lock, Glossary, Screenplay, Mastering).
-- **Pillar 2 Room 2 Translation Collective Verification (COMPLETED & CERTIFIED)**:
-  - Fixed `ModelGateway` session affinity key rotation during rate limit backoffs (`clear_affinity` + 60s window).
-  - Hardened dramatic script localization framing (`[CREATIVE SCRIPT LOCALIZATION & DRAMATURGY]`) preventing commercial book copyright refusal heuristics.
-  - Fail-closed validation in `TranslationQualityCritic` enforcing zero truncation / zero refusal.
-  - Chapter 1 (1,498 words) translated into unabridged literary Hindustani (`chapter_001_hi.md`, 9,647 characters, length ratio 1.29). 28/28 model & translation tests PASS.
-- **Grand Unification 100% Completed & Merged into Main**:
-  - All 7 phases operational, audited, and production ready via CLI, Python API, and Antigravity UI.
+- **Pillar 2 Room 2 Translation Collective Hardening & Certification (COMPLETED & CERTIFIED)**:
+  - Universal Novel-Agnostic Invariant strictly enforced: zero hardcoded novel terms in engine code.
+  - Hardened prompts & parser across Room 1.5/Room 2 (`prompt_builder.py`, `draft_translator.py`, `classifier.py`, `sanitizer.py`, `scanner.py`, `manager.py`).
+  - Enforced zero English article leakage (`द` stripped), phonetic transliteration for beasts/orders (`विचर`, `बैसिलिस्क`, `ड्रैगन`), Unicode European diacritics (`Téa and Véa` -> `तेया और वेया`), and canonical BookBible SSOT precedence.
+- **2-Tier Standalone Dynamic Prompt & Directing Subsystem (COMPLETED & CERTIFIED)**:
+  - Pure "Input in, Output out" decoupled contracts (`ProductionPlaybook`, `ChapterDirectorCard`).
+  - Room 1 `ProductionPlaybookSynthesizer` generates novel-tailored prompt blocks, custom spoken registers, and narrator demeanors.
+  - Room 1.5 `ChapterSteeringDirector` generates chapter scene atmosphere, character emotional stakes, and vocal tint.
+  - Downstream rooms (Room 2 Translation, Room 3 Screenplay, Room 4 TTS) dynamically consume tailored directives. 22/22 tests green. Multi-Expert Triad Audit certified.
+- **Key Quarantine Submodule & Hang Defenses (COMPLETED & CERTIFIED)**:
+  - Physical segregation vault ([`quarantine.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/quarantine.py)), zero zombie resurrection on reset/rollover, ingestion shield.
+  - Hang defenses: timeout bounded sleep, SQLite WAL `busy_timeout=30000`, multi-worker TTS concurrency bypass, affinity self-lockout fix.
+  - 126 ACTIVE keys + 2 isolated. 9/9 quarantine tests & 11/11 lease engine tests 100% green. CLI `keys quarantine` operational.
+- **Novel Production Pipeline Ready**: Source EPUB ready for fresh clean run.
+
