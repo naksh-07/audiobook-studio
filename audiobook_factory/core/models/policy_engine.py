@@ -104,15 +104,37 @@ def classify_universal_api_error(
     body_lower = error_body.lower()
     header_wait = parse_retry_after(headers)
 
-    # 1. Authentication / Key Validity (HTTP 401/403/400)
-    if status_code in (401, 403) or (
+    # 1. Temporary Geo / Location restriction (do not burn key on VPN drop)
+    if status_code == 403 and any(
+        x in body_lower for x in ["user_location_not_supported", "location is not supported", "georestricted", "country"]
+    ):
+        return NormalizedApiError(
+            category="LOCATION_UNSUPPORTED",
+            wait_sec=30.0,
+            message=f"User location/VPN not supported for {provider}. Check network routing.",
+            is_retryable=True,
+            suggested_action="COOL_DOWN",
+        )
+
+    # 2. Authentication / Key Validity (HTTP 401/403/400)
+    is_400_key_error = (
         status_code == 400 and any(
             x in body_lower for x in [
                 "api_key_invalid", "api key not valid", "invalid api key",
-                "authentication_error", "permission_denied", "forbidden", "unauthorized"
+                "apikey invalid", "api_key_expired", "consumer_suspended"
             ]
         )
-    ):
+    )
+    is_403_key_error = (
+        status_code == 403 and not any(
+            x in body_lower for x in [
+                "user_location_not_supported", "location is not supported",
+                "quota exceeded", "resource_exhausted"
+            ]
+        )
+    )
+
+    if status_code == 401 or is_400_key_error or is_403_key_error:
         return NormalizedApiError(
             category="INVALID_KEY",
             wait_sec=0.0,

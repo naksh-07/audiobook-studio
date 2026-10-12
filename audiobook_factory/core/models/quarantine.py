@@ -66,12 +66,15 @@ class KeyQuarantineManager:
 
     def is_quarantined(self, key_or_hash: str) -> bool:
         """Checks if a key, hash, or alias resides in the quarantine vault."""
+        if not key_or_hash or not isinstance(key_or_hash, str) or not key_or_hash.strip():
+            return False
+        clean = key_or_hash.strip()
         from audiobook_factory.core.models.lease_manager import _hash_key
-        kh = key_or_hash if len(key_or_hash) in (12, 16) and not key_or_hash.startswith("AIza") else _hash_key(key_or_hash)
+        kh = _hash_key(clean)
         with self._lock, get_db_connection(self.db_path) as conn:
             row = conn.execute(
-                "SELECT 1 FROM key_quarantine WHERE key_hash = ? OR key_alias = ? LIMIT 1;",
-                (kh, key_or_hash),
+                "SELECT 1 FROM key_quarantine WHERE key_hash = ? OR key_hash = ? OR key_alias = ? OR encrypted_key = ? LIMIT 1;",
+                (clean, kh, clean, clean),
             ).fetchone()
             return bool(row)
 
@@ -88,44 +91,52 @@ class KeyQuarantineManager:
         Atomically transfers an API key from active inventory/quota ledgers into the quarantine vault.
         Terminates active leases and logs structured audit entry.
         """
+        if not api_key_or_hash or not isinstance(api_key_or_hash, str) or not api_key_or_hash.strip():
+            return False
+
+        clean_input = api_key_or_hash.strip()
         from audiobook_factory.core.models.lease_manager import _hash_key, _alias_key
 
-        is_hash = len(api_key_or_hash) in (12, 16) and not api_key_or_hash.startswith("AIza")
         with self._lock, get_db_connection(self.db_path) as conn:
             conn.execute("BEGIN IMMEDIATE;")
 
-            # 1. Resolve key attributes
-            if is_hash:
-                row = conn.execute(
-                    "SELECT key_hash, key_alias, encrypted_key, provider FROM key_inventory WHERE key_hash = ?;",
-                    (api_key_or_hash,),
-                ).fetchone()
-                if row:
-                    kh = row["key_hash"]
-                    ka = row["key_alias"]
-                    raw_k = row["encrypted_key"]
-                    prov = row["provider"]
-                else:
-                    # Check legacy table if not in key_inventory
-                    row_legacy = conn.execute(
-                        "SELECT key_hash, key_preview, api_key, provider FROM key_quota_ledger WHERE key_hash = ?;",
-                        (api_key_or_hash,),
-                    ).fetchone()
+            # 1. Deterministic multi-field lookup across key_hash, key_alias, and encrypted_key
+            row = conn.execute("""
+                SELECT key_hash, key_alias, encrypted_key, provider
+                FROM key_inventory
+                WHERE key_hash = ? OR key_alias = ? OR encrypted_key = ?
+                LIMIT 1;
+            """, (clean_input, clean_input, clean_input)).fetchone()
+
+            if not row:
+                # Check legacy table
+                try:
+                    row_legacy = conn.execute("""
+                        SELECT key_hash, key_preview, api_key, provider
+                        FROM key_quota_ledger
+                        WHERE key_hash = ? OR api_key = ?
+                        LIMIT 1;
+                    """, (clean_input, clean_input)).fetchone()
                     if row_legacy:
                         kh = row_legacy["key_hash"]
                         raw_k = row_legacy["api_key"]
                         ka = _alias_key(raw_k)
                         prov = row_legacy["provider"] or provider
                     else:
-                        kh = api_key_or_hash
-                        ka = f"key_{kh[:8]}"
-                        raw_k = "[UNKNOWN_OR_ALREADY_PURGED]"
+                        kh = _hash_key(clean_input)
+                        ka = _alias_key(clean_input)
+                        raw_k = clean_input
                         prov = provider
+                except sqlite3.OperationalError:
+                    kh = _hash_key(clean_input)
+                    ka = _alias_key(clean_input)
+                    raw_k = clean_input
+                    prov = provider
             else:
-                kh = _hash_key(api_key_or_hash)
-                ka = _alias_key(api_key_or_hash)
-                raw_k = api_key_or_hash
-                prov = provider
+                kh = row["key_hash"]
+                ka = row["key_alias"]
+                raw_k = row["encrypted_key"]
+                prov = row["provider"]
 
             # 2. Insert into quarantine vault
             conn.execute("""

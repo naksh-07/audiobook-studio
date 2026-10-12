@@ -124,10 +124,10 @@ class ModelGateway:
                 model_override=model,
                 preferred_key_alias=preferred_key,
             )
-            if session_id:
-                self.anti_ban_guard.affinity.bind_affinity(session_id, plan.key_alias)
-
             try:
+                if session_id and not self.anti_ban_guard.affinity.get_affinity_key(session_id):
+                    self.anti_ban_guard.affinity.bind_affinity(session_id, plan.key_alias)
+
                 # Shield 1, 3, 4, 5, 7: Pre-request gate checks & pacing
                 self.anti_ban_guard.pre_request_gate(
                     key_alias=plan.key_alias,
@@ -261,10 +261,10 @@ class ModelGateway:
                 model_override=model,
                 preferred_key_alias=preferred_key,
             )
-            if session_id:
-                self.anti_ban_guard.affinity.bind_affinity(session_id, plan.key_alias)
-
             try:
+                if session_id and not self.anti_ban_guard.affinity.get_affinity_key(session_id):
+                    self.anti_ban_guard.affinity.bind_affinity(session_id, plan.key_alias)
+
                 self.anti_ban_guard.pre_request_gate(
                     key_alias=plan.key_alias,
                     word_count=len(text.split()),
@@ -367,9 +367,11 @@ class ModelGateway:
             preferred_provider=provider,
             identity=identity,
         )
-        self.anti_ban_guard.affinity.bind_affinity(session_id, plan.key_alias)
-        # Release the initial probe lease immediately so inner requests can lease the affinity key
-        self.lease_manager.release_lease(plan.lease.lease_id)
+        try:
+            self.anti_ban_guard.affinity.bind_affinity(session_id, plan.key_alias)
+        finally:
+            # Release the initial probe lease immediately so inner requests can lease the affinity key
+            self.lease_manager.release_lease(plan.lease.lease_id)
 
         try:
             yield plan.key_alias

@@ -20,7 +20,7 @@ from audiobook_factory.guard_shield import (
     get_circuit_breaker,
 )
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "audiobooks" / "key_pool_state.db"
+from audiobook_factory.core.models.db import DEFAULT_DB_PATH
 
 
 def _google_quota_date_str() -> str:

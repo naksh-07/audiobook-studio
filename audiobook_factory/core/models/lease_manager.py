@@ -283,14 +283,17 @@ class KeyLeaseManager:
         """, (now_ts,))
         reclaimed += res.rowcount
 
-        # 2. Sweep dead PID leases
+        # 2. Sweep dead PID leases (scoped to local workstation to prevent cross-host premature reaping)
+        my_ws = os.environ.get("WORKSTATION_ID", "local_workstation")
         active_leases = conn.execute("""
-            SELECT lease_id, process_id, key_hash
+            SELECT lease_id, process_id, key_hash, workstation_id
             FROM key_leases
             WHERE status = 'ACTIVE';
         """).fetchall()
 
         for row in active_leases:
+            if row["workstation_id"] != my_ws:
+                continue
             pid = row["process_id"]
             if not is_pid_alive(pid):
                 conn.execute("""
@@ -359,32 +362,30 @@ class KeyLeaseManager:
         lease_id = str(uuid.uuid4())
         today = self._today_str(provider)
 
+        # 1. Housekeeping transaction (commits rollover, dead PID sweep, and expired backoff resets)
         with self._lock, self._connection() as conn:
-            # Atomic transaction
             conn.execute("BEGIN IMMEDIATE;")
-
-            # 1. Date rollover check
             self._check_date_rollover(conn, provider=provider)
-
-            # 2. Sweep dead/stale leases
             self.sweep_stale_and_dead_leases(conn)
-
-            # 3. Check user concurrency quota
-            if not allow_multi_lease:
-                self._check_user_concurrency(conn, eff_identity, provider, max_allowed=1)
-
-            # 4. Clear expired temporary backoffs (defensive against NULL timestamps)
             conn.execute("""
                 UPDATE key_inventory
                 SET status = 'ACTIVE', backoff_until = NULL
                 WHERE status = 'TEMP_BACKOFF' AND (backoff_until IS NULL OR backoff_until <= ?);
             """, (now_ts,))
-
             conn.execute("""
                 UPDATE model_quota_ledger
                 SET status = 'ACTIVE', backoff_until = NULL
                 WHERE status = 'TEMP_BACKOFF' AND (backoff_until IS NULL OR backoff_until <= ?);
             """, (now_ts,))
+            conn.commit()
+
+        # 2. Atomic lease reservation transaction
+        with self._lock, self._connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
+
+            # Check user concurrency quota
+            if not allow_multi_lease:
+                self._check_user_concurrency(conn, eff_identity, provider, max_allowed=1)
 
             # 5. Query candidate keys that are NOT currently leased
             is_tts = (workload_type == "tts") or (model and "-tts" in model.lower())
@@ -510,6 +511,7 @@ class KeyLeaseManager:
         now_ts = datetime.now().isoformat()
         new_expires_ts = (datetime.now() + timedelta(seconds=extend_seconds)).isoformat()
         with self._lock, self._connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
             cursor = conn.execute("""
                 UPDATE key_leases
                 SET expires_at = ?, heartbeat_at = ?
@@ -521,6 +523,7 @@ class KeyLeaseManager:
     def release_lease(self, lease_id: str) -> bool:
         """Releases an active lease handle and records audit completion."""
         with self._lock, self._connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
             row = conn.execute("SELECT key_alias, user_id, process_id, provider FROM key_leases WHERE lease_id = ?;", (lease_id,)).fetchone()
             if not row:
                 return False
@@ -544,6 +547,7 @@ class KeyLeaseManager:
     def revoke_lease(self, lease_id: str, reason: str = "error") -> bool:
         """Revokes an active lease (e.g. on 429 quota exhaustion or critical failure)."""
         with self._lock, self._connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
             row = conn.execute("SELECT key_alias, user_id, process_id, provider FROM key_leases WHERE lease_id = ?;", (lease_id,)).fetchone()
             if not row:
                 return False
@@ -572,7 +576,16 @@ class KeyLeaseManager:
         tokens_used: int = 0,
     ) -> None:
         """Records a successful call for a key."""
+        if not api_key_or_hash or not isinstance(api_key_or_hash, str) or not api_key_or_hash.strip():
+            return
         kh = api_key_or_hash if len(api_key_or_hash) == 16 else _hash_key(api_key_or_hash)
+        try:
+            from audiobook_factory.core.models.quarantine import get_key_quarantine_manager
+            if get_key_quarantine_manager(self.db_path).is_quarantined(kh):
+                return
+        except Exception:
+            pass
+
         with self._lock, self._connection() as conn:
             conn.execute("""
                 UPDATE key_inventory
@@ -603,7 +616,16 @@ class KeyLeaseManager:
         provider: str = "gemini",
     ) -> None:
         """Marks a key or model as exhausted for today (e.g. 10 RPD reached on TTS)."""
+        if not api_key_or_hash or not isinstance(api_key_or_hash, str) or not api_key_or_hash.strip():
+            return
         kh = api_key_or_hash if len(api_key_or_hash) == 16 else _hash_key(api_key_or_hash)
+        try:
+            from audiobook_factory.core.models.quarantine import get_key_quarantine_manager
+            if get_key_quarantine_manager(self.db_path).is_quarantined(kh):
+                return
+        except Exception:
+            pass
+
         today = self._today_str(provider)
         is_tts = (model is None) or ("-tts" in model.lower())
 
@@ -616,6 +638,25 @@ class KeyLeaseManager:
                         failed_calls_today = failed_calls_today + 1
                     WHERE key_hash = ?;
                 """, (today, kh))
+
+                try:
+                    conn.execute("""
+                        UPDATE key_quota_ledger
+                        SET status = 'EXHAUSTED_TODAY',
+                            exhausted_date = ?,
+                            failed_calls_today = failed_calls_today + 1
+                        WHERE key_hash = ?;
+                    """, (today, kh))
+                    if len(kh) == 16:
+                        conn.execute("""
+                            UPDATE key_quota_ledger
+                            SET status = 'EXHAUSTED_TODAY',
+                                exhausted_date = ?,
+                                failed_calls_today = failed_calls_today + 1
+                            WHERE key_hash = ?;
+                        """, (today, kh[:12]))
+                except sqlite3.OperationalError:
+                    pass
 
             if model:
                 conn.execute("""
@@ -686,10 +727,20 @@ class KeyLeaseManager:
         provider: str = "gemini",
     ) -> None:
         """Marks a key for temporary backoff without burning it for the whole day."""
+        if not api_key_or_hash or not isinstance(api_key_or_hash, str) or not api_key_or_hash.strip():
+            return
         kh = api_key_or_hash if len(api_key_or_hash) == 16 else _hash_key(api_key_or_hash)
+        try:
+            from audiobook_factory.core.models.quarantine import get_key_quarantine_manager
+            if get_key_quarantine_manager(self.db_path).is_quarantined(kh):
+                return
+        except Exception:
+            pass
+
         backoff_until = datetime.fromtimestamp(time.time() + backoff_seconds).isoformat()
 
         with self._lock, self._connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
             conn.execute("""
                 UPDATE key_inventory
                 SET status = CASE WHEN status = 'EXHAUSTED_TODAY' THEN status ELSE 'TEMP_BACKOFF' END,
@@ -697,6 +748,25 @@ class KeyLeaseManager:
                     failed_calls_today = failed_calls_today + 1
                 WHERE key_hash = ?;
             """, (backoff_until, kh))
+
+            try:
+                conn.execute("""
+                    UPDATE key_quota_ledger
+                    SET status = CASE WHEN status = 'EXHAUSTED_TODAY' THEN status ELSE 'TEMP_BACKOFF' END,
+                        backoff_until = ?,
+                        failed_calls_today = failed_calls_today + 1
+                    WHERE key_hash = ?;
+                """, (backoff_until, kh))
+                if len(kh) == 16:
+                    conn.execute("""
+                        UPDATE key_quota_ledger
+                        SET status = CASE WHEN status = 'EXHAUSTED_TODAY' THEN status ELSE 'TEMP_BACKOFF' END,
+                            backoff_until = ?,
+                            failed_calls_today = failed_calls_today + 1
+                        WHERE key_hash = ?;
+                    """, (backoff_until, kh[:12]))
+            except sqlite3.OperationalError:
+                pass
 
             if model:
                 conn.execute("""
