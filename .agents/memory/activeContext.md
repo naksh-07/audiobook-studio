@@ -33,7 +33,6 @@
   - Downstream rooms (Room 2 Translation, Room 3 Screenplay, Room 4 TTS) dynamically consume tailored directives. 22/22 tests green. Multi-Expert Triad Audit certified.
 - **Key Quarantine Submodule & Hang Defenses (COMPLETED & CERTIFIED)**:
   - Physical segregation vault ([`quarantine.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/quarantine.py)), zero zombie resurrection on reset/rollover, ingestion shield.
-  - Hang defenses: timeout bounded sleep, SQLite WAL `busy_timeout=30000`, multi-worker TTS concurrency bypass, affinity self-lockout fix.
-  - 126 ACTIVE keys + 2 isolated. 9/9 quarantine tests & 11/11 lease engine tests 100% green. CLI `keys quarantine` operational.
+  - 126 ACTIVE keys + 2 isolated. 48/48 tests 100% green (9 quarantine, 11 lease engine, 6 adversarial stress, 22 dynamic directing). Rigor 98% BULLETPROOF.
 - **Novel Production Pipeline Ready**: Source EPUB ready for fresh clean run.
 
