@@ -21,41 +21,58 @@ CATALOG_JSON_PATH = DATA_DIR / "curated_voice_catalog.json"
 CATALOG_DB_PATH = DATA_DIR / "voice_catalog.db"
 
 # Universal Offline Fallback: Curated native Hindi & English voices if data files are missing
+# Universal Offline Fallback: Curated Google Gemini multilingual studio models
 EMBEDDED_FALLBACK_VOICES = {
     "hi-IN": [
-        # Male Low / Deep Pitch
-        {"id": "hi-in-tutor-1", "gender": "male", "pitch": "low", "age": 56, "dialect": "Urdu", "timbre": "deep, resonant, and confident", "archetypes": ["elder", "stoic_warrior", "literary_narrator", "mentor"]},
-        {"id": "hi-in-advisor-10", "gender": "male", "pitch": "low", "age": 31, "dialect": "Haryanvi Hindi", "timbre": "textured, resonant, and soothing", "archetypes": ["adult", "warrior", "soldier", "brawler"]},
-        {"id": "hi-in-advisor-2", "gender": "male", "pitch": "low", "age": 47, "dialect": "Bhojpuri Hindi", "timbre": "professional yet approachable", "archetypes": ["adult", "rustic", "butcher", "commoner"]},
-        {"id": "hi-in-tutor-5", "gender": "male", "pitch": "low", "age": 35, "dialect": "Bhojpuri Hindi", "timbre": "resonant and witty", "archetypes": ["adult", "charismatic_noble", "bard", "companion"]},
-        {"id": "hi-in-assistant-1", "gender": "male", "pitch": "low", "age": 55, "dialect": "Urdu", "timbre": "conversational, dry humor, and warm", "archetypes": ["elder", "innkeeper", "ally"]},
-        {"id": "hi-in-concierge-2", "gender": "male", "pitch": "low", "age": 33, "dialect": "Bundeli Hindi", "timbre": "reflective, calm, and reassuring", "archetypes": ["adult", "scholar", "philosopher"]},
-        # Male Medium / High Pitch
-        {"id": "hi-in-advisor-4", "gender": "male", "pitch": "medium", "age": 54, "dialect": "Bundeli Hindi", "timbre": "laid-back, encouraging, and chill", "archetypes": ["elder", "advisor", "noble"]},
-        {"id": "hi-in-tutor-8", "gender": "male", "pitch": "low", "age": 53, "dialect": "Haryanvi Hindi", "timbre": "light, airy, and precise", "archetypes": ["elder", "magistrate", "official", "alderman"]},
-        {"id": "hi-in-commercial-2", "gender": "male", "pitch": "low", "age": 24, "dialect": "Awadhi Hindi", "timbre": "professional yet approachable", "archetypes": ["youth", "apprentice", "scout"]},
-        {"id": "hi-in-tutor-3", "gender": "male", "pitch": "low", "age": 24, "dialect": "Awadhi Hindi", "timbre": "comforting someone who is stressed", "archetypes": ["youth", "brother", "companion"]},
-        # Female Low / Medium Pitch
-        {"id": "hi-in-advisor-1", "gender": "female", "pitch": "low", "age": 32, "dialect": "Awadhi Hindi", "timbre": "comforting, authoritative, and deep", "archetypes": ["adult", "queen", "sorceress", "commander"]},
-        {"id": "hi-in-concierge-3", "gender": "female", "pitch": "medium", "age": 54, "dialect": "Awadhi Hindi", "timbre": "deep, velvety, and unhurried", "archetypes": ["elder", "maternal", "priestess", "aristocrat"]},
-        {"id": "hi-in-advisor-12", "gender": "female", "pitch": "medium", "age": 54, "dialect": "Urdu", "timbre": "warm and engaging", "archetypes": ["elder", "grandmother", "healer", "matron"]},
-        {"id": "hi-in-tutor-4", "gender": "female", "pitch": "medium", "age": 28, "dialect": "Bundeli Hindi", "timbre": "warm and engaging", "archetypes": ["adult", "sorceress", "heroine", "adviser"]},
-        # Female High Pitch / Youth
-        {"id": "hi-in-tutor-7", "gender": "female", "pitch": "high", "age": 29, "dialect": "Urdu", "timbre": "bright, breezy, and youthful", "archetypes": ["youth", "princess", "young_maiden", "scout"]},
-        {"id": "hi-in-training-9", "gender": "female", "pitch": "high", "age": 36, "dialect": "Bhojpuri Hindi", "timbre": "confident and clear", "archetypes": ["adult", "heroine", "warrior_maiden"]},
-        {"id": "hi-in-assistant-5", "gender": "female", "pitch": "high", "age": 33, "dialect": "Awadhi Hindi", "timbre": "confident and clear", "archetypes": ["adult", "friend", "ally"]},
-        {"id": "hi-in-tutor-9", "gender": "female", "pitch": "high", "age": 25, "dialect": "Awadhi Hindi", "timbre": "warm and engaging", "archetypes": ["youth", "daughter", "apprentice"]},
+        # Male Studio Models
+        {"id": "Charon", "gender": "male", "pitch": "low", "age": 45, "dialect": "Haryanvi Hindi, Standard Hindi", "timbre": "deep, resonant, and steady", "archetypes": ["adult", "warrior", "stoic_warrior", "soldier", "brute", "hero", "imposing", "lead"]},
+        {"id": "Fenrir", "gender": "male", "pitch": "low", "age": 55, "dialect": "Urdu, Standard Hindi", "timbre": "authoritative, commanding, and resonant", "archetypes": ["elder", "king", "ruler", "mentor", "commander", "authoritative", "noble"]},
+        {"id": "Algenib", "gender": "male", "pitch": "low", "age": 38, "dialect": "Bhojpuri Hindi, Standard Hindi", "timbre": "gravelly, textured, and weathered", "archetypes": ["adult", "mercenary", "warrior", "rustic", "hunter", "commoner"]},
+        {"id": "Enceladus", "gender": "male", "pitch": "low", "age": 48, "dialect": "Bundeli Hindi, Standard Hindi", "timbre": "dark, breathy, and sinister", "archetypes": ["adult", "sinister", "villain", "dark", "sorcerer", "imposing", "mysterious"]},
+        {"id": "Orus", "gender": "male", "pitch": "low", "age": 40, "dialect": "Haryanvi Hindi, Standard Hindi", "timbre": "firm, serious, and no-nonsense", "archetypes": ["adult", "official", "magistrate", "commander", "disciplined", "soldier"]},
+        {"id": "Algieba", "gender": "male", "pitch": "low", "age": 36, "dialect": "Urdu, Awadhi Hindi, Standard Hindi", "timbre": "smooth, relaxed, and polished", "archetypes": ["adult", "noble", "aristocrat", "polished", "courtier", "charismatic_noble"]},
+        {"id": "Achird", "gender": "male", "pitch": "medium", "age": 46, "dialect": "Bhojpuri Hindi, Standard Hindi", "timbre": "friendly, approachable, and warm", "archetypes": ["adult", "innkeeper", "tavernkeeper", "ally", "rustic", "commoner", "peasant"]},
+        {"id": "Puck", "gender": "male", "pitch": "medium", "age": 32, "dialect": "Bhojpuri Hindi, Awadhi Hindi, Standard Hindi", "timbre": "upbeat, energetic, and charismatic", "archetypes": ["adult", "bard", "companion", "witty", "charismatic", "rogue", "agile"]},
+        {"id": "Zephyr", "gender": "male", "pitch": "high", "age": 17, "dialect": "Haryanvi Hindi, Bundeli Hindi, Standard Hindi", "timbre": "youthful, bright, breezy, and energetic", "archetypes": ["youth", "scout", "apprentice", "teen", "adolescent", "youngster", "fighter", "rebel"]},
+        # Female Studio Models
+        {"id": "Aoede", "gender": "female", "pitch": "medium", "age": 35, "dialect": "Standard Hindi, Urdu", "timbre": "calm, steady, articulate, and melodious", "archetypes": ["literary_narrator", "storyteller", "narrator", "adult"]},
+        {"id": "Kore", "gender": "female", "pitch": "medium", "age": 38, "dialect": "Standard Hindi, Urdu", "timbre": "firm, authoritative, and direct", "archetypes": ["adult", "queen", "sorceress", "leader", "regal", "authoritative", "commander"]},
+        {"id": "Leda", "gender": "female", "pitch": "high", "age": 20, "dialect": "Awadhi Hindi, Standard Hindi", "timbre": "youthful, vibrant, bright, and breezy", "archetypes": ["youth", "princess", "young_maiden", "vibrant", "maiden", "daughter"]},
+        {"id": "Achernar", "gender": "female", "pitch": "medium", "age": 30, "dialect": "Awadhi Hindi, Urdu, Standard Hindi", "timbre": "soft, intimate, gentle, and breathy", "archetypes": ["adult", "intimate", "poetic", "gentle", "healer", "companion", "mystical"]},
+        {"id": "Callisto", "gender": "female", "pitch": "low", "age": 52, "dialect": "Bhojpuri Hindi, Bundeli Hindi, Standard Hindi", "timbre": "warm, deep, velvety, and maternal", "archetypes": ["elder", "maternal", "matron", "grandmother", "priestess", "adult"]},
     ],
     "en-US": [
-        {"id": "Charon", "gender": "male", "pitch": "low", "age": 45, "dialect": "American English", "timbre": "deep, stoic, and grave", "archetypes": ["warrior", "veteran", "hero"]},
-        {"id": "Puck", "gender": "male", "pitch": "medium", "age": 35, "dialect": "American English", "timbre": "upbeat, energetic, and charismatic", "archetypes": ["bard", "companion", "rogue"]},
-        {"id": "Fenrir", "gender": "male", "pitch": "low", "age": 55, "dialect": "American English", "timbre": "authoritative, wise, and passionate", "archetypes": ["elder", "king", "mentor"]},
-        {"id": "Orus", "gender": "male", "pitch": "low", "age": 40, "dialect": "American English", "timbre": "firm, serious, and no-nonsense", "archetypes": ["commander", "soldier", "magistrate"]},
+        # Male Studio Models
+        {"id": "Charon", "gender": "male", "pitch": "low", "age": 45, "dialect": "American English", "timbre": "deep, stoic, and grave", "archetypes": ["warrior", "veteran", "hero", "lead"]},
+        {"id": "Fenrir", "gender": "male", "pitch": "low", "age": 55, "dialect": "American English", "timbre": "authoritative, wise, and passionate", "archetypes": ["elder", "king", "mentor", "commander"]},
+        {"id": "Algenib", "gender": "male", "pitch": "low", "age": 38, "dialect": "American English", "timbre": "gravelly, grounded, and hard-hitting", "archetypes": ["mercenary", "warrior", "veteran", "hunter"]},
+        {"id": "Enceladus", "gender": "male", "pitch": "low", "age": 48, "dialect": "American English", "timbre": "dark, breathy, and ominous", "archetypes": ["villain", "dark", "sorcerer", "sinister"]},
+        {"id": "Orus", "gender": "male", "pitch": "low", "age": 40, "dialect": "American English", "timbre": "firm, serious, and no-nonsense", "archetypes": ["commander", "soldier", "magistrate", "official"]},
+        {"id": "Algieba", "gender": "male", "pitch": "low", "age": 36, "dialect": "American English", "timbre": "smooth, relaxed, and polished", "archetypes": ["noble", "aristocrat", "courtier", "charismatic"]},
+        {"id": "Achird", "gender": "male", "pitch": "medium", "age": 46, "dialect": "American English", "timbre": "friendly, approachable, and warm", "archetypes": ["innkeeper", "tavernkeeper", "ally", "companion"]},
+        {"id": "Puck", "gender": "male", "pitch": "medium", "age": 35, "dialect": "American English", "timbre": "upbeat, energetic, and charismatic", "archetypes": ["bard", "companion", "rogue", "youth"]},
+        {"id": "Zephyr", "gender": "male", "pitch": "high", "age": 17, "dialect": "American English", "timbre": "bright, youthful, and agile", "archetypes": ["youth", "scout", "apprentice", "teen"]},
+        # Female Studio Models
         {"id": "Aoede", "gender": "female", "pitch": "medium", "age": 35, "dialect": "American English", "timbre": "breezy, natural, and melodious", "archetypes": ["literary_narrator", "storyteller"]},
         {"id": "Kore", "gender": "female", "pitch": "medium", "age": 40, "dialect": "American English", "timbre": "firm, authoritative, and direct", "archetypes": ["queen", "sorceress", "leader"]},
         {"id": "Leda", "gender": "female", "pitch": "high", "age": 22, "dialect": "American English", "timbre": "youthful, vibrant, and energetic", "archetypes": ["youth", "maiden", "princess"]},
+        {"id": "Achernar", "gender": "female", "pitch": "medium", "age": 30, "dialect": "American English", "timbre": "soft, intimate, and gentle", "archetypes": ["intimate", "gentle", "healer", "companion"]},
+        {"id": "Callisto", "gender": "female", "pitch": "low", "age": 52, "dialect": "American English", "timbre": "warm, deep, and maternal", "archetypes": ["elder", "maternal", "matron"]},
     ]
 }
+
+
+MALE_VOICE_PERSONAS = [
+    "Fenrir",
+    "Orus",
+    "Algieba",
+    "Achird",
+    "Algenib",
+    "Enceladus",
+    "Puck",
+    "Zephyr",
+    "Charon",
+]
 
 
 class VoiceCatalog:
@@ -66,6 +83,7 @@ class VoiceCatalog:
     def __init__(self):
         self._voices_by_id: Dict[str, Dict[str, Any]] = {}
         self._voices_by_lang: Dict[str, List[Dict[str, Any]]] = {}
+        self._fallback_male_idx: int = 0
         self._load_catalog()
 
     @classmethod
@@ -86,7 +104,18 @@ class VoiceCatalog:
                     for l_code, v_list in langs.items():
                         self._voices_by_lang[l_code] = v_list
                         for v in v_list:
-                            self._voices_by_id[v["id"]] = v
+                            vid = v["id"]
+                            if vid in self._voices_by_id:
+                                existing = self._voices_by_id[vid]
+                                cur_d = existing.get("dialect", "")
+                                new_d = v.get("dialect", "")
+                                if new_d and new_d not in cur_d:
+                                    existing["dialect"] = f"{cur_d}, {new_d}".strip(", ")
+                                cur_arch = set(existing.get("archetypes", []))
+                                cur_arch.update(v.get("archetypes", []))
+                                existing["archetypes"] = list(cur_arch)
+                            else:
+                                self._voices_by_id[vid] = dict(v)
                     loaded = True
                     logger.debug(f"[VoiceCatalog] Loaded {len(self._voices_by_id)} voices from JSON cache.")
                     # Ensure SQLite database is created if missing
@@ -160,8 +189,12 @@ class VoiceCatalog:
                 for v in v_list:
                     self._voices_by_id[v["id"]] = v
 
-    def get_voice(self, voice_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieves exact voice metadata by ID."""
+    def get_voice(self, voice_id: str, language_code: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Retrieves exact voice metadata by ID, optionally scoped to language."""
+        if language_code and language_code in self._voices_by_lang:
+            for v in self._voices_by_lang[language_code]:
+                if v["id"] == voice_id:
+                    return v
         return self._voices_by_id.get(voice_id)
 
     def query_voices(
@@ -234,6 +267,8 @@ class VoiceCatalog:
             candidates = self._voices_by_lang.get("hi-IN" if "hi" in language_code else "en-US", [])
 
         gender_clean = (gender or "male").lower()
+        if gender_clean not in ("male", "female"):
+            gender_clean = "male"
         arch_tokens = set((archetype or "").lower().replace("-", " ").replace("_", " ").split())
 
         # Determine effective child vs adolescent teen state
@@ -255,6 +290,11 @@ class VoiceCatalog:
             v_gender = v.get("gender", "").lower()
             v_age = v.get("age")
             v_timbre = v.get("timbre", "").lower()
+
+            # --- Narrator Vocal Separation ---
+            # Aoede is reserved strictly for narration roles; dialogue characters must not receive Aoede
+            if vid == "Aoede" and not bool(arch_tokens & {"narrator", "literary_narrator", "storyteller"}):
+                continue
 
             # --- Gender, Teen, & Anime Seiyū Filter ---
             if is_teen and gender_clean == "male":
@@ -282,12 +322,30 @@ class VoiceCatalog:
                     continue
             else:
                 # Adult role: strict gender matching
-                if v_gender != gender_clean and gender_clean in ("male", "female"):
+                if v_gender != gender_clean:
                     continue
 
             score = 0
 
-            # 1. Age-appropriate vocal scoring
+            # 1. Role-Suitability & Archetype Matching (Prioritized Studio Models)
+            if v_gender == "male":
+                if bool(arch_tokens & {"bard", "minstrel", "witty", "companion", "jester", "rogue"}) and vid == "Puck":
+                    score += 55
+                elif bool(arch_tokens & {"knight", "noble", "aristocrat", "solemn", "paladin"}) and vid in ("Algieba", "Fenrir"):
+                    score += 50
+                elif bool(arch_tokens & {"warrior", "mercenary", "gravelly", "hardened", "soldier", "brute", "veteran", "hunter"}) and vid in ("Algenib", "Charon"):
+                    score += 50
+            elif v_gender == "female":
+                if bool(arch_tokens & {"sorceress", "queen", "regal", "witch", "leader"}) and vid == "Kore":
+                    score += 55
+                elif bool(arch_tokens & {"youth", "young", "girl", "maiden", "vibrant", "princess", "daughter", "apprentice"}) and vid == "Leda":
+                    score += 55
+                elif bool(arch_tokens & {"soft", "gentle", "intimate", "healer", "poetic"}) and vid == "Achernar":
+                    score += 55
+                elif bool(arch_tokens & {"matron", "maternal", "mother", "elder", "priestess"}) and vid == "Callisto":
+                    score += 55
+
+            # 2. Age-appropriate vocal scoring
             if is_teen and gender_clean == "male":
                 # Teen Boy preference: Young male models (<= 26yo) win strongly over females
                 if v_gender == "male":
@@ -310,20 +368,20 @@ class VoiceCatalog:
                 if any(w in v_timbre for w in ("youthful", "bright", "breezy", "energetic", "quick-witted")):
                     score += 20
 
-            # 2. Dialect Alignment (+45 bonus)
+            # 3. Dialect Alignment (+45 bonus)
             if dialect_hint and dialect_hint.strip():
                 d_token = dialect_hint.strip().lower()
                 cand_dialect = v.get("dialect", "").lower()
                 if d_token in cand_dialect or (d_token == "delhi" and "urdu" in cand_dialect):
                     score += 45
 
-            # 3. Pitch alignment
+            # 4. Pitch alignment
             if pitch_hint and v.get("pitch", "").lower() == pitch_hint.lower():
                 score += 30
             elif effective_child and v.get("pitch", "").lower() in ("high", "medium"):
                 score += 15
 
-            # 4. Age alignment (for non-children or general proximity)
+            # 5. Age alignment (for non-children or general proximity)
             if age_hint and v_age:
                 diff = abs(v_age - age_hint)
                 if diff <= 5:
@@ -333,7 +391,7 @@ class VoiceCatalog:
                 elif diff <= 20:
                     score += 5
 
-            # 5. Archetype and timbre keyword alignment
+            # 6. Archetype and timbre keyword alignment
             v_archs = set([a.lower() for a in v.get("archetypes", [])])
             v_timbre_words = set(v_timbre.split())
             v_desc_words = set(v.get("description", "").lower().split())
@@ -350,17 +408,28 @@ class VoiceCatalog:
         # Fallback if all scored candidates filtered out: pick first candidate with matching gender
         for v in candidates:
             if v["id"] not in exclude_set and v.get("gender") == gender_clean:
+                if v["id"] == "Aoede" and not bool(arch_tokens & {"narrator", "literary_narrator", "storyteller"}):
+                    continue
                 return v["id"]
-        for v in candidates:
-            if v["id"] not in exclude_set:
-                return v["id"]
+        # When all candidates of the requested gender are in exclude_set, do NOT return candidates[0]["id"] (Charon).
+        # Return "" (empty string) so caller (character_caster.py) can cycle round-robin.
+        matching_gender_candidates = [
+            v for v in candidates
+            if v.get("gender") == gender_clean
+            and not (v["id"] == "Aoede" and not bool(arch_tokens & {"narrator", "literary_narrator", "storyteller"}))
+        ]
+        if matching_gender_candidates and all(v["id"] in exclude_set for v in matching_gender_candidates):
+            return ""
 
-        # Ultimate safety fallback
+        # Ultimate safety fallback: cycle across MALE_VOICE_PERSONAS rather than always returning Charon
         if effective_child:
-            return "hi-in-tutor-7" if "hi" in language_code else "Leda"
+            return "Leda" if gender_clean == "female" else "Zephyr"
         if gender_clean == "female":
-            return "hi-in-advisor-1" if "hi" in language_code else "Kore"
-        return "hi-in-advisor-10" if "hi" in language_code else "Charon"
+            return "Kore"
+
+        fallback_voice = MALE_VOICE_PERSONAS[self._fallback_male_idx % len(MALE_VOICE_PERSONAS)]
+        self._fallback_male_idx += 1
+        return fallback_voice
 
     def get_catalog_summary_for_llm(
         self,

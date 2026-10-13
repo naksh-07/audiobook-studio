@@ -292,7 +292,7 @@ class NovelStateMaintainer:
                         canonical_id=sp_clean.lower().replace(" ", "_"),
                         english_name=sp_clean,
                         hindi_name=sp_clean,
-                        gender=gender or "neutral",
+                        gender=gender if (gender and str(gender).lower() in ("male", "female")) else "male",
                         provenance=EpistemicProvenance(
                             origin="CORPUS_EXTRACTED",
                             evidence_quote=f"Dynamic mid-novel discovery: {sp_clean}",
@@ -339,7 +339,7 @@ class NovelStateMaintainer:
                         "character_uuid": getattr(ent, "canonical_id", None) or sp_str.lower().replace(" ", "_"),
                         "display_name": getattr(ent, "hindi_name", None) or ent.english_name or sp_str,
                         "english_name": ent.english_name or sp_str,
-                        "gender": ent.gender or "neutral",
+                        "gender": ent.gender if (ent.gender and str(ent.gender).lower() in ("male", "female")) else "male",
                         "assigned_voice_id": ent.assigned_voice,
                         "pitch_shift": ent.pitch_ratio,
                         "speed_multiplier": ent.speed_ratio,

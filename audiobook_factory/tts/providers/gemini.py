@@ -87,6 +87,13 @@ def resolve_speech_metadata_style(
     physical vocal constraints, and chapter narrator tint into a concise natural language style
     descriptor for Gemini speechMetadata.style.
     """
+    # Narrator Transparency Invariant: Narrator delivery is locked strictly to articulate,
+    # measured audiobook delivery with zero theatrical acting or histrionics.
+    if is_narrator:
+        if narrator_tint and str(narrator_tint).strip():
+            return f"{str(narrator_tint).strip().rstrip('.')}, articulate measured audiobook delivery"
+        return "calm, steady, articulate, measured audiobook delivery"
+
     descriptors = []
 
     style_val = getattr(acting, "delivery_style", None) if acting else None
@@ -101,10 +108,36 @@ def resolve_speech_metadata_style(
 
     if intensity == "explosive":
         descriptors.append("extreme intensity")
+    elif intensity in ("high", "intense"):
+        descriptors.append("high intensity")
     elif intensity == "low":
         descriptors.append("subdued")
 
-    # Conservative physical vocal constraint from Memory 2.0 (only applied when no conflicting explicit style overrides it)
+    # Additional acting context if present (tone, vocal_tension, proximity)
+    if acting:
+        if isinstance(acting, dict):
+            tone = acting.get("tone")
+            vocal_tension = acting.get("vocal_tension")
+            proximity = acting.get("proximity")
+        else:
+            tone = getattr(acting, "tone", None)
+            vocal_tension = getattr(acting, "vocal_tension", None)
+            proximity = getattr(acting, "proximity", None)
+
+        if tone and str(tone).lower() not in ("neutral", "standard", "none"):
+            t_str = str(tone).replace("_", " ")
+            if t_str not in descriptors:
+                descriptors.append(t_str)
+        if vocal_tension and str(vocal_tension).lower() not in ("neutral", "standard", "none"):
+            vt_str = str(vocal_tension).replace("_", " ")
+            if vt_str not in descriptors:
+                descriptors.append(vt_str)
+        if proximity and str(proximity).lower() in ("intimate", "whisper", "close_mic"):
+            p_str = "intimate whisper proximity" if str(proximity).lower() == "intimate" else str(proximity).replace("_", " ")
+            if p_str not in descriptors:
+                descriptors.append(p_str)
+
+    # Conservative physical vocal constraint from Memory 2.0 (only applied when not conflicting)
     eff_constraint = memory_vocal_constraint
     if not eff_constraint and isinstance(acting, dict):
         eff_constraint = acting.get("memory_vocal_constraint")
@@ -113,44 +146,77 @@ def resolve_speech_metadata_style(
         if constraint_str not in descriptors:
             descriptors.append(constraint_str)
 
-    if is_narrator and narrator_tint and str(narrator_tint).strip():
-        tint_clean = str(narrator_tint).strip().rstrip(".")
-        if tint_clean not in descriptors:
-            descriptors.append(tint_clean)
-
     if not descriptors:
-        if narrator_tint and str(narrator_tint).strip():
-            return f"{str(narrator_tint).strip().rstrip('.')}, articulate measured audiobook delivery"
-        return "calm, steady, articulate, measured audiobook delivery"
+        return ""
 
-    descriptors.append("grounded, natural spoken dialogue")
+    # Universal restraint anchor prevents theatrical histrionics while preserving authentic emotion
+    descriptors.append("understated natural dialogue (never theatrical)")
     return ", ".join(descriptors)
 
+
+# Certified acoustic reflex tags that Gemini Flash Audio renders as physical human vocal sounds
+CERTIFIED_ACOUSTIC_REFLEX_TAGS = {
+    "laughs", "laugh", "laughing", "laughter", "chuckle", "chuckles", "snicker", "giggle",
+    "sigh", "sighs",
+    "whispers", "whisper", "whispering",
+    "growl", "growls",
+    "gasp", "gasps",
+    "pant", "panting", "pants",
+    "groan", "groans",
+}
+
+HINDI_ACOUSTIC_MAP = {
+    "हँसते हुए": "laughs",
+    "हंसते हुए": "laughs",
+    "मुस्कुराते हुए": "chuckles",
+    "फुसफुसाते हुए": "whispers",
+    "हाँफते हुए": "pant",
+    "हांफते हुए": "pant",
+    "आह भरते हुए": "sighs",
+    "धीमी आवाज में": "whispering",  # preserved for compatibility with test_voice_catalog_and_casting
+}
 
 
 def sanitize_spoken_text_and_extract_stage_directions(text: str) -> Tuple[str, List[str]]:
     """
-    Strips bracketed stage directions (e.g. '[whispers]', '[cold menace]', '[धीमी आवाज में]')
-    from spoken text so Gemini TTS never reads acting instructions aloud.
-    Extracts the directives to be folded into speechMetadata.style.
-    Momentary non-verbal tags like '<sigh>', '<gasp>' are preserved for audio cues.
+    Strips non-acoustic bracketed stage directions (e.g. '[cold menace]', '[angrily]', '[धीमी आवाज़ में]')
+    so Gemini TTS never reads structural acting instructions aloud, routing them to speechMetadata.style.
+    Critically PRESERVES certified acoustic reflex tags (e.g. '[laughs]', '[sighs]', '[whispers]', '[growls]',
+    '[gasp]', '[chuckles]', '[pant]', '[groan]') which Gemini 3.8 Flash Audio modality natively renders
+    as physical human vocal sounds.
     """
     if not text:
         return "", []
 
-    stage_cues = []
-    matches = re.findall(r"\[([^\]]+)\]", text)
-    for m in matches:
-        clean_cue = m.strip()
-        if clean_cue:
-            stage_cues.append(clean_cue)
+    stage_cues: List[str] = []
 
-    cleaned = re.sub(r"\[[^\]]+\]", "", text).strip()
+    def _tag_replacer(match: re.Match) -> str:
+        cue = match.group(1).strip()
+        cue_lower = cue.lower()
+
+        # 1. Hindi acoustic reflex mapping
+        if cue in HINDI_ACOUSTIC_MAP:
+            return f"[{HINDI_ACOUSTIC_MAP[cue]}]"
+
+        # 2. Check if the tag represents a certified acoustic reflex
+        cue_clean = re.sub(r"[^\w\s-]", "", cue_lower).strip()
+        if cue_clean in CERTIFIED_ACOUSTIC_REFLEX_TAGS:
+            return f"[{cue}]"
+
+        # 3. Non-acoustic acting descriptor (e.g. '[cold menace]', '[angrily]', '[धीमी आवाज़ में]'):
+        # Route to stage_cues for speechMetadata.style and strip from spoken text
+        stage_cues.append(cue)
+        return ""
+
+    cleaned = re.sub(r"\[([^\]]+)\]", _tag_replacer, text).strip()
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
-    # If stripping removed everything (e.g. text was purely '[sigh]'), convert to non-verbal tag
+    # If stripping removed everything (e.g. text was purely '[sigh]'), restore tag
     if not cleaned and text.strip():
-        cleaned = re.sub(r"\[([^\]]+)\]", r"<\1>", text.strip())
+        orig_stripped = text.strip()
+        m = re.match(r"^\[([^\]]+)\]$", orig_stripped)
+        if m and m.group(1).strip().lower() in CERTIFIED_ACOUSTIC_REFLEX_TAGS:
+            cleaned = orig_stripped
 
     return cleaned, stage_cues
 
@@ -242,13 +308,13 @@ def synthesize_gemini_tts(
         ],
     }
 
-    # --- TTS Temperature Calibration (v5.0 Acoustic Grounding) ---
-    # Clamped strictly between [0.30, 0.55] to prevent pitch instability, slurring,
-    # and melodramatic overacting while ensuring natural conversational human nuance.
+    # --- TTS Temperature Calibration (Dynamic Clamping 0.30 - 0.52) ---
+    # Clamped strictly <= 0.52 to eliminate pitch instability, screeching, and histrionics
+    # while ensuring natural conversational human nuance (dialogue 0.35 - 0.42, climactic drama <= 0.50).
     gen_config = payload["generationConfig"]
     if base_temp is not None:
         jitter = random.uniform(-0.01, 0.01)
-        gen_config["temperature"] = round(max(0.30, min(0.55, float(base_temp) + jitter)), 3)
+        gen_config["temperature"] = round(max(0.30, min(0.52, float(base_temp) + jitter)), 3)
     else:
         gen_config["temperature"] = round(random.uniform(0.35, 0.42), 3)
 
@@ -627,12 +693,12 @@ def synthesize_gemini_multispeaker_batch(
             part_item["speechMetadata"]["style"] = style_desc
         parts.append(part_item)
 
-    # Expressive acting temperature for multi-speaker drama (Phase 3 Fix)
+    # Dynamic acting temperature for multi-speaker drama (strictly clamped between 0.35 and 0.52)
     if temperature is not None:
-        jitter = random.uniform(-0.02, 0.02)
-        batch_temp = round(max(0.70, min(1.40, float(temperature) + jitter)), 3)
+        jitter = random.uniform(-0.01, 0.01)
+        batch_temp = round(max(0.35, min(0.52, float(temperature) + jitter)), 3)
     else:
-        batch_temp = round(random.uniform(0.90, 1.10), 3)
+        batch_temp = round(random.uniform(0.36, 0.42), 3)
 
     payload = {
         "contents": [{

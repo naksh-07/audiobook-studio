@@ -119,9 +119,6 @@ class GeminiTTSPerformanceAdapter(BaseTTSPerformanceAdapter):
                 if mod not in components:
                     components.append(mod)
 
-        # Universal Anti-Melodrama Anchor
-        components.append("grounded, natural spoken dialogue")
-
         # Deduplicate while preserving order
         seen = set()
         unique = []

@@ -63,6 +63,8 @@ def normalize_speech_text(text: str, is_hindi: bool = False) -> str:
 
     # Strip formatting artifacts
     text = re.sub(r"\s+", " ", text).strip()
+    # Strip trailing commas left by dialogue tag stripping
+    text = re.sub(r",\s*$", "।" if is_hindi else ".", text)
     return text
 
 

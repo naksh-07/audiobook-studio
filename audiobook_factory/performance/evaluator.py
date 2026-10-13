@@ -60,7 +60,11 @@ class PerformanceEvaluator:
                 or os.environ.get("UNIT_TEST_MODE", "").lower() in ("true", "1", "yes")
                 or "PYTEST_CURRENT_TEST" in os.environ
             )
-            judge_cfg = PerceptualJudgeConfig(enable_external_llm=not is_offline)
+            enable_ext = (
+                not is_offline
+                and os.environ.get("ENABLE_PERCEPTUAL_LLM", "false").lower() in ("true", "1", "yes")
+            )
+            judge_cfg = PerceptualJudgeConfig(enable_external_llm=enable_ext)
             self.perceptual_judge = PerceptualPerformanceJudge(config=judge_cfg)
 
     def evaluate_take(

@@ -78,8 +78,8 @@ def extract_clean_pcm_from_gemini_container(raw_bytes: bytes) -> Tuple[bytes, in
 def read_surgically_cleaned_chunk(
     chunk_path: Union[Path, str],
     target_sample_rate: int = 24000,
-    safety_buffer_ms: float = 40.0,
-    fade_in_ms: float = 12.0,
+    safety_buffer_ms: float = 300.0,
+    fade_in_ms: float = 3.0,
     fade_out_ms: float = 18.0
 ) -> Tuple[bytes, int]:
     """

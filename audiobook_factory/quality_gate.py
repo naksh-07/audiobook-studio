@@ -72,6 +72,26 @@ class ExtractionQualityAuditor:
 
         detected_lit = len(book.get_literary_chapters())
         prod_chunks = len(book.get_production_chunks())
+        expected_targets = getattr(existing_report, "expected_literary_targets", 0) or book.raw_metadata.get("expected_literary_targets", 0)
+
+        # Defect 5: Resolved literary chapter target with 0 blocks or 0 words (Fail-Closed)
+        zero_target_errors = [
+            c.title or f"Chapter {c.number}"
+            for c in book.chapters
+            if len(c.blocks) == 0 or c.words == 0
+        ]
+        if zero_target_errors:
+            errors.append(
+                f"CRITICAL_ERROR: Resolved literary chapter target(s) {zero_target_errors} contain 0 blocks or 0 words."
+            )
+
+        # Defect 6: Missing literary targets / dropped stories (Fail-Closed)
+        if expected_targets > 0 and detected_lit < expected_targets:
+            errors.append(
+                f"CRITICAL_ERROR: Detected literary chapters ({detected_lit}) < expected literary targets ({expected_targets}). "
+                f"Stories or chapters have been dropped during extraction."
+            )
+
         used_fallback = any(
             c.boundary_origin in ("fallback_production_chunk", "spine_fallback")
             for c in book.chapters
@@ -106,6 +126,7 @@ class ExtractionQualityAuditor:
             total_words=total_words,
             total_chapters=total_chapters,
             detected_literary_chapters=detected_lit,
+            expected_literary_targets=expected_targets,
             production_chunks=prod_chunks,
             used_fallback_chunking=used_fallback,
             total_blocks=total_blocks,

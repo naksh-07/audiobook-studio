@@ -84,6 +84,7 @@ def test_pipeline_simulation_both_tracks(mock_pipeline_environment):
     mock_pod_pkg.write_bytes(b"MOCK_PODCAST_M4A")
 
     with patch("audiobook_factory.orchestrator.process_book_file") as mock_extract, \
+         patch("audiobook_factory.preproduction.run_preproduction") as mock_preprod, \
          patch("audiobook_factory.orchestrator.translate_book_project") as mock_trans, \
          patch("audiobook_factory.orchestrator.verify_translation_coverage_gates"), \
          patch("audiobook_factory.orchestrator.generate_project_scripts") as mock_scripts, \
@@ -93,6 +94,7 @@ def test_pipeline_simulation_both_tracks(mock_pipeline_environment):
          patch("audiobook_factory.podcast.orchestrator.PodcastOrchestrator.produce_podcast_episode") as mock_pod_orch, \
          patch("audiobook_factory.packaging.package_project") as mock_pkg, \
          patch("audiobook_factory.orchestrator.verify_packaging_gates"):
+        mock_preprod.return_value = {"status": "CACHED_LOCKED"}
 
         mock_extract.return_value = {
             "book_id": book_slug,
@@ -175,9 +177,11 @@ def test_pipeline_simulation_podcast_only(mock_pipeline_environment):
     mock_pod_pkg.write_bytes(b"MOCK_PODCAST_M4A")
 
     with patch("audiobook_factory.orchestrator.process_book_file") as mock_extract, \
+         patch("audiobook_factory.preproduction.run_preproduction") as mock_preprod, \
          patch("audiobook_factory.podcast.generate_project_podcasts") as mock_pod_gen, \
          patch("audiobook_factory.podcast.orchestrator.PodcastOrchestrator.produce_podcast_episode") as mock_pod_orch, \
          patch("audiobook_factory.packaging.package_project") as mock_pkg:
+        mock_preprod.return_value = {"status": "CACHED_LOCKED"}
 
         mock_extract.return_value = {
             "book_id": book_slug,
@@ -228,11 +232,13 @@ def test_pipeline_simulation_audiobook_only(mock_pipeline_environment):
     mock_m4b.write_bytes(b"MOCK_M4B")
 
     with patch("audiobook_factory.orchestrator.process_book_file") as mock_extract, \
+         patch("audiobook_factory.preproduction.run_preproduction") as mock_preprod, \
          patch("audiobook_factory.orchestrator.generate_project_scripts") as mock_scripts, \
          patch("audiobook_factory.orchestrator.verify_screenplay_project_gates"), \
          patch.object(PipelineOrchestrator, "produce_chapter") as mock_prod_chap, \
          patch("audiobook_factory.packaging.package_project") as mock_pkg, \
          patch("audiobook_factory.orchestrator.verify_packaging_gates"):
+        mock_preprod.return_value = {"status": "CACHED_LOCKED"}
 
         mock_extract.return_value = {
             "book_id": book_slug,

@@ -119,14 +119,14 @@ class VoiceCandidateEngine:
         breakdown: Dict[str, float] = {}
 
         # 1. Gender Alignment (Hard filter / heavy weight)
-        gender_score = 1.0
-        if profile.gender in ("male", "female") and v_sex in ("male", "female"):
-            if profile.gender == v_sex:
-                gender_score = 1.0
-                strengths.append(f"Acoustic gender alignment ({v_sex})")
-            else:
-                gender_score = 0.10
-                risks.append(f"Gender mismatch: voice is {v_sex}, character is {profile.gender}")
+        target_gender = profile.gender if profile.gender in ("male", "female") else "male"
+        cand_sex = v_sex if v_sex in ("male", "female") else "male"
+        if target_gender == cand_sex:
+            gender_score = 1.0
+            strengths.append(f"Acoustic gender alignment ({cand_sex})")
+        else:
+            gender_score = 0.05
+            risks.append(f"Gender mismatch: voice is {cand_sex}, character is {target_gender}")
         breakdown["gender_fit"] = gender_score
 
         # 2. Perceived Age Match

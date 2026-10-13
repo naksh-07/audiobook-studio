@@ -186,6 +186,9 @@ class DialogueAttributionAuditor:
         if stripped_quotes:
             cleaned = stripped_quotes
 
+        # Strip trailing commas left by dialogue tag stripping
+        cleaned = re.sub(r",\s*$", "।" if is_hindi else ".", cleaned)
+
         final_text = f"{vocal_prefix}{cleaned}" if vocal_prefix else cleaned
         was_modified = (final_text != original)
         return final_text, was_modified
@@ -389,6 +392,36 @@ Output JSON: A list of objects matching each segment by "index":
                     s_copy["text"] = cleaned_txt
                     corrections_log.append(f"Turn {idx}: Stripped residual speech tags from dialogue")
 
+            # Deterministic Step B2: Anti-Narrator Spoken Dialogue Guard
+            if s_copy.get("type") == "dialogue":
+                spk_val = s_copy.get("speaker", "Narrator").strip()
+                if spk_val.lower() in ("narrator", "narration", "foley", ""):
+                    resolved = None
+                    # 1. Inspect preceding lead-in text for character/alias matches
+                    if audited_turns:
+                        prev_txt = audited_turns[-1].get("text", "")
+                        for al_k, al_target in alias_map.items():
+                            if len(al_k) >= 3 and al_k in prev_txt.lower():
+                                resolved = al_target
+                                break
+                    # 2. Conversational polarity: find interlocutor before last dialogue turn
+                    if not resolved:
+                        prev_dialogue_speakers = [
+                            t.get("speaker") for t in audited_turns
+                            if t.get("type") == "dialogue" and t.get("speaker") not in ("Narrator", "Foley")
+                        ]
+                        if prev_dialogue_speakers:
+                            last_d_spk = prev_dialogue_speakers[-1]
+                            alt_speakers = [s for s in reversed(prev_dialogue_speakers) if s != last_d_spk]
+                            if alt_speakers:
+                                resolved = alt_speakers[0]
+                            else:
+                                resolved = last_d_spk
+                    if resolved:
+                        misattributions_fixed += 1
+                        corrections_log.append(f"Turn {idx}: Re-attributed dialogue leaked to Narrator to '{resolved}'")
+                        s_copy["speaker"] = resolved
+
             audited_turns.append(s_copy)
 
         # Deterministic Step C: Split-Quote Unification (Audible Flow Standard)
@@ -397,6 +430,41 @@ Output JSON: A list of objects matching each segment by "index":
         stitched_count = initial_turn_count - len(audited_turns)
         if stitched_count > 0:
             corrections_log.append(f"Unified {stitched_count} split dialogue fragments into continuous thoughts.")
+
+        # Deterministic Step D: Sandwiched Turn & Polarity Reattribution
+        for i, turn in enumerate(audited_turns):
+            if turn.get("type") == "dialogue" and turn.get("speaker", "Narrator") in ("Narrator", "Foley", ""):
+                prev_spk = None
+                for p in reversed(audited_turns[:i]):
+                    if p.get("type") == "dialogue" and p.get("speaker") not in ("Narrator", "Foley"):
+                        prev_spk = p.get("speaker")
+                        break
+                next_spk = None
+                for n in audited_turns[i + 1:]:
+                    if n.get("type") == "dialogue" and n.get("speaker") not in ("Narrator", "Foley"):
+                        next_spk = n.get("speaker")
+                        break
+
+                resolved_spk = None
+                if prev_spk and next_spk and prev_spk == next_spk:
+                    # Sandwiched turn between two turns of prev_spk: must be the interlocutor
+                    for p in reversed(audited_turns[:i]):
+                        if p.get("type") == "dialogue" and p.get("speaker") not in ("Narrator", "Foley", prev_spk):
+                            resolved_spk = p.get("speaker")
+                            break
+                elif prev_spk:
+                    # Alternating partner
+                    for p in reversed(audited_turns[:i]):
+                        if p.get("type") == "dialogue" and p.get("speaker") not in ("Narrator", "Foley", prev_spk):
+                            resolved_spk = p.get("speaker")
+                            break
+                    if not resolved_spk:
+                        resolved_spk = prev_spk
+
+                if resolved_spk:
+                    misattributions_fixed += 1
+                    corrections_log.append(f"Turn {turn.get('index')}: Fixed dialogue leaked to Narrator to '{resolved_spk}'")
+                    turn["speaker"] = resolved_spk
 
         report = {
             "status": "AUDITED_AND_CERTIFIED",

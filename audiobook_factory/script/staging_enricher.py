@@ -22,6 +22,7 @@ def _enrich_performance_and_staging_llm(
     segments: List[Dict[str, Any]],
     dramatic_context: str = "",
     is_hindi: bool = False,
+    character_roster: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Pass 2: Performance Director & Spatial Audio Staging.
@@ -136,12 +137,36 @@ Output JSON: A list of objects where each object corresponds by "index" to the i
             seg["subtext"] = ""
             seg["underlying_emotion"] = "neutral"
 
+    # Acoustic reflex tag processing & non-acoustic cue extraction
+    try:
+        from audiobook_factory.script.agents.stanislavski_director import StanislavskiSubtextDirector
+        for seg in segments:
+            is_narr = str(seg.get("speaker") or "").strip().lower() in ("narrator", "narration", "") or seg.get("type") == "narration"
+            cleaned, _, _ = StanislavskiSubtextDirector.process_acoustic_reflexes_and_acting_cues(
+                text=str(seg.get("text") or ""),
+                is_dialogue=not is_narr,
+            )
+            seg["text"] = cleaned
+    except Exception:
+        pass
+
     try:
         from audiobook_factory.script.agents.dramaturgy_judge import DramaturgyConsistencyJudge
         judge = DramaturgyConsistencyJudge()
         segments, _ = judge.audit_and_certify(segments, chunk_title="Enriched Segment")
     except Exception:
         pass
+
+    if character_roster:
+        try:
+            from audiobook_factory.script.agents.script_room import format_and_align_segments
+            segments = format_and_align_segments(
+                segments,
+                character_roster=character_roster,
+                is_hindi=is_hindi,
+            )
+        except Exception:
+            pass
 
     return segments
 
@@ -207,5 +232,7 @@ def _parse_dramatized_chunk_llm(
         segments=pass1_turns,
         dramatic_context=dramatic_context,
         is_hindi=is_hindi,
+        character_roster=character_roster,
     )
     return enriched_turns
+

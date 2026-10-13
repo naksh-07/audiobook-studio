@@ -179,31 +179,35 @@ class TestHierarchicalEPUBExtraction(unittest.TestCase):
             # 1. Verify clean slug derivation (watermark stripped)
             self.assertEqual(book.book_id, "tales_of_destiny")
 
-            # 2. Verify all marketing/frontmatter chapters are pruned
-            self.assertEqual(len(book.chapters), 4)
+            # 2. Verify all marketing/frontmatter chapters are pruned (2 authentic literary chapters)
+            self.assertEqual(len(book.chapters), 2)
 
             # 3. Verify hierarchical titling and parent linkages
-            ch1, ch2, ch3, ch4 = book.chapters
-            self.assertEqual(ch1.title, "The Ancient Mountain - Part I")
+            ch1, ch2 = book.chapters
+            self.assertEqual(ch1.title, "The Ancient Mountain")
             self.assertEqual(ch1.parent_chapter_title, "The Ancient Mountain")
             self.assertEqual(ch1.boundary_origin, "toc_navigation")
 
-            self.assertEqual(ch2.title, "The Ancient Mountain - Part II")
-            self.assertEqual(ch2.parent_chapter_title, "The Ancient Mountain")
+            self.assertEqual(ch2.title, "The Frozen Shore")
+            self.assertEqual(ch2.parent_chapter_title, "The Frozen Shore")
+            self.assertEqual(ch2.boundary_origin, "toc_navigation")
 
-            self.assertEqual(ch3.title, "The Frozen Shore - Part I")
-            self.assertEqual(ch3.parent_chapter_title, "The Frozen Shore")
-
-            self.assertEqual(ch4.title, "The Frozen Shore - Part II")
-            self.assertEqual(ch4.parent_chapter_title, "The Frozen Shore")
-
-            # 4. Verify heading deduplication in Markdown projection (zero title stuttering)
+            # 4. Verify intra-chapter section breaks rendered as ## I, ## II in Markdown projection
             ch1_md = ch1.to_markdown()
-            lines = [line.strip() for line in ch1_md.splitlines() if line.strip()]
-            self.assertEqual(lines[0], "# The Ancient Mountain - Part I")
-            # First narrative line must be the actual author prose, NOT duplicate "THE ANCIENT MOUNTAIN" or "I"
-            self.assertIn("He will not emerge from that cavern alive", lines[1])
+            self.assertIn("# The Ancient Mountain", ch1_md)
+            self.assertIn("## I", ch1_md)
+            self.assertIn("## II", ch1_md)
+            self.assertIn("He will not emerge from that cavern alive", ch1_md)
+            self.assertIn("The dawn brought cold northern rain", ch1_md)
             self.assertNotIn("\nI\n", ch1_md)
+
+            ch2_md = ch2.to_markdown()
+            self.assertIn("# The Frozen Shore", ch2_md)
+            self.assertIn("## I", ch2_md)
+            self.assertIn("## II", ch2_md)
+            self.assertIn("Snow fell quietly over the silent roofs", ch2_md)
+            self.assertIn("The journey was set for the hour before noon", ch2_md)
+            self.assertNotIn("\nI\n", ch2_md)
 
 
 if __name__ == "__main__":

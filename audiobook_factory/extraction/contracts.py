@@ -159,11 +159,12 @@ class CanonicalChapter(BaseModel):
                 continue
             if b.semantic_metadata.get("is_lead_heading"):
                 continue
-            if b.type == "heading":
+            if b.type == "heading" or b.semantic_metadata.get("is_section_break"):
                 b_clean = text.strip().upper()
                 t_clean = self.title.strip().upper()
                 p_clean = (self.parent_chapter_title or "").strip().upper()
-                if b_clean in (t_clean, p_clean) or (p_clean and b_clean in (f"PART {t_clean}", f"CHAPTER {t_clean}")):
+                is_sec = bool(b.semantic_metadata.get("is_section_break"))
+                if not is_sec and (b_clean in (t_clean, p_clean) or (p_clean and b_clean in (f"PART {t_clean}", f"CHAPTER {t_clean}"))):
                     continue
                 lvl = int(b.semantic_metadata.get("level", 2))
                 prefix = "#" * max(2, min(lvl, 6))
@@ -202,6 +203,7 @@ class ExtractionQualityReport(BaseModel):
     total_words: int = Field(default=0, description="Total words extracted across all chapters")
     total_chapters: int = Field(default=0, description="Total output chapter/chunk units generated")
     detected_literary_chapters: int = Field(default=0, description="Number of true literary chapters detected in source")
+    expected_literary_targets: int = Field(default=0, description="Expected literary chapter targets resolved from navigation/TOC")
     production_chunks: int = Field(default=0, description="Number of artificial production chunks created for processing limits")
     used_fallback_chunking: bool = Field(default=False, description="True if no literary chapters were found and fallback chunking was used")
     total_blocks: int = Field(default=0, description="Total canonical content blocks")
@@ -457,6 +459,7 @@ class CanonicalBook(BaseModel):
                 "warnings": len(self.quality_report.warnings),
                 "errors": len(self.quality_report.errors),
                 "detected_literary_chapters": detected_lit,
+                "expected_literary_targets": getattr(self.quality_report, "expected_literary_targets", 0),
                 "production_chunks": prod_chunks,
                 "used_fallback_chunking": used_fallback,
             },

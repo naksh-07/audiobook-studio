@@ -150,3 +150,60 @@ def test_offline_mock_fallback_robustness():
             assert len(res.audio_bytes) > 44
     finally:
         os.environ.pop("MOCK_OFFLINE", None)
+
+
+def test_split_text_into_speech_chunks_basic():
+    """Verifies that split_text_into_speech_chunks breaks text into chunks <= max_words."""
+    from audiobook_factory.tts.gateway_bridge import split_text_into_speech_chunks
+    short_text = "यह एक छोटा वाक्य है।"
+    chunks = split_text_into_speech_chunks(short_text, max_words=28)
+    assert len(chunks) == 1
+    assert chunks[0][0] == short_text
+    assert chunks[0][1] == 0.0
+
+    long_text = (
+        "मलबे के बीच सिमटे नगरवासी उस टूटे-फूटे खण्डहर में मुँह बाए अंधेरे गर्त को, पत्थरों से घिरे उस स्याह बिल को चुपचाप ताक रहे थे। "
+        "पीले वास्कट में खड़ा एक भारी-भरकम एल्डरमैन इस पैर से उस पैर पर झूलता रहा, गला खंकारकर साफ़ किया और अपनी मुड़ी-तुड़ी टोपी उतार ली। "
+        "उसने अपनी पतली पड़ चुकी भौंहों से पसीना पोंछते हुए कहा—"
+    )
+    chunks = split_text_into_speech_chunks(long_text, max_words=28, is_dialogue=False)
+    assert len(chunks) == 3
+    for chunk_text, pause in chunks:
+        assert len(chunk_text.split()) <= 28
+    assert chunks[0][1] == 0.35
+    assert chunks[1][1] == 0.35
+    assert chunks[2][1] == 0.0
+
+
+def test_execute_tts_to_file_multi_chunk_stitching(tmp_path):
+    """Verifies that execute_tts_to_file splits long utterances, calls synthesis per chunk, and concatenates."""
+    out_file = tmp_path / "long_stitched.wav"
+    wav_bytes = _create_synthetic_wav_bytes(dur_sec=1.0)
+    mock_res = SpeechResult(
+        audio_bytes=wav_bytes,
+        mime_type="audio/wav",
+        sample_rate=24000,
+        duration_sec=1.0,
+        tokens_used=12,
+        model_id="gemini-3.8-flash",
+        provider="gemini",
+    )
+
+    long_text = (
+        "मलबे के बीच सिमटे नगरवासी उस टूटे-फूटे खण्डहर में मुँह बाए अंधेरे गर्त को, पत्थरों से घिरे उस स्याह बिल को चुपचाप ताक रहे थे। "
+        "पीले वास्कट में खड़ा एक भारी-भरकम एल्डरमैन इस पैर से उस पैर पर झूलता रहा, गला खंकारकर साफ़ किया और अपनी मुड़ी-तुड़ी टोपी उतार ली। "
+        "उसने अपनी पतली पड़ चुकी भौंहों से पसीना पोंछते हुए कहा—"
+    )
+
+    with patch("audiobook_factory.tts.gateway_bridge.execute_tts_synthesize", return_value=mock_res) as mock_syn:
+        path, dur = execute_tts_to_file(
+            text=long_text,
+            output_file=out_file,
+            voice="hi-in-tutor-1",
+            speaker="Narrator",
+        )
+        assert path.exists()
+        assert mock_syn.call_count == 3
+        # 3 chunks of 1.0s + 2 pauses of 0.35s = ~3.7s
+        assert dur > 3.0
+

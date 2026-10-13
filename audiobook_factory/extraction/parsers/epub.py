@@ -297,9 +297,71 @@ def _parse_epub3_nav_tree(elem: ET.Element, nav_base_dir: str = "", opf_dir: str
     return items
 
 
-def _flatten_nav_tree(nodes: List[NavItem]) -> List[Tuple[str, str, Optional[str]]]:
-    """Flattens NavItem tree into linear chapter targets with parent context: (resolved_title, src, parent_title)."""
-    targets: List[Tuple[str, str, Optional[str]]] = []
+class NavTarget:
+    """Represents a flattened navigation chapter target with optional intra-chapter section breaks."""
+    def __init__(
+        self,
+        title: str,
+        src: str,
+        parent_title: Optional[str] = None,
+        section_breaks: Optional[List[Tuple[str, str]]] = None,
+    ):
+        self.title = title
+        self.src = src
+        self.parent_title = parent_title
+        self.section_breaks = section_breaks or []
+
+    def __repr__(self) -> str:
+        return (
+            f"NavTarget(title={self.title!r}, src={self.src!r}, "
+            f"parent={self.parent_title!r}, section_breaks={len(self.section_breaks)})"
+        )
+
+
+_SUBSECTION_RE = re.compile(
+    r"^(?:[IVXLCDM]+|\d+|part\s+(?:[IVXLCDM]+|\d+)|section\s+(?:[IVXLCDM]+|\d+)|scene\s+(?:[IVXLCDM]+|\d+)|§\s*\d+)$",
+    re.IGNORECASE,
+)
+
+
+def _is_subsection_label(label: str) -> bool:
+    """
+    Matches Roman numerals (I, II, IV, VIII...), Arabic digits (1, 2, 3...),
+    or short section labels (Part I, Part 1, Section 1, Scene 2, § 1).
+    """
+    clean = label.strip()
+    if not clean:
+        return False
+    if bool(_SUBSECTION_RE.match(clean)):
+        return True
+    stripped = clean.rstrip(". :")
+    return bool(stripped and _SUBSECTION_RE.match(stripped))
+
+
+_ROMAN_NUMERAL_SET = {
+    "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+    "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX",
+}
+
+_STRICT_ROMAN_RE = re.compile(
+    r"^(?:M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3}))$",
+    re.IGNORECASE,
+)
+
+
+def _is_roman_numeral(label: str) -> bool:
+    """Matches Roman numerals (I through XX and canonical Roman strings)."""
+    clean = label.strip().rstrip(". :").upper()
+    if not clean:
+        return False
+    if clean in _ROMAN_NUMERAL_SET:
+        return True
+    return bool(_STRICT_ROMAN_RE.match(clean))
+
+
+def _flatten_nav_tree(nodes: List[NavItem]) -> List[NavTarget]:
+    """Flattens NavItem tree into linear chapter targets with parent context and intra-chapter section breaks."""
+    targets: List[NavTarget] = []
     for n in nodes:
         clean_lbl = n.label.strip()
         display_lbl = clean_lbl.title() if clean_lbl.isupper() and len(clean_lbl.split()) > 1 else clean_lbl
@@ -317,14 +379,35 @@ def _flatten_nav_tree(nodes: List[NavItem]) -> List[Tuple[str, str, Optional[str
                     title = f"{p_display} - {clean_lbl}"
                 else:
                     title = f"{p_display} - {clean_lbl}"
-            targets.append((title, n.src, p_display))
+            targets.append(NavTarget(title=title, src=n.src, parent_title=p_display))
         else:
-            first_child_src = n.children[0].src
-            p_display = clean_lbl.title() if clean_lbl.isupper() and len(clean_lbl.split()) > 1 else clean_lbl
-            if n.src != first_child_src:
-                intro_title = f"{p_display} - Introduction"
-                targets.append((intro_title, n.src, p_display))
-            targets.extend(_flatten_nav_tree(n.children))
+            num_sub = sum(1 for c in n.children if _is_subsection_label(c.label))
+            is_sub_cluster = len(n.children) > 0 and (num_sub / len(n.children)) >= 0.60
+
+            if is_sub_cluster:
+                # Majority of children are scene/section breaks -> Authentic literary chapter!
+                # Do NOT split into separate chapter targets. Keep parent as target and collect child breaks.
+                p_display = None
+                if n.parent_label:
+                    p_raw = n.parent_label.strip()
+                    p_display = p_raw.title() if p_raw.isupper() and len(p_raw.split()) > 1 else p_raw
+
+                target_src = n.src or n.children[0].src
+                section_breaks = [(c.label.strip(), c.src.strip()) for c in n.children]
+                targets.append(
+                    NavTarget(
+                        title=display_lbl,
+                        src=target_src,
+                        parent_title=p_display,
+                        section_breaks=section_breaks,
+                    )
+                )
+            else:
+                # Children are standalone chapters under parent (e.g. Book One -> Chapter 1, Chapter 2)
+                for c in n.children:
+                    if not c.parent_label:
+                        c.parent_label = n.label
+                targets.extend(_flatten_nav_tree(n.children))
     return targets
 
 
@@ -373,6 +456,8 @@ def _deduplicate_leading_headings(
 
     keep_start_idx = 0
     for idx in range(min(4, len(blocks))):
+        if blocks[idx].semantic_metadata.get("is_section_break"):
+            break
         blk_text = blocks[idx].normalized_text.strip().upper()
         matches = (
             blk_text == p_clean
@@ -387,6 +472,184 @@ def _deduplicate_leading_headings(
             break
 
     return blocks, keep_start_idx
+
+
+def _apply_intra_chapter_section_breaks(
+    blocks: List[CanonicalBlock],
+    section_breaks: Optional[List[Tuple[str, str]]] = None,
+    chapter_title: str = "",
+    parent_title: Optional[str] = None,
+) -> List[CanonicalBlock]:
+    """
+    Marks blocks corresponding to TOC sub-section children or intra-chapter Roman numerals
+    (I, II, III, etc.) as heading level 2 (or inserts a heading block if only anchor/prose exists).
+    Ensures that when to_markdown() is called, sections render cleanly as '## I', '## II', etc.
+    within the single literary chapter without triggering chapter splits.
+    """
+    if not blocks:
+        return blocks
+
+    result_blocks = list(blocks)
+    title_clean = chapter_title.strip().upper().rstrip(". :")
+    parent_clean = (parent_title or "").strip().upper().rstrip(". :")
+
+    # Extract Roman numeral from title if chapter title is e.g. "Chapter I" or "Part I"
+    title_part_match = re.search(r"(?:Chapter|Part)\s+([IVXLCDM]+|\d+)", chapter_title, re.IGNORECASE)
+    title_roman = title_part_match.group(1).upper() if title_part_match else ""
+
+    if section_breaks:
+        for sec_label, sec_src in section_breaks:
+            clean_lbl = sec_label.strip()
+            if not clean_lbl:
+                continue
+
+            parts = sec_src.split("#")
+            sec_sf = parts[0]
+            sec_anchor = parts[1] if len(parts) > 1 else ""
+
+            match_idx: Optional[int] = None
+
+            # 1. Match by HTML anchor
+            if sec_anchor:
+                for idx, b in enumerate(result_blocks):
+                    b_sf = b.provenance.spine_item or ""
+                    sf_matches = not sec_sf or b_sf == sec_sf or b_sf.endswith(sec_sf) or sec_sf.endswith(b_sf)
+                    if sf_matches and b.provenance.html_id == sec_anchor:
+                        match_idx = idx
+                        break
+
+            # 2. Fallback: match by label text if anchor didn't match
+            if match_idx is None:
+                clean_upper = clean_lbl.upper().rstrip(". :")
+                for idx, b in enumerate(result_blocks):
+                    b_txt = b.normalized_text.strip().upper().rstrip(". :")
+                    if b_txt == clean_upper and not b.semantic_metadata.get("is_section_break"):
+                        match_idx = idx
+                        break
+
+            if match_idx is not None:
+                target_b = result_blocks[match_idx]
+                clean_norm = clean_lbl.upper().rstrip(". :")
+                found_lbl_idx: Optional[int] = None
+
+                # Search around match_idx (including match_idx - 1, match_idx, and forward)
+                scan_start = max(0, match_idx - 1)
+                scan_end = min(match_idx + 4, len(result_blocks))
+                for scan_idx in range(scan_start, scan_end):
+                    cand = result_blocks[scan_idx]
+                    cand_norm = cand.normalized_text.strip().upper().rstrip(". :")
+                    if cand_norm in (title_clean, parent_clean) or (title_roman and cand_norm == title_roman and scan_idx == 0):
+                        continue
+                    if cand_norm == clean_norm or _is_roman_numeral(cand_norm) or _is_subsection_label(cand.normalized_text):
+                        found_lbl_idx = scan_idx
+                        break
+
+                if found_lbl_idx is not None:
+                    lbl_block = result_blocks[found_lbl_idx]
+                    lbl_block.type = "heading"
+                    clean_roman = lbl_block.normalized_text.strip().rstrip(". :").upper()
+                    if _is_roman_numeral(clean_roman):
+                        lbl_block.normalized_text = clean_roman
+                    lbl_block.semantic_metadata["level"] = 2
+                    lbl_block.semantic_metadata["is_section_break"] = True
+                    lbl_block.semantic_metadata["is_lead_heading"] = False
+                else:
+                    # Target block is prose; insert a clean heading block
+                    tgt_text = target_b.normalized_text.strip().upper().rstrip(". :")
+                    is_title_block = (tgt_text in (title_clean, parent_clean))
+                    insert_idx = match_idx + 1 if is_title_block else match_idx
+
+                    inserted_heading = clean_lbl.strip().rstrip(". :")
+                    if _is_roman_numeral(inserted_heading):
+                        inserted_heading = inserted_heading.upper()
+
+                    prov = target_b.provenance.model_copy(
+                        update={"html_id": sec_anchor or target_b.provenance.html_id}
+                    )
+                    heading_block = CanonicalBlock(
+                        id=f"{target_b.id}-sec-{clean_lbl.lower().replace(' ', '_')}",
+                        type="heading",
+                        raw_text=clean_lbl,
+                        normalized_text=inserted_heading,
+                        provenance=prov,
+                        confidence="HIGH",
+                        semantic_metadata={"level": 2, "is_section_break": True, "is_lead_heading": False},
+                    )
+                    result_blocks.insert(insert_idx, heading_block)
+
+    # Post-processing pass: Reliably format all intra-chapter Roman numerals (I to X and beyond) as ## I, ## II, etc.
+    for idx, b in enumerate(result_blocks):
+        if b.semantic_metadata.get("is_section_break"):
+            continue
+        if b.semantic_metadata.get("is_lead_heading"):
+            continue
+
+        raw_clean = b.normalized_text.strip().rstrip(". :").upper()
+        if not raw_clean:
+            continue
+
+        if _is_roman_numeral(raw_clean):
+            # Guard against classifying the chapter title itself as an intra-chapter section break
+            if raw_clean in (title_clean, parent_clean) or raw_clean in (f"CHAPTER {title_clean}", f"PART {title_clean}"):
+                continue
+            if title_roman and raw_clean == title_roman and idx < 2:
+                continue
+
+            b.type = "heading"
+            b.normalized_text = raw_clean
+            b.semantic_metadata["level"] = 2
+            b.semantic_metadata["is_section_break"] = True
+            b.semantic_metadata["is_lead_heading"] = False
+
+    return result_blocks
+
+
+def _stitch_severed_page_break_blocks(blocks: List[CanonicalBlock]) -> List[CanonicalBlock]:
+    """
+    Forensic Heuristic: Heals sentences and dialogue broken mid-flight across
+    artificial print page-boundary <p> tags generated by EPUB conversion tools (e.g. Calibre).
+    """
+    if not blocks:
+        return blocks
+
+    terminators = ('.', '!', '?', '"', "'", '—', '–', ':', '…')
+    sq = "'"
+    dq = '"'
+
+    stitched: List[CanonicalBlock] = []
+    i = 0
+    while i < len(blocks):
+        curr = blocks[i]
+        while i + 1 < len(blocks):
+            nxt = blocks[i + 1]
+            if curr.type != "paragraph" or nxt.type != "paragraph":
+                break
+
+            curr_text = curr.normalized_text.strip()
+            nxt_text = nxt.normalized_text.strip()
+
+            if not curr_text or not nxt_text:
+                break
+
+            # Condition 1: Mid-sentence cut (no terminal punctuation, lowercase continuation)
+            c1 = not curr_text.endswith(terminators) and nxt_text[0].islower()
+
+            # Condition 2: Open single-quote split across page boundary
+            c2 = curr_text.startswith(sq) and not curr_text.endswith(sq) and not nxt_text.startswith(sq) and nxt_text.endswith(sq)
+
+            # Condition 3: Open double-quote split across page boundary
+            c3 = curr_text.startswith(dq) and not curr_text.endswith(dq) and not nxt_text.startswith(dq) and nxt_text.endswith(dq)
+
+            if c1 or c2 or c3:
+                curr.raw_text = curr.raw_text.rstrip() + " " + nxt.raw_text.lstrip()
+                curr.normalized_text = (curr.normalized_text.rstrip() + " " + nxt.normalized_text.lstrip()).strip()
+                i += 1
+            else:
+                break
+        stitched.append(curr)
+        i += 1
+
+    return stitched
 
 
 class ForensicEPUBParser:
@@ -568,6 +831,8 @@ class ForensicEPUBParser:
             chapters: List[CanonicalChapter] = []
             legacy_items: List[Dict[str, Any]] = []
 
+            expected_target_count = len([t for t in resolved_nav_targets if not _is_non_literary_frontmatter(t.title)])
+
             if resolved_nav_targets:
                 # Build unified ordered block list with spine coordinates
                 ordered_blocks_with_loc: List[Tuple[str, int, CanonicalBlock]] = []
@@ -576,8 +841,13 @@ class ForensicEPUBParser:
                         ordered_blocks_with_loc.append((sf, b_idx, blk))
 
                 # Resolve nav positions to exact block index in ordered_blocks_with_loc
-                nav_block_starts: List[Tuple[str, int, str, Optional[str]]] = []
-                for lbl, src, parent_lbl in resolved_nav_targets:
+                nav_block_starts: List[Tuple[str, int, str, Optional[str], List[Tuple[str, str]]]] = []
+                for target in resolved_nav_targets:
+                    lbl = target.title
+                    src = target.src
+                    parent_lbl = target.parent_title
+                    section_breaks = target.section_breaks
+
                     parts = src.split("#")
                     sf = parts[0]
                     anchor = parts[1] if len(parts) > 1 else ""
@@ -586,69 +856,79 @@ class ForensicEPUBParser:
                     match_idx: Optional[int] = None
                     if anchor:
                         for g_idx, (b_sf, _, b_obj) in enumerate(ordered_blocks_with_loc):
-                            if b_sf == sf and b_obj.provenance.html_id == anchor:
+                            sf_match = (b_sf == sf or b_sf.endswith(f"/{sf}") or sf.endswith(f"/{b_sf}"))
+                            if sf_match and b_obj.provenance.html_id == anchor:
                                 match_idx = g_idx
                                 break
+
                     if match_idx is None:
                         for g_idx, (b_sf, _, _) in enumerate(ordered_blocks_with_loc):
-                            if b_sf == sf:
+                            sf_match = (b_sf == sf or b_sf.endswith(f"/{sf}") or sf.endswith(f"/{b_sf}"))
+                            if sf_match:
                                 match_idx = g_idx
                                 break
 
                     if match_idx is not None:
-                        nav_block_starts.append((lbl, match_idx, sf, parent_lbl))
+                        nav_block_starts.append((lbl, match_idx, sf, parent_lbl, section_breaks))
 
-                for i, (title, start_idx, spine_file, parent_title) in enumerate(nav_block_starts):
+                for i, (title, start_idx, spine_file, parent_title, section_breaks) in enumerate(nav_block_starts):
                     if _is_non_literary_frontmatter(title):
                         continue
                     end_idx = nav_block_starts[i + 1][1] if i + 1 < len(nav_block_starts) else len(ordered_blocks_with_loc)
                     chap_block_triples = ordered_blocks_with_loc[start_idx:end_idx]
                     blocks = [b for _, _, b in chap_block_triples]
-                    if not blocks:
-                        continue
+
+                    # Apply intra-chapter section breaks before deduplicating lead headings
+                    blocks = _apply_intra_chapter_section_breaks(
+                        blocks=blocks,
+                        section_breaks=section_breaks,
+                        chapter_title=title,
+                        parent_title=parent_title,
+                    )
 
                     # Deduplicate leading headings so title is not repeated as body prose
                     blocks, lead_heading_idx = _deduplicate_leading_headings(blocks, title, parent_title)
-                    body_blocks = blocks[lead_heading_idx:]
+                    body_blocks = _stitch_severed_page_break_blocks(blocks[lead_heading_idx:])
+                    blocks = blocks[:lead_heading_idx] + body_blocks
 
                     # Generate chapter text from parsed body blocks
                     clean_text = "\n\n".join(b.normalized_text for b in body_blocks if b.normalized_text.strip())
                     word_count = len(clean_text.split())
 
-                    if word_count >= 5:
-                        chap_num = len(chapters) + 1
-                        canonical_chap = CanonicalChapter(
-                            id=f"ch-{chap_num:03d}",
-                            number=chap_num,
-                            title=title,
-                            blocks=blocks,
-                            source_location=spine_file,
-                            confidence="HIGH",
-                            words=word_count,
-                            unit_type="literary_chapter",
-                            is_literary_chapter=True,
-                            is_production_chunk=False,
-                            boundary_origin="toc_navigation",
-                            literary_chapter_number=chap_num,
-                            parent_chapter_title=parent_title or title,
-                            chunk_index=1,
-                            total_chunks_in_chapter=1,
-                        )
-                        chapters.append(canonical_chap)
-                        legacy_items.append({
-                            "title": title,
-                            "content": clean_text,
-                            "words": word_count,
-                            "unit_type": "literary_chapter",
-                            "is_literary_chapter": True,
-                            "is_production_chunk": False,
-                            "boundary_origin": "toc_navigation",
-                            "literary_chapter_number": chap_num,
-                            "parent_chapter_title": parent_title or title,
-                            "chunk_index": 1,
-                            "total_chunks": 1,
-                            "source_location": spine_file,
-                        })
+                    chap_num = len(chapters) + 1
+                    is_valid = len(blocks) > 0 and word_count >= 5
+                    canonical_chap = CanonicalChapter(
+                        id=f"ch-{chap_num:03d}",
+                        number=chap_num,
+                        title=title,
+                        blocks=blocks,
+                        source_location=spine_file,
+                        confidence="HIGH" if is_valid else "LOW",
+                        words=word_count,
+                        unit_type="literary_chapter",
+                        is_literary_chapter=True,
+                        is_production_chunk=False,
+                        boundary_origin="toc_navigation",
+                        literary_chapter_number=chap_num,
+                        parent_chapter_title=parent_title or title,
+                        chunk_index=1,
+                        total_chunks_in_chapter=1,
+                    )
+                    chapters.append(canonical_chap)
+                    legacy_items.append({
+                        "title": title,
+                        "content": clean_text,
+                        "words": word_count,
+                        "unit_type": "literary_chapter",
+                        "is_literary_chapter": True,
+                        "is_production_chunk": False,
+                        "boundary_origin": "toc_navigation",
+                        "literary_chapter_number": chap_num,
+                        "parent_chapter_title": parent_title or title,
+                        "chunk_index": 1,
+                        "total_chunks": 1,
+                        "source_location": spine_file,
+                    })
 
             # Fallback to sequential spine document traversal
             if not chapters:
@@ -657,6 +937,7 @@ class ForensicEPUBParser:
                     blocks = spine_blocks_map.get(item_path, [])
                     if not blocks:
                         continue
+                    blocks = _stitch_severed_page_break_blocks(blocks)
 
                     clean_text = "\n\n".join(b.normalized_text for b in blocks if b.normalized_text.strip())
                     word_count = len(clean_text.split())
@@ -724,10 +1005,19 @@ class ForensicEPUBParser:
         )
         detected_lit = len(canonical_book.get_literary_chapters())
         prod_chunks = len(canonical_book.get_production_chunks())
+        metadata["expected_literary_targets"] = expected_target_count
+        canonical_book.raw_metadata["expected_literary_targets"] = expected_target_count
+
+        has_critical_error = (
+            len(chapters) == 0
+            or total_words < 50
+            or (expected_target_count > 0 and detected_lit < expected_target_count)
+            or any(len(c.blocks) == 0 or c.words == 0 for c in canonical_book.chapters)
+        )
 
         report = ExtractionQualityReport(
-            overall_confidence="HIGH" if len(chapters) > 0 and total_words > 100 and not used_fallback else ("MEDIUM" if used_fallback else "LOW"),
-            gate_status="PASS" if len(chapters) > 0 and total_words > 100 else "REVIEW",
+            overall_confidence="HIGH" if not has_critical_error and not used_fallback and total_words > 100 else ("MEDIUM" if used_fallback and not has_critical_error else "LOW"),
+            gate_status="REVIEW" if has_critical_error else "PASS",
             source_type="epub",
             source_path=str(self.file_path),
             extraction_engine="epub_dom_structural",
@@ -735,6 +1025,7 @@ class ForensicEPUBParser:
             total_words=total_words,
             total_chapters=len(chapters),
             detected_literary_chapters=detected_lit,
+            expected_literary_targets=expected_target_count,
             production_chunks=prod_chunks,
             used_fallback_chunking=used_fallback,
             total_blocks=total_blocks,

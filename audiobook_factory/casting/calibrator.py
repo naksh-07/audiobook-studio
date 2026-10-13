@@ -88,8 +88,8 @@ class SceneAcousticCalibrator:
                     pairwise_dist[pair_key] = round(re_dist, 2)
 
         matrix.pairwise_distances = pairwise_dist
-        matrix.min_distance = round(min_dist, 2)
-        matrix.is_contrast_sufficient = (min_dist >= MIN_ACCEPTABLE_DISTANCE) or bool(adjustments)
+        matrix.min_distance = round(min(pairwise_dist.values()), 2) if pairwise_dist else round(min_dist, 2)
+        matrix.is_contrast_sufficient = (matrix.min_distance >= MIN_ACCEPTABLE_DISTANCE) or bool(adjustments)
         matrix.calibration_adjustments = adjustments
 
         # 3. Apply calibration adjustments to segment dictionaries
@@ -129,8 +129,8 @@ class SceneAcousticCalibrator:
         """
         Calculates mathematical auditory separation distance [0.0, 1.0] between two speakers.
         """
-        cfg_a = voice_map.get(speaker_a, {})
-        cfg_b = voice_map.get(speaker_b, {})
+        cfg_a = voice_map.get(speaker_a) or voice_map.get(speaker_a.lower(), {})
+        cfg_b = voice_map.get(speaker_b) or voice_map.get(speaker_b.lower(), {})
 
         vid_a = cfg_a.get("voice") or cfg_a.get("assigned_voice_id", "voice_a")
         vid_b = cfg_b.get("voice") or cfg_b.get("assigned_voice_id", "voice_b")

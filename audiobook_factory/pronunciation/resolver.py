@@ -159,7 +159,17 @@ class PronunciationResolver:
         if self.book_bible and hasattr(self.book_bible, "find_character"):
             char_ent = self.book_bible.find_character(stripped)
             if char_ent:
-                spoken = char_ent.pronunciation_hint or char_ent.hindi_name or char_ent.english_name
+                is_hindi_token = any('\u0900' <= c <= '\u097f' for c in stripped)
+                if is_hindi_token:
+                    cand_spoken = char_ent.pronunciation_hint or char_ent.hindi_name
+                    if cand_spoken and any('\u0900' <= c <= '\u097f' for c in cand_spoken):
+                        spoken = cand_spoken
+                    else:
+                        # Sacred Devanagari preservation: NEVER overwrite Hindi text with Latin/English tokens!
+                        spoken = stripped
+                else:
+                    spoken = char_ent.pronunciation_hint or char_ent.english_name or char_ent.hindi_name or stripped
+
                 status = PronunciationStatus.VERIFIED if char_ent.pronunciation_hint else PronunciationStatus.LIKELY
                 return PronunciationResolutionResult(
                     original_token=token,
@@ -167,7 +177,7 @@ class PronunciationResolver:
                     resolved_spoken=spoken,
                     status=status,
                     source=PronunciationSource.BOOK_BIBLE,
-                    language=SpokenLanguage.HINDI if char_ent.hindi_name else SpokenLanguage.ENGLISH,
+                    language=SpokenLanguage.HINDI if is_hindi_token else SpokenLanguage.ENGLISH,
                     transformation_applied=(spoken != stripped),
                     requires_review=False,
                     explanation=f"Resolved via Tier 2 BookBible character '{char_ent.english_name}'",

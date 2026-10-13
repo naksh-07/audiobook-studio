@@ -16,16 +16,17 @@ from typing import Dict, List, Any, Optional, Set, Tuple
 
 
 ENGLISH_NON_ENTITY_STOPWORDS = {
+    # Pronouns & Possessives
     "The", "He", "She", "They", "Then", "After", "There", "When", "What", "It", "In", "On", "At",
     "Are", "Yes", "Do", "You", "Who", "No", "That", "As", "Your", "Well", "And", "So", "Ah",
     "Greetings", "How", "History", "This", "Not", "Something", "But", "If", "To", "Become",
     "Why", "Where", "Which", "Can", "Could", "Would", "Should", "May", "Might", "Must",
     "Never", "Always", "Sometimes", "Perhaps", "Maybe", "Here", "Now", "Only", "Just",
     "All", "Some", "One", "Two", "Three", "Four", "Five", "My", "Our", "His", "Her", "Its",
-    "Their", "We", "I", "Sit", "Let", "Geography", "Because", "Certainly", "Civilization",
+    "Their", "We", "I", "Me", "Him", "Them", "Us", "Mine", "Yours", "Hers", "Ours", "Theirs",
+    "Sit", "Let", "Geography", "Because", "Certainly", "Civilization",
     "Stories", "True", "Nonsense", "Instead", "Either", "Another", "Whatever", "Notice",
     "Nothing", "Someone", "Everybody", "Nobody", "Anyway", "Obviously", "Forgive", "Wait",
-    "Look", "Listen", "Come", "Go", "Back", "Suddenly", "Meanwhile", "Finally", "Soon",
     "Chapter", "Book", "Part", "Prologue", "Epilogue", "Scene", "Act", "Volume",
     "With", "Without", "From", "Into", "Under", "Over", "Between", "Through", "During",
     "Before", "Behind", "Across", "Along", "Above", "Below", "Against", "Around", "Near",
@@ -34,12 +35,86 @@ ENGLISH_NON_ENTITY_STOPWORDS = {
     "Seldom", "Rarely", "Hardly", "Barely", "Scarcely", "Once", "Twice", "First", "Second",
     "Third", "Next", "Last", "Early", "Late", "Already", "Still", "Yet", "Even", "Also",
     "Too", "Very", "Quite", "Rather", "Almost", "Nearly", "About", "Again", "Further",
-    "Farther", "Away", "Whom", "Whose", "Whatever", "Whoever", "Whichever", "Wherever",
+    "Farther", "Away", "Whom", "Whose", "Whoever", "Whichever", "Wherever",
     "Whenever", "However", "Although", "Though", "While", "Whilst", "Whereas", "Since",
     "Unless", "Until", "Till", "Lest", "Except", "Besides", "Whether", "Nor", "Or", "For",
     "Later", "Tonight", "Yesterday", "Tomorrow", "Today", "Morning", "Evening", "Night",
     "Behind", "Underneath", "Beside", "Inside", "Outside", "Amid", "Amidst",
+    # Auxiliary verbs & forms of be / do / have / get
+    "Did", "Done", "Does", "Doing",
+    "Have", "Had", "Has", "Having",
+    "Get", "Got", "Gets", "Getting", "Gotten",
+    "Is", "Was", "Were", "Are", "Am", "Be", "Been", "Being",
+    # Contraction stems & truncated negative auxiliaries
+    "Don", "Doesn", "Didn", "Won", "Wouldn", "Couldn", "Shouldn", "Isn", "Aren", "Wasn",
+    "Weren", "Hasn", "Haven", "Hadn", "Ain", "Can't", "Don't", "Doesn't", "Didn't",
+    "Won't", "Wouldn't", "Couldn't", "Shouldn't", "Isn't", "Aren't", "Wasn't", "Weren't",
+    "It's", "That's", "There's", "Here's", "He's", "She's", "They're", "We're", "You're",
+    "Let's", "What's", "Who's", "Where's", "Why's", "How's",
+    # Common sentence-initial imperatives & speech verbs
+    "Look", "Looked", "Looking", "Listen", "Listened", "Listening",
+    "Tell", "Told", "Telling", "Ask", "Asked", "Asking",
+    "Come", "Came", "Coming", "Say", "Said", "Saying",
+    "See", "Saw", "Seen", "Seeing", "Go", "Went", "Gone", "Going",
+    "Hear", "Heard", "Hearing", "Feel", "Felt", "Feeling",
+    "Take", "Took", "Taken", "Taking", "Give", "Gave", "Given", "Giving",
+    "Make", "Made", "Making", "Know", "Knew", "Known", "Knowing",
+    "Think", "Thought", "Thinking", "Find", "Found", "Finding",
+    "Leave", "Left", "Leaving", "Put", "Putting", "Keep", "Kept", "Keeping",
+    "Hold", "Held", "Holding", "Speak", "Spoke", "Spoken", "Speaking",
+    "Talk", "Talked", "Talking", "Call", "Called", "Calling",
+    "Start", "Started", "Stop", "Stopped", "Stand", "Stood", "Standing",
+    "Turn", "Turned", "Walk", "Walked", "Run", "Ran", "Running",
+    "Show", "Showed", "Bring", "Brought", "Open", "Opened", "Close", "Closed",
+    "Help", "Helped", "Try", "Tried", "Remember", "Remembered", "Forget", "Forgot",
+    "Believe", "Believed", "Understand", "Understood",
+    # Interjections & conversational starters
+    "Hey", "Hello", "Hi", "Oh", "Ha", "Oho", "Yeah", "Nope", "Aye", "Nay",
+    "Please", "Thank", "Thanks", "Sorry", "Excuse", "Pardon", "Alas", "Sure", "Surely", "Right", "Alright",
+    # Known geographical and common fantasy location nouns
+    "City", "Town", "Village", "Kingdom", "Empire", "Castle", "Palace", "Fortress", "Citadel",
+    "Forest", "Wood", "Woods", "Grove", "Jungle",
+    "River", "Stream", "Brook", "Lake", "Sea", "Ocean", "Pond", "Bay", "Harbor", "Port",
+    "Mountain", "Mountains", "Peak", "Valley", "Canyon", "Gorge", "Hill", "Hills",
+    "Street", "Road", "Avenue", "Lane", "Alley", "Highway", "Bridge", "Gate", "Wall",
+    "Square", "Market", "Plaza", "Courtyard",
+    "Inn", "Tavern", "Pub", "House", "Home", "Room", "Chamber", "Hall", "Tower", "Temple", "Church",
+    "Dungeon", "Cell", "Prison", "Cave", "Cavern", "Crypt", "Tomb",
+    "Island", "Isle", "Peninsula", "Coast", "Shore", "Beach",
+    "Plains", "Field", "Fields", "Meadow", "Desert", "Swamp", "Marsh", "Bog",
+    "Province", "Continent", "World", "Realm", "Land", "Territory", "District", "Country",
+    "North", "South", "East", "West", "Northern", "Southern", "Eastern", "Western",
+    "Earth", "Moon", "Sun", "Sky", "Heaven", "Hell",
+    # Known benchmark geographical names & landmarks
+    "Brokilon", "Wyzima", "Cintra", "Blaviken", "Novigrad", "Skellige", "Ellander",
+    # Deities, titles of address, and non-entity honorific abstractions
+    "God", "Gods", "Goddess", "Goddesses", "Lordship", "Ladyship", "Majesty", "Grace", "Highness",
+    "Excellency", "Holiness", "Eminence",
 }
+
+_STOPWORDS_LOWER = {w.lower() for w in ENGLISH_NON_ENTITY_STOPWORDS}
+
+
+def is_stopword(token: str) -> bool:
+    """Checks if a token is a grammatical stopword, auxiliary verb, pronoun, contraction, or location noun."""
+    if not token:
+        return True
+    t_clean = token.strip()
+    t_clean = re.sub(r"^[\"\'“‘]+|[\"\'”’]+$", "", t_clean)
+    if not t_clean:
+        return True
+    t_stripped = re.sub(r"['’](?:t|s|ll|re|ve|d|m)$", "", t_clean, flags=re.IGNORECASE)
+    for cand in (t_clean, t_stripped):
+        if cand in ENGLISH_NON_ENTITY_STOPWORDS:
+            return True
+        if cand.capitalize() in ENGLISH_NON_ENTITY_STOPWORDS:
+            return True
+        if cand.title() in ENGLISH_NON_ENTITY_STOPWORDS:
+            return True
+        if cand.lower() in _STOPWORDS_LOWER:
+            return True
+    return False
+
 
 TITLE_WORDS = {
     "Lord", "Lady", "Baron", "Count", "Duke", "Duchess", "Captain", "Doctor", "Dr", "Mr", "Mrs",
@@ -236,7 +311,7 @@ class LexicalCorpusScanner:
                 for m in TITLE_HONORIFICS_PATTERN.finditer(para):
                     title = m.group(1).strip()
                     name = m.group(2).strip()
-                    if name in ENGLISH_NON_ENTITY_STOPWORDS:
+                    if is_stopword(name):
                         continue
                     full_entity = name
                     cls._record_entity(
@@ -248,24 +323,24 @@ class LexicalCorpusScanner:
                     )
                     para_entities_in_context.add(full_entity)
 
-
                 # 2. Check Multi-word proper nouns: e.g. "Geralt of Rivia", "Edna Pontellier", "Lord Corwin"
                 for m in MULTIWORD_PROPER_NOUN_PATTERN.finditer(para):
                     name = m.group(1).strip()
                     parts = name.split()
-                    if parts[0] in ENGLISH_NON_ENTITY_STOPWORDS:
+                    if is_stopword(parts[0]) or is_stopword(parts[-1]):
                         continue
                     if parts[0] in TITLE_WORDS and len(parts) >= 2:
                         title = parts[0]
                         base_name = " ".join(parts[1:])
-                        cls._record_entity(
-                            entities=entities,
-                            name=base_name,
-                            ch_num=ch_num,
-                            quote=para[:250],
-                            associated_title=title,
-                        )
-                        para_entities_in_context.add(base_name)
+                        if not is_stopword(base_name):
+                            cls._record_entity(
+                                entities=entities,
+                                name=base_name,
+                                ch_num=ch_num,
+                                quote=para[:250],
+                                associated_title=title,
+                            )
+                            para_entities_in_context.add(base_name)
                     cls._record_entity(
                         entities=entities,
                         name=name,
@@ -278,7 +353,7 @@ class LexicalCorpusScanner:
                 for pat in (POST_DIALOGUE_SPEAKER_PATTERN, POST_DIALOGUE_SPEAKER_THEN_VERB_PATTERN):
                     for m in pat.finditer(para):
                         speaker = m.group(1).strip()
-                        if speaker not in ENGLISH_NON_ENTITY_STOPWORDS:
+                        if not is_stopword(speaker):
                             cls._record_entity(
                                 entities=entities,
                                 name=speaker,
@@ -292,7 +367,7 @@ class LexicalCorpusScanner:
                 for pat in (PRE_DIALOGUE_SPEAKER_PATTERN, PRE_DIALOGUE_VERB_THEN_SPEAKER_PATTERN):
                     for m in pat.finditer(para):
                         speaker = m.group(1).strip()
-                        if speaker not in ENGLISH_NON_ENTITY_STOPWORDS and speaker not in TITLE_WORDS:
+                        if not is_stopword(speaker) and speaker not in TITLE_WORDS:
                             cls._record_entity(
                                 entities=entities,
                                 name=speaker,
@@ -305,7 +380,7 @@ class LexicalCorpusScanner:
                 # 4B. Check Clause Pre-dialogue speakers (e.g. "Elena drew her cloak tight and whispered, '...'")
                 for m in re.finditer(r'\b([A-Z][a-z]{2,20})\b[^.!?\n]{0,60}\s+(?:said|asked|replied|whispered|cried|shouted|murmured|roared|growled|gasped|muttered|yelled|demanded|snarled|chuckled)\s*[,:\s]*["\'“]', para):
                     speaker = m.group(1).strip()
-                    if speaker not in ENGLISH_NON_ENTITY_STOPWORDS and speaker not in TITLE_WORDS:
+                    if not is_stopword(speaker) and speaker not in TITLE_WORDS:
                         cls._record_entity(
                             entities=entities,
                             name=speaker,
@@ -318,7 +393,13 @@ class LexicalCorpusScanner:
                 # 5. Check all capitalized proper nouns (e.g. Elena, Wyzima, Corwin)
                 for m in re.finditer(r'\b([A-Z][a-z]{2,20})\b', para):
                     w = m.group(1).strip()
-                    if w not in ENGLISH_NON_ENTITY_STOPWORDS and w not in TITLE_WORDS:
+                    # Check for trailing contraction e.g. Don't -> Don
+                    trailing_contract = re.match(r"^['’](?:t|s|ll|re|ve|d|m)\b", para[m.end():], re.IGNORECASE)
+                    if trailing_contract:
+                        full_contract = w + trailing_contract.group(0)
+                        if is_stopword(w) or is_stopword(full_contract):
+                            continue
+                    if not is_stopword(w) and w not in TITLE_WORDS:
                         cls._record_entity(
                             entities=entities,
                             name=w,

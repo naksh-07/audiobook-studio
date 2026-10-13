@@ -46,6 +46,7 @@ def _parse_dialogue_turns_llm(
             "   - Attribute dialogue to canonical character names based on narrative descriptions and epithets matching the Canonical Character Roster provided below.\n"
             "   - ANTI-ALIAS SPLITTING RULE: If a character is introduced by a descriptive role, epithet, or moniker before revealing their true name (e.g. 'The Stranger' / 'अजनबी' or 'Silver Falcon' / 'सिल्वर फाल्कन' is revealed to be 'Lord Sterling' / 'लॉर्ड स्टर्लिंग'), ATTRIBUTE ALL TURNS to the canonical character name ('Lord Sterling' or 'लॉर्ड स्टर्लिंग')! NEVER split the character into two different speakers!\n"
             "   - Similarly, if 'The scarred captain' / 'दाग़ी कप्तान' is 'Captain Drake' / 'कैप्टन ड्रेक', attribute to canonical 'Captain Drake' / 'कैप्टन ड्रेक'!\n"
+            "   - ZERO QUOTE LEAKAGE TO NARRATOR: Spoken dialogue ('type': 'dialogue') must NEVER be attributed to 'Narrator'! The Narrator ONLY speaks narration ('type': 'narration'). If a minor character, mob member, townsperson, or thug speaks whose name is not in the roster, attribute them to their conversational role or the active character in that exchange, NEVER to 'Narrator'!\n"
             "   - Never use generic pronouns ('he', 'she', 'उसने', 'वह') as speaker names. Always resolve to the canonical character.\n"
             "3. PRESERVE ALL NARRATIVE PROSE & DIALOGUE TAGS:\n"
             "   - NEVER delete, skip, or summarize author narrative prose or descriptions. The Narrator delivers atmospheric exposition, setting up character dialogue.\n"
@@ -111,7 +112,7 @@ Current Scene Text:
 Output JSON: A list of objects where each object has:
 - "index": int (1-based relative to this chunk)
 - "type": "narration" | "dialogue" (group character speech into complete unified dialogue turns with narrative lead-ins)
-- "speaker": canonical character name, "Narrator", or "Foley"
+- "speaker": For type "dialogue", speaker MUST BE a character name (NEVER "Narrator"). "Narrator" is strictly and exclusively for type "narration".
 - "text": spoken dialogue or narrative text with optional inline vocal tags like [whispers], [shouting], or "[ACTION]"
 - "emotion": "neutral" | "angry" | "whispering" | "sad" | "excited" | "growl" | "calm_raspy"
 """

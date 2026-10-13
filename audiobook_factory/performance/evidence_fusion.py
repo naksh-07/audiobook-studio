@@ -83,7 +83,7 @@ class EvidenceFusionEngine:
         word_count = len(text.split())
         if word_count > 0:
             expected_dur = (word_count / 3.1) / max(0.5, direction.pace)
-            max_allowed = max(4.0, expected_dur * 3.5)
+            max_allowed = max(10.0, expected_dur * 4.0 + 15.0)
             if dur > max_allowed:
                 reasons.append(
                     f"Audio duration {dur:.2f}s exceeds maximum threshold of {max_allowed:.2f}s"

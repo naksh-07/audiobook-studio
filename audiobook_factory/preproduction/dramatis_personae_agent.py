@@ -63,13 +63,14 @@ class DramatisPersonaeAgent:
             "Always strip leading articles completely (e.g. 'The Butcher' -> 'कसाई', 'The Stranger' -> 'अजनबी').\n"
             "  * PHONETIC FIDELITY: Pronounce foreign vowels and diphthongs phonetically (e.g. final 'a' is 'आ' or 'या', e.g. Elena -> 'एलेना', Freya -> 'फ्रेया'). "
             "NEVER confuse fantasy proper names with unrelated English common words or letters.\n"
-            "- 'gender': 'male' | 'female' | 'other'\n"
+            "- 'gender': 'male' | 'female'\n"
             "- 'aliases': list of strings (alternative names, nicknames, titles)\n"
             "- 'prominence': 'lead' | 'major' | 'minor' | 'incidental'\n"
             "- 'vocal_archetype': string (e.g. 'deep gravelly baritone', 'caustic aristocratic alto', 'youthful tenor', 'weathered rustic bass')\n"
             "- 'sociolect_trait': string (dynamically derived sociolect fitting the novel's literary world and social hierarchy, e.g. 'POOR_OPPRESSED_PEASANT', 'ORTHODOX_PRIEST_LANDLORD', 'FEUDAL_ZAMINDAR', 'URBAN_DETECTIVE', 'STREET_THUG', 'ARISTOCRATIC_COMMANDER', 'NEUTRAL')\n"
             "- 'recommended_pronoun_level': 'aap' | 'tum' | 'tu'\n"
-            "- 'speech_quirks': string (cadence quirks, verbal tics, laconic grunts, respectful deferrals, etc.)"
+            "- 'speech_quirks': string (cadence quirks, verbal tics, laconic grunts, respectful deferrals, etc.)\n"
+            "- NEVER extract geographical regions, forests, kingdoms, cities, towns, or landmarks (e.g. Brokilon, Wyzima, Cintra) as characters. Exclude all locations."
         )
 
         prompt = f"""Book Title: {book_title}
@@ -85,7 +86,7 @@ Output JSON: A list of character profile objects:
   {{
     "english_name": string,
     "hindi_name": string,
-    "gender": "male" | "female" | "other",
+    "gender": "male" | "female",
     "aliases": [string],
     "prominence": "lead" | "major" | "minor" | "incidental",
     "vocal_archetype": string,
@@ -125,4 +126,10 @@ Output JSON: A list of character profile objects:
                     res = res[k]
                     break
 
-        return res if isinstance(res, list) else []
+        if isinstance(res, list):
+            try:
+                from audiobook_factory.character_caster import CharacterCaster
+                return CharacterCaster.consolidate_characters(res)
+            except Exception:
+                return res
+        return []

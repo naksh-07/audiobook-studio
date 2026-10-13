@@ -212,6 +212,9 @@ class ModelGateway:
                     )
                     if not fast_mode:
                         time.sleep(min(norm_err.wait_sec, 2.0))
+                elif norm_err.suggested_action == "ROTATE_MODEL":
+                    # Clear explicit model override on model-level failure so router can pick next candidate
+                    model = None
                 elif not norm_err.is_retryable:
                     raise
 

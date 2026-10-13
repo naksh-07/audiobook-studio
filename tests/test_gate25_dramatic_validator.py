@@ -84,3 +84,17 @@ def test_validator_catches_epistemic_breach():
     issue_codes = [i.code for i in result.issues]
     assert "EPISTEMIC_ISOLATION_BREACH" in issue_codes
     assert result.status == "FAIL"
+
+
+def test_validator_catches_narrator_dialogue_leakage():
+    """Verify DramaticValidator strictly flags dialogue misattributed to Narrator."""
+    segments = [
+        {"index": 1, "speaker": "Narrator", "text": "He stepped into the clearing.", "type": "narration"},
+        {"index": 2, "speaker": "Narrator", "text": "Nobody touched anything, sir!", "type": "dialogue"},
+    ]
+    result = DramaticValidator.validate_screenplay_and_plan(segments=segments)
+    assert result.passed is False
+    assert result.status == "FAIL"
+    issue_codes = [i.code for i in result.issues]
+    assert "NARRATOR_DIALOGUE_LEAKAGE" in issue_codes
+

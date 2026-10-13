@@ -56,6 +56,16 @@ class GenerationStrategyResolver:
         """
         Calculates the optimal generation strategy and target take variants.
         """
+        import os
+        if os.environ.get("TTS_MULTI_TAKE", "false").lower() in ("false", "0", "no"):
+            return GenerationStrategyPlan(
+                segment_uid=direction.segment_uid,
+                strategy="ISOLATED_SINGLE_TAKE",
+                recommended_takes=1,
+                target_variants=["standard"],
+                rationale="Single-take standard mode: pure supersonic efficiency",
+            )
+
         rep = risk_report or GenerationRiskEngine.calculate_segment_risk(direction, text=text)
         is_narr = direction.speaker in ("Narrator", "Foley") or direction.narrative_mode == "narrator_exposition"
 

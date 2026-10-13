@@ -11,11 +11,80 @@ import os
 import json
 import uuid
 import datetime
+import unicodedata
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 
 from audiobook_factory.logger import logger
 from .contracts import CastLock, CastLockManifest, CastingEvaluationRecord
+from .phonetic_transliteration import derive_devanagari_name, is_devanagari
+
+
+FORBIDDEN_GENERIC_TOKENS: Set[str] = {
+    "of", "three", "little", "eye", "lord", "sir", "master",
+    "chancellor", "leader", "mistress",
+    "ओफ़", "ओफ", "ऑफ़", "ऑफ", "थ्री", "आई", "एे", "लिटिल", "सिर", "मास्टेर",
+    "चान्सेल्लोर", "लीडेर", "मिस्ट्रेस्स",
+    "the", "थे", "द", "का", "की", "के", "से",
+    # Generic occupations, titles, numbers, and descriptors
+    "man", "मान", "fat", "फ़ाट", "फाट", "yellow", "येल्लोव", "येलो",
+    "jerkin", "जेर्किन", "cobbler", "कोब्ब्लेर", "कॉबलर", "sorcerer", "सोर्सेरेर", "सोर्सरर",
+    "sorceress", "सोर्सेरेस्स", "सोर्सरेस", "halberdier", "हाल्बेर्डिेर", "हलबर्डियर",
+    "warrior", "वार्रिोर", "वॉरियर", "वारियर", "reaver", "रीवेर", "रीवर",
+    "denesle", "डेनेस्ले", "golden", "गोल्डेन", "गोल्डन", "dragon", "ड्रागोन", "ड्रैगन",
+    "little", "लिट्ट्ले", "duke", "डुके", "ड्यूक", "baron", "बारोन", "बैरन",
+    "queen", "क्वीन", "miss", "मिस्स", "मिस", "mrs", "म्र्स", "मिसेज",
+}
+
+FORBIDDEN_PREPOSITIONAL_PHRASES: Set[str] = {
+    "of the", "ओफ़ थे", "ओफ थे", "ऑफ़ द", "ऑफ द",
+    "लीडेर ओफ़", "लीडेर ओफ", "लीडेर ओफ़ थे", "लीडेर ओफ थे",
+    "leader of", "leader of the",
+}
+
+CONNECTOR_EDGE_TOKENS: Set[str] = {
+    "of", "the", "ओफ़", "ओफ", "ऑफ़", "ऑफ", "थे", "द", "का", "की", "के", "से",
+    "de", "van", "von",
+}
+
+
+def _is_standalone_forbidden_key(key: str, is_primary_identity: bool = False) -> bool:
+    """Returns True if a key is a stop connector, honorific title, prepositional phrase, or forbidden standalone token."""
+    if not key:
+        return True
+    k_clean = str(key).strip()
+    if len(k_clean) < 3:
+        return True
+    k_low = k_clean.lower()
+
+    if k_low in FORBIDDEN_GENERIC_TOKENS or k_clean in FORBIDDEN_GENERIC_TOKENS:
+        return True
+    k_no_nukta = unicodedata.normalize("NFD", k_clean).replace("\u093c", "")
+    k_no_nukta = unicodedata.normalize("NFC", k_no_nukta).strip().lower()
+    if k_no_nukta in FORBIDDEN_GENERIC_TOKENS:
+        return True
+
+    if k_low in FORBIDDEN_PREPOSITIONAL_PHRASES or k_clean in FORBIDDEN_PREPOSITIONAL_PHRASES:
+        return True
+
+    # Check if starts or ends with connector (e.g. "of the", "लीडेर ओफ़", "leader of the")
+    tokens = [t.strip().lower() for t in k_clean.split() if t.strip()]
+    if tokens:
+        if tokens[0] in CONNECTOR_EDGE_TOKENS or tokens[-1] in CONNECTOR_EDGE_TOKENS:
+            if is_primary_identity:
+                if all(t in CONNECTOR_EDGE_TOKENS or t in FORBIDDEN_GENERIC_TOKENS for t in tokens):
+                    return True
+            else:
+                return True
+
+    if not is_primary_identity:
+        try:
+            from audiobook_factory.character_caster import _is_blacklisted_or_generic, _STOP_CONNECTORS
+            if _is_blacklisted_or_generic(k_clean) or k_low in _STOP_CONNECTORS:
+                return True
+        except (ImportError, AttributeError):
+            pass
+    return False
 
 
 CAST_LOCK_FILENAME = "cast_lock.json"
@@ -76,16 +145,34 @@ class CastLockManager:
         selection_rationale: str = "",
         calibration_overrides: Optional[Dict[str, Any]] = None,
         locked_by: str = "Director",
+        display_name_hi: Optional[str] = None,
+        aliases: Optional[List[str]] = None,
+        eq_formant_profile: Optional[Dict[str, Any]] = None,
     ) -> CastLock:
         """
         Creates or updates a formal Cast Lock for a character.
         """
         evidence = evaluation_record.model_dump() if evaluation_record else {}
         calib = calibration_overrides or {}
+        alias_list = list(aliases) if aliases else []
+
+        disp_hi = display_name_hi.strip() if display_name_hi else None
+        if not disp_hi or not is_devanagari(disp_hi):
+            derived_hi, dev_aliases = derive_devanagari_name(
+                character_name, project_dir=self.project_dir, aliases=alias_list
+            )
+            disp_hi = derived_hi or disp_hi
+            for da in dev_aliases:
+                if da and da not in alias_list:
+                    alias_list.append(da)
+        if disp_hi and disp_hi not in alias_list:
+            alias_list.append(disp_hi)
 
         lock = CastLock(
             character_id=character_id,
             character_name=character_name,
+            display_name_hi=disp_hi,
+            aliases=alias_list,
             voice_id=voice_id,
             casting_version="1.0.0",
             locked=True,
@@ -95,18 +182,38 @@ class CastLockManager:
             selection_rationale=selection_rationale or (evaluation_record.evaluation_summary if evaluation_record else "Direct cast lock"),
             casting_evidence=evidence,
             calibration_overrides=calib,
+            eq_formant_profile=eq_formant_profile,
         )
 
-        if character_id:
+        if character_id and not _is_standalone_forbidden_key(character_id, is_primary_identity=True):
             self.manifest.locks[character_id] = lock
-        if character_name and character_name != character_id:
+        if character_name and character_name != character_id and not _is_standalone_forbidden_key(character_name, is_primary_identity=True):
             self.manifest.locks[character_name] = lock
+        if disp_hi and not _is_standalone_forbidden_key(disp_hi, is_primary_identity=True):
+            self.manifest.locks[disp_hi] = lock
+        for a in alias_list:
+            if not a:
+                continue
+            a_clean = str(a).strip()
+            if _is_standalone_forbidden_key(a_clean):
+                continue
+            self.manifest.locks[a_clean] = lock
         self.save()
         logger.info(f"  [CAST LOCK] Locked character '{character_name}' ({character_id}) -> Voice '{voice_id}'.")
         return lock
 
     def get_lock(self, character_name_or_id: str) -> Optional[CastLock]:
         """Resolves cast lock for character by canonical name or ID."""
+        if not character_name_or_id:
+            return None
+        c_clean = str(character_name_or_id).strip()
+        c_low = c_clean.lower()
+        if c_low in FORBIDDEN_GENERIC_TOKENS or c_clean in FORBIDDEN_GENERIC_TOKENS:
+            return None
+        c_norm = unicodedata.normalize("NFD", c_clean).replace("\u093c", "")
+        c_norm = unicodedata.normalize("NFC", c_norm).strip().lower()
+        if c_norm in FORBIDDEN_GENERIC_TOKENS:
+            return None
         return self.manifest.get_lock(character_name_or_id)
 
     def is_locked(self, character_name_or_id: str) -> bool:
@@ -217,12 +324,19 @@ class CastLockManager:
     def sync_voice_registry(self) -> Path:
         """
         Synchronizes cast locks into voice_registry.json for backward compatibility.
+        Writes entries for lock.character_name, lock.character_id, lock.display_name_hi,
+        and all entries in lock.aliases to guarantee voice_registry.json contains both
+        Devanagari and Latin keys, preventing UnregisteredSpeakerError.
         """
         existing_reg: Dict[str, Any] = {}
         if self.registry_file.exists():
             try:
                 with open(self.registry_file, "r", encoding="utf-8") as f:
                     existing_reg = json.load(f)
+                existing_reg = {
+                    k: v for k, v in existing_reg.items()
+                    if not _is_standalone_forbidden_key(k, is_primary_identity=(k in ("Narrator", "सूत्रधार")))
+                }
             except Exception:
                 existing_reg = {}
 
@@ -239,7 +353,46 @@ class CastLockManager:
                 for k, v in lock.calibration_overrides.items():
                     if k not in cfg:
                         cfg[k] = v
-                existing_reg[lock.character_name] = cfg
+
+                # Register character_name, character_id, display_name_hi, and every alias
+                keys_to_register = []
+                if lock.character_name:
+                    keys_to_register.append(lock.character_name)
+                if lock.character_id:
+                    keys_to_register.append(lock.character_id)
+                if lock.display_name_hi:
+                    keys_to_register.append(lock.display_name_hi)
+                if lock.aliases:
+                    for alias in lock.aliases:
+                        if alias and str(alias).strip():
+                            keys_to_register.append(str(alias).strip())
+
+                # Guarantee authentic Devanagari keys are present in voice_registry
+                if not any(is_devanagari(k) for k in keys_to_register):
+                    derived_hi, dev_aliases = derive_devanagari_name(
+                        lock.character_name, project_dir=self.project_dir, aliases=lock.aliases
+                    )
+                    if derived_hi:
+                        keys_to_register.append(derived_hi)
+                        lock.display_name_hi = derived_hi
+                    for da in dev_aliases:
+                        if da:
+                            keys_to_register.append(da)
+                            if da not in lock.aliases:
+                                lock.aliases.append(da)
+
+                primary_identities = {
+                    str(x).strip() for x in (lock.character_name, lock.character_id, lock.display_name_hi) if x
+                }
+
+                for key in set(keys_to_register):
+                    if not key:
+                        continue
+                    k_clean = str(key).strip()
+                    is_prim = k_clean in primary_identities
+                    if _is_standalone_forbidden_key(k_clean, is_primary_identity=is_prim):
+                        continue
+                    existing_reg[k_clean] = dict(cfg)
 
         tmp_reg = self.registry_file.with_suffix(f".tmp_{os.getpid()}_{uuid.uuid4().hex[:6]}")
         try:

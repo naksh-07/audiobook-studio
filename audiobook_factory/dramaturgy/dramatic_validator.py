@@ -207,6 +207,16 @@ class DramaticValidator:
             spk_low = spk.lower()
             seg_type = seg.get("type", "narration")
 
+            if seg_type == "dialogue" and spk_low in ("narrator", "narration", ""):
+                issues.append(
+                    DramaticValidationIssue(
+                        code="NARRATOR_DIALOGUE_LEAKAGE",
+                        severity="ERROR",
+                        message=f"Spoken dialogue turn #{seg.get('index', '?')} is misattributed to '{spk or 'Narrator'}'. Spoken dialogue must be attributed to a character, never Narrator.",
+                        segment_uid=seg.get("uid"),
+                    )
+                )
+
             if seg_type == "dialogue" and spk_low not in ("narrator", "foley"):
                 # Dialogue segments should ideally carry actioning or objective in dramatic mode
                 if not seg.get("actioning") and not seg.get("character_objective") and seg.get("scene_id"):

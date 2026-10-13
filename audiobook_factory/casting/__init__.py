@@ -27,6 +27,11 @@ from .registry import VoiceProfileRegistry
 from .director import StudioCastingDirector
 from .calibrator import SceneAcousticCalibrator
 from .adapters import BaseVoiceAdapter, GeminiVoiceAdapter, QwenVoiceAdapter
+from .phonetic_transliteration import (
+    derive_devanagari_name,
+    transliterate_to_devanagari,
+    is_devanagari,
+)
 
 __all__ = [
     "CharacterCastingProfile",
@@ -51,5 +56,8 @@ __all__ = [
     "BaseVoiceAdapter",
     "GeminiVoiceAdapter",
     "QwenVoiceAdapter",
+    "derive_devanagari_name",
+    "transliterate_to_devanagari",
+    "is_devanagari",
 ]
 

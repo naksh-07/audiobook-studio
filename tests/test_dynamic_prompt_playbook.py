@@ -288,7 +288,7 @@ class TestDynamicPromptPlaybook(unittest.TestCase):
         from audiobook_factory.tts.providers.gemini import resolve_speech_metadata_style
 
         # Default without tint
-        def_style = resolve_speech_metadata_style(acting=None, emotion="neutral")
+        def_style = resolve_speech_metadata_style(acting=None, emotion="neutral", is_narrator=True)
         self.assertEqual(def_style, "calm, steady, articulate, measured audiobook delivery")
 
         # With narrator tint
@@ -299,7 +299,7 @@ class TestDynamicPromptPlaybook(unittest.TestCase):
             is_narrator=True,
         )
         self.assertIn("ominous tavern dread, low watchful tension", tinted_style)
-        self.assertIn("grounded, natural spoken dialogue", tinted_style)
+        self.assertIn("articulate measured audiobook delivery", tinted_style)
 
     def test_12_adversarial_chapter_zero_dialogue(self):
         """Stress test: Chapter with 0 dialogue (100% pure descriptive prose)."""

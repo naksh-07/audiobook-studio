@@ -22,13 +22,15 @@ from .contracts import (
 
 def _default_enable_external_llm() -> bool:
     import os
-    if os.environ.get("MOCK_OFFLINE", "").lower() in ("true", "1", "yes"):
-        return False
-    if os.environ.get("UNIT_TEST_MODE", "").lower() in ("true", "1", "yes"):
-        return False
-    if "PYTEST_CURRENT_TEST" in os.environ:
-        return False
-    return True
+    if os.environ.get("ENABLE_PERCEPTUAL_LLM", "false").lower() in ("true", "1", "yes"):
+        if os.environ.get("MOCK_OFFLINE", "").lower() in ("true", "1", "yes"):
+            return False
+        if os.environ.get("UNIT_TEST_MODE", "").lower() in ("true", "1", "yes"):
+            return False
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            return False
+        return True
+    return False
 
 
 class PerceptualJudgeConfig(BaseModel):

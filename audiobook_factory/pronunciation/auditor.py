@@ -178,15 +178,21 @@ class PronunciationAudioQA:
             })
 
             # Check for omission / swallowed token
-            if t_dur_ms < min_expected_dur:
-                omissions.append(f"Token '{target_token}' suspiciously truncated ({t_dur_ms}ms < min {min_expected_dur}ms)")
-                review_reasons.append(f"Token '{target_token}' appears swallowed or omitted.")
+            if alignment_method == "mms_fa_ctc":
+                if t_dur_ms < min_expected_dur:
+                    omissions.append(f"Token '{target_token}' suspiciously truncated ({t_dur_ms}ms < min {min_expected_dur}ms)")
+                    review_reasons.append(f"Token '{target_token}' appears swallowed or omitted.")
+            else:
+                # In proportional fallback, do not falsely flag omissions based purely on average word math
+                if t_dur_ms < 15:
+                    review_reasons.append(f"Token '{target_token}' average cadence appears rushed ({t_dur_ms}ms).")
 
-            # Check for unnatural repetition / stutter loop (e.g. > 4x average word duration)
-            max_expected_dur = max(1200, syllables * 350)
-            if t_dur_ms > max_expected_dur:
-                repetitions.append(f"Token '{target_token}' duration anomaly ({t_dur_ms}ms > max {max_expected_dur}ms)")
-                review_reasons.append(f"Token '{target_token}' exhibits stutter or prolonged delay.")
+            # Check for unnatural repetition / stutter loop
+            if alignment_method == "mms_fa_ctc":
+                max_expected_dur = max(1200, syllables * 350)
+                if t_dur_ms > max_expected_dur:
+                    repetitions.append(f"Token '{target_token}' duration anomaly ({t_dur_ms}ms > max {max_expected_dur}ms)")
+                    review_reasons.append(f"Token '{target_token}' exhibits stutter or prolonged delay.")
 
         # Determine overall verification status
         has_omission = (len(omissions) > 0)

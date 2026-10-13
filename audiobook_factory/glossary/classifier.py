@@ -95,7 +95,7 @@ Output JSON strictly matching this schema:
       "hindi_name": "string (phonetic Devanagari or Hindustani role)",
       "entity_type": "PROPER_NAME" | "HERALDIC_MONIKER" | "OCCUPATIONAL_ROLE",
       "aliases": ["string (alternative monikers, nicknames, and descriptors)"],
-      "gender": "male" | "female" | "neutral" | "unknown",
+      "gender": "male" | "female",
       "voice_style": "string (brief acoustic/acting style description)",
       "hindustani_archetype": "string (e.g. RUGGED_GRIT, ARISTOCRATIC, MILITARY_OFFICER)"
     }}
@@ -178,7 +178,7 @@ Output JSON strictly matching this schema:
                 aliases = [a.strip() for a in c.get("aliases", []) if isinstance(a, str) and a.strip()]
 
                 gender_raw = str(c.get("gender", "unknown")).lower()
-                gender_val = gender_raw if gender_raw in ("male", "female", "neutral") else "unknown"
+                gender_val = gender_raw if gender_raw in ("male", "female") else "male"
 
                 entities.append(
                     ChapterEntity(

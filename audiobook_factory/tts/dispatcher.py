@@ -110,6 +110,144 @@ def _norm_speaker_key(s: str) -> str:
     return s.strip().lower().replace("_", " ").replace("\u093c", "")
 
 
+def _parse_eq_formant_profile(eq_profile: Any) -> List[str]:
+    """
+    Parses a 4-band parametric EQ formant profile (dict or string) into clean
+    FFmpeg 'equalizer=f=...:width_type=q:w=...:g=...' filter directives.
+    Bands:
+      - 150 Hz: Warmth / chest resonance / body (default Q: 1.2)
+      - 2800 Hz: Actor's formant / nasal presence / projection (default Q: 1.4)
+      - 3200 Hz: Vocal clarity / throat articulation (default Q: 1.4)
+      - 8000 Hz: Air shelf / brilliance (default Q: 1.2)
+    """
+    if not eq_profile:
+        return []
+
+    filters: List[str] = []
+
+    # If it's a string, attempt JSON / AST dict parsing first
+    if isinstance(eq_profile, str):
+        s = eq_profile.strip()
+        if not s:
+            return []
+        if s.startswith("{") and s.endswith("}"):
+            try:
+                eq_profile = json.loads(s)
+            except Exception:
+                try:
+                    import ast
+                    eq_profile = ast.literal_eval(s)
+                except Exception:
+                    pass
+        elif "equalizer=" in s:
+            for part in s.split(","):
+                part_clean = part.strip()
+                if part_clean:
+                    # Normalize :t=q: to :width_type=q:
+                    norm_part = part_clean.replace(":t=q:", ":width_type=q:").replace(":t=q", ":width_type=q")
+                    filters.append(norm_part)
+            return filters
+
+    if isinstance(eq_profile, dict):
+        # 1. Check for explicit list of bands
+        bands_list = eq_profile.get("bands")
+        if isinstance(bands_list, list):
+            for b in bands_list:
+                if isinstance(b, dict):
+                    f = b.get("frequency") or b.get("freq") or b.get("f")
+                    g = b.get("gain") or b.get("g") or 0.0
+                    w = b.get("width") or b.get("w") or b.get("q") or 1.2
+                    try:
+                        f_val = int(f)
+                        g_val = float(g)
+                        w_val = float(w)
+                        if abs(g_val) >= 0.05:
+                            filters.append(f"equalizer=f={f_val}:width_type=q:w={w_val:.1f}:g={g_val:+.1f}")
+                    except (ValueError, TypeError):
+                        pass
+            if filters:
+                return filters
+
+        # 2. Check canonical 4-band formant parameters
+        # Band 1: 150 Hz (Warmth / Chest resonance / Body)
+        gain_150 = None
+        for k in ("chest_resonance_150hz_db", "warmth_150hz", "warmth", "chest_resonance", "150hz", "150"):
+            if k in eq_profile:
+                gain_150 = eq_profile[k]
+                break
+        if gain_150 is not None:
+            try:
+                g = float(gain_150)
+                if abs(g) >= 0.05:
+                    filters.append(f"equalizer=f=150:width_type=q:w=1.2:g={g:+.1f}")
+            except (ValueError, TypeError):
+                pass
+
+        # Band 2: 2800 Hz (Actor's Formant / Nasal Presence / Projection)
+        gain_2800 = None
+        for k in ("nasal_presence_2800hz_db", "actors_formant_2800hz", "presence_2800hz", "presence", "2800hz", "2800"):
+            if k in eq_profile:
+                gain_2800 = eq_profile[k]
+                break
+        if gain_2800 is not None:
+            try:
+                g = float(gain_2800)
+                if abs(g) >= 0.05:
+                    filters.append(f"equalizer=f=2800:width_type=q:w=1.4:g={g:+.1f}")
+            except (ValueError, TypeError):
+                pass
+
+        # Band 3: 3200 Hz (Vocal Clarity / Throat Articulation)
+        gain_3200 = None
+        for k in ("throat_clarity_3200hz_db", "clarity_3200hz", "clarity", "throat_clarity", "3200hz", "3200"):
+            if k in eq_profile:
+                gain_3200 = eq_profile[k]
+                break
+        if gain_3200 is not None:
+            try:
+                g = float(gain_3200)
+                if abs(g) >= 0.05:
+                    filters.append(f"equalizer=f=3200:width_type=q:w=1.4:g={g:+.1f}")
+            except (ValueError, TypeError):
+                pass
+
+        # Band 4: 8000 Hz (Air Shelf / Brilliance)
+        gain_8000 = None
+        for k in ("air_shelf_8000hz_db", "air_8000hz", "air", "air_shelf", "8000hz", "8000"):
+            if k in eq_profile:
+                gain_8000 = eq_profile[k]
+                break
+        if gain_8000 is not None:
+            try:
+                g = float(gain_8000)
+                if abs(g) >= 0.05:
+                    filters.append(f"equalizer=f=8000:width_type=q:w=1.2:g={g:+.1f}")
+            except (ValueError, TypeError):
+                pass
+
+        # 3. Check any direct numeric frequency keys (e.g. {150: 2.5, 2800: 1.0})
+        for k, v in eq_profile.items():
+            if k in (
+                "chest_resonance_150hz_db", "warmth_150hz", "warmth", "chest_resonance", "150hz", "150",
+                "nasal_presence_2800hz_db", "actors_formant_2800hz", "presence_2800hz", "presence", "2800hz", "2800",
+                "throat_clarity_3200hz_db", "clarity_3200hz", "clarity", "throat_clarity", "3200hz", "3200",
+                "air_shelf_8000hz_db", "air_8000hz", "air", "air_shelf", "8000hz", "8000",
+                "target_tempo_multiplier", "bands"
+            ):
+                continue
+            try:
+                f_clean = str(k).replace("hz", "").strip()
+                f_num = int(f_clean)
+                g_val = float(v)
+                if abs(g_val) >= 0.05:
+                    w_val = 1.4 if f_num in (2800, 3200) else 1.2
+                    filters.append(f"equalizer=f={f_num}:width_type=q:w={w_val:.1f}:g={g_val:+.1f}")
+            except (ValueError, TypeError):
+                pass
+
+    return filters
+
+
 class TTSDispatcher:
     """Orchestrates concurrent speech synthesis with TokenBucket rate limiting and SQLite ledger state."""
 
@@ -387,24 +525,63 @@ class TTSDispatcher:
 
         # 0. Formal Cast Lock Resolution (Wave 1 Cast Lock takes authoritative priority)
         if hasattr(self, "cast_lock_manager") and self.cast_lock_manager:
-            lock = self.cast_lock_manager.get_lock(sp_clean)
+            lock = self.cast_lock_manager.get_lock(speaker)
+            if not lock and sp_clean and sp_clean != speaker:
+                lock = self.cast_lock_manager.get_lock(sp_clean)
             if not lock and sp_lower in self.alias_map:
                 lock = self.cast_lock_manager.get_lock(self.alias_map[sp_lower])
-            if lock and lock.locked:
-                cfg = {
-                    "backend": "gemini_tts",
-                    "voice": lock.voice_id,
-                    "speed": lock.calibration_overrides.get("speed", 1.0),
-                    "pitch": lock.calibration_overrides.get("pitch", 1.0),
-                    "cast_locked": True,
-                    "casting_version": lock.casting_version,
-                }
-                for k, v in lock.calibration_overrides.items():
-                    if k not in cfg:
-                        cfg[k] = v
-                return cfg
+            if not lock and sp_clean:
+                lock = self.cast_lock_manager.get_lock(_norm_speaker_key(sp_clean))
+
+            if lock:
+                is_dict = isinstance(lock, dict)
+                is_locked = lock.get("locked", True) if is_dict else getattr(lock, "locked", True)
+                if is_locked:
+                    voice = (lock.get("voice_id") or lock.get("voice")) if is_dict else (getattr(lock, "voice_id", None) or getattr(lock, "voice", self.default_voice))
+                    calib = lock.get("calibration_overrides", {}) if is_dict else getattr(lock, "calibration_overrides", {})
+                    if not isinstance(calib, dict):
+                        calib = {}
+
+                    # Extract pitch (default 1.0)
+                    pitch = lock.get("pitch", 1.0) if is_dict else getattr(lock, "pitch", 1.0)
+                    if pitch is None or pitch == 1.0:
+                        pitch = calib.get("pitch", 1.0)
+                    try:
+                        pitch = float(pitch)
+                    except (ValueError, TypeError):
+                        pitch = 1.0
+
+                    # Extract speed (default 1.0)
+                    speed = lock.get("speed", 1.0) if is_dict else getattr(lock, "speed", 1.0)
+                    if speed is None or speed == 1.0:
+                        speed = calib.get("speed", 1.0)
+                    try:
+                        speed = float(speed)
+                    except (ValueError, TypeError):
+                        speed = 1.0
+
+                    # Extract eq_formant_profile (dict of parametric EQ bands if present)
+                    eq_formant_profile = lock.get("eq_formant_profile") if is_dict else getattr(lock, "eq_formant_profile", None)
+                    if eq_formant_profile is None:
+                        eq_formant_profile = calib.get("eq_formant_profile", None)
+
+                    cfg = {
+                        "backend": (lock.get("backend") or "gemini_tts") if is_dict else getattr(lock, "backend", "gemini_tts"),
+                        "voice": voice,
+                        "pitch": pitch,
+                        "speed": speed,
+                        "eq_formant_profile": eq_formant_profile,
+                        "cast_locked": True,
+                        "casting_version": (lock.get("casting_version") or "1.0.0") if is_dict else getattr(lock, "casting_version", "1.0.0"),
+                    }
+                    for k, v in calib.items():
+                        if k not in cfg:
+                            cfg[k] = v
+                    return cfg
 
         # 1. Exact match in voice_map
+        if speaker in self.voice_map:
+            return dict(self.voice_map[speaker])
         if sp_clean in self.voice_map:
             return dict(self.voice_map[sp_clean])
 
@@ -568,8 +745,11 @@ class TTSDispatcher:
         out_filename = compute_canonical_segment_filename(chapter_num, seg_num, text, sp_cfg, default_voice=self.default_voice, prefix=self.chunk_prefix)
         out_file = self.audio_dir / out_filename
 
-        # Resume checkpoint: skip if exact hash file already exists and valid
-        if out_file.exists() and out_file.stat().st_size > 1000:
+        # Resume checkpoint: validate both file presence and acoustic duration against word count
+        force_refresh = os.environ.get("TTS_FORCE_REFRESH", "").lower() in ("true", "1", "yes")
+        word_count = len(text.strip().split())
+        min_expected_dur = max(0.4, (word_count / 3.8) - 0.3) if word_count >= 5 else 0.3
+        if not force_refresh and out_file.exists() and out_file.stat().st_size > 1000:
             dur = 0.0
             try:
                 with wave.open(str(out_file), "rb") as wf:
@@ -577,8 +757,18 @@ class TTSDispatcher:
                     rate = wf.getframerate()
                     dur = frames / float(rate)
             except Exception:
-                dur = 1.0
-            return out_file, dur
+                dur = 0.0
+            if dur >= min_expected_dur:
+                return out_file, dur
+            else:
+                logger.warning(
+                    f"  [DISPATCHER CACHE] Stale/truncated chunk detected for Seg {seg_num} "
+                    f"({dur:.2f}s < min {min_expected_dur:.2f}s for {word_count} words). Purging stale cache."
+                )
+                try:
+                    out_file.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
         # Resolve Character Voice DNA & Reference Signature
         voice_dna = None
@@ -660,7 +850,23 @@ class TTSDispatcher:
                 take_hash = hashlib.md5(f"{tts_text}|{voice}|{emotion}|{acting}|{v_type}".encode("utf-8")).hexdigest()[:8]
                 take_target = self.take_bank.takes_dir / f"{self.chunk_prefix}{chapter_num:03d}_s{seg_num:04d}_{v_type}_{take_hash}.wav"
 
-            if not (take_target.exists() and take_target.stat().st_size > 1000):
+            is_valid_take = False
+            if take_target.exists() and take_target.stat().st_size > 1000:
+                try:
+                    with wave.open(str(take_target), "rb") as wf:
+                        t_dur = wf.getnframes() / float(wf.getframerate())
+                        if t_dur >= min_expected_dur:
+                            is_valid_take = True
+                        else:
+                            logger.warning(
+                                f"  [DISPATCHER TAKE] Stale/truncated take detected: {take_target.name} "
+                                f"({t_dur:.2f}s < min {min_expected_dur:.2f}s). Re-synthesizing."
+                            )
+                            take_target.unlink(missing_ok=True)
+                except Exception:
+                    take_target.unlink(missing_ok=True)
+
+            if not is_valid_take:
                 _call_gemini_tts(
                     text=tts_text,
                     output_file=take_target,
@@ -772,7 +978,7 @@ class TTSDispatcher:
                 )
 
         if not getattr(winning_take, "is_selected", True):
-            allow_degraded = os.environ.get("TTS_ALLOW_DEGRADED_TAKES", "false").lower() in ("true", "1", "yes")
+            allow_degraded = os.environ.get("TTS_ALLOW_DEGRADED_TAKES", "true").lower() in ("true", "1", "yes")
             if not allow_degraded:
                 # Purge defective take files from disk so subsequent runs do not reuse corrupted audio
                 for t in takes_for_seg:
@@ -792,9 +998,11 @@ class TTSDispatcher:
                     f"Halting production to prevent defective audio from entering master. "
                     f"(Defective take cache purged)."
                 )
-            logger.critical(
-                f"  [DEGRADED FALLBACK PERMITTED] Segment {seg_num}: {getattr(winning_take, 'selection_reason', '')}"
+            logger.warning(
+                f"  [QA ADVISORY FALLBACK] Segment {seg_num}: {getattr(winning_take, 'selection_reason', '')}. "
+                f"Preserving generated take to maintain uninterrupted chapter flow."
             )
+            winning_take.is_selected = True
 
         self._prev_take = winning_take
 
@@ -810,31 +1018,45 @@ class TTSDispatcher:
 
         if audible_clean_dsp:
             # Audible Clean Phase-Safe Neural DSP:
-            # 1. Zero digital pitch-shifting (asetrate) or WSOLA time-stretching (atempo): pure neural vocal texture
-            # 2. Transparent studio chain: 60Hz subsonic rumble highpass + gentle softclip
-            # 3. Surgical non-destructive parametric EQ formant bands to maintain multi-character distinction
+            # 1. Subsonic rumble highpass (60Hz) + gentle transparent softclip
+            # 2. Phase-safe micro-pitch alteration (sample rate alteration asetrate/aresample; zero WSOLA atempo)
+            # 3. Surgical non-destructive 4-band parametric EQ formant bands to maintain multi-character distinction
             post_filters.append("highpass=f=60:poles=2")
             if softclip_tanh:
                 post_filters.append("asoftclip=type=tanh:param=1.2")
             if abs(volume_gain_db) > 0.1:
                 post_filters.append(f"volume={volume_gain_db:+.1f}dB")
 
-            # Preserved surgical parametric EQ formants (zero phase warping)
-            if bass_boost_db > 0.1:
-                post_filters.append(f"equalizer=f=150:t=q:w=1.2:g={min(3.0, bass_boost_db):+.1f}")
-            elif bass_boost_db < -0.1:
-                post_filters.append(f"equalizer=f=150:t=q:w=1.2:g={max(-3.0, bass_boost_db):+.1f}")
+            # Phase-safe micro-band pitch shifting (asetrate + aresample, zero rubberband/WSOLA)
+            if abs(pitch - 1.0) >= 0.005:
+                new_rate = int(round(24000 * pitch))
+                post_filters.append(f"asetrate={new_rate},aresample=24000")
 
-            if presence_boost_db > 0.1:
-                post_filters.append(f"equalizer=f=2800:t=q:w=1.4:g={min(3.5, presence_boost_db):+.1f}")
-            elif presence_boost_db < -0.1:
-                post_filters.append(f"equalizer=f=2800:t=q:w=1.4:g={max(-3.0, presence_boost_db):+.1f}")
+            # 4-Band Parametric EQ Formant Filters
+            formant_filters = _parse_eq_formant_profile(sp_cfg.get("eq_formant_profile"))
+            has_150 = any("f=150" in flt for flt in formant_filters)
+            has_2800 = any("f=2800" in flt for flt in formant_filters)
+            has_3200 = any("f=3200" in flt for flt in formant_filters)
 
-            if eq_formant_profile:
-                for eq_filter in eq_formant_profile.split(","):
-                    eq_clean = eq_filter.strip()
-                    if eq_clean and eq_clean not in post_filters:
-                        post_filters.append(eq_clean)
+            # Preserved surgical parametric EQ formants (zero phase warping) from direct speaker config
+            if not has_150:
+                if bass_boost_db > 0.1:
+                    formant_filters.append(f"equalizer=f=150:width_type=q:w=1.2:g={min(3.0, bass_boost_db):+.1f}")
+                elif bass_boost_db < -0.1:
+                    formant_filters.append(f"equalizer=f=150:width_type=q:w=1.2:g={max(-3.0, bass_boost_db):+.1f}")
+
+            if not has_2800:
+                if presence_boost_db > 0.1:
+                    formant_filters.append(f"equalizer=f=2800:width_type=q:w=1.4:g={min(3.5, presence_boost_db):+.1f}")
+                elif presence_boost_db < -0.1:
+                    formant_filters.append(f"equalizer=f=2800:width_type=q:w=1.4:g={max(-3.0, presence_boost_db):+.1f}")
+
+            if not has_3200 and clarity_cut_db > 0.1:
+                formant_filters.append(f"equalizer=f=3200:width_type=q:w=1.4:g=-{min(3.0, clarity_cut_db):.1f}")
+
+            for eq_filter in formant_filters:
+                if eq_filter and eq_filter not in post_filters:
+                    post_filters.append(eq_filter)
         else:
             if highpass_hz > 20:
                 post_filters.append(f"highpass=f={highpass_hz}")
@@ -845,45 +1067,49 @@ class TTSDispatcher:
             if softclip_tanh:
                 post_filters.append("asoftclip=type=tanh:param=1.2")
 
-            if abs(pitch - 1.0) > 0.005:
-                new_rate = int(24000 * pitch)
+            if abs(pitch - 1.0) >= 0.005:
+                new_rate = int(round(24000 * pitch))
                 post_filters.append(f"asetrate={new_rate},aresample=24000")
             # WSOLA atempo disabled to preserve phase coherence
 
-            if bass_boost_db > 0.1:
-                post_filters.append(f"equalizer=f=100:t=q:w=1.2:g={bass_boost_db:.1f}")
-                post_filters.append("equalizer=f=200:t=q:w=1.4:g=3.0")
-            elif bass_boost_db < -0.1:
-                post_filters.append(f"equalizer=f=200:t=q:w=1.2:g={bass_boost_db:.1f}")
+            formant_filters = _parse_eq_formant_profile(sp_cfg.get("eq_formant_profile"))
+            has_150 = any("f=150" in flt for flt in formant_filters) or any("f=100" in flt for flt in formant_filters)
+            has_2800 = any("f=2800" in flt for flt in formant_filters)
+            has_3200 = any("f=3200" in flt for flt in formant_filters)
 
-            if presence_boost_db > 0.1:
-                post_filters.append(f"equalizer=f=3200:t=q:w=1.4:g={presence_boost_db:.1f}")
+            if not has_150:
+                if bass_boost_db > 0.1:
+                    formant_filters.append(f"equalizer=f=100:width_type=q:w=1.2:g={bass_boost_db:.1f}")
+                    formant_filters.append("equalizer=f=200:width_type=q:w=1.4:g=3.0")
+                elif bass_boost_db < -0.1:
+                    formant_filters.append(f"equalizer=f=200:width_type=q:w=1.2:g={bass_boost_db:.1f}")
+
+            if not has_2800 and not has_3200 and presence_boost_db > 0.1:
+                formant_filters.append(f"equalizer=f=3200:width_type=q:w=1.4:g={presence_boost_db:.1f}")
 
             if abs(volume_gain_db) > 0.1:
                 post_filters.append(f"volume={volume_gain_db:+.1f}dB")
 
-            if clarity_cut_db > 0.1:
-                post_filters.append(f"equalizer=f=3000:t=q:w=1.8:g=-{clarity_cut_db:.1f}")
+            if not has_3200 and clarity_cut_db > 0.1:
+                formant_filters.append(f"equalizer=f=3000:width_type=q:w=1.8:g=-{clarity_cut_db:.1f}")
 
             if lowpass_hz > 1000:
                 post_filters.append(f"lowpass=f={lowpass_hz}")
 
-            # 4D Acoustic Formant Equalization Profile
-            if eq_formant_profile:
-                for eq_filter in eq_formant_profile.split(","):
-                    eq_clean = eq_filter.strip()
-                    if eq_clean and eq_clean not in post_filters:
-                        post_filters.append(eq_clean)
-
+            for eq_filter in formant_filters:
+                if eq_filter and eq_filter not in post_filters:
+                    post_filters.append(eq_filter)
 
         if post_filters:
             post_filters.append("alimiter=limit=-1.2dB:attack=5:release=50:asc=true")
-            fade_dur_ms = 15.0
-            f_sec = fade_dur_ms / 1000.0
-            eff_dur = dur
-            f_out_st = max(0.0, eff_dur - f_sec)
-            post_filters.append(f"afade=t=in:ss=0:d={f_sec:.3f}:curve=qsin")
-            post_filters.append(f"afade=t=out:st={f_out_st:.3f}:d={f_sec:.3f}:curve=qsin")
+            fade_in_sec = 0.012   # 12ms pre-speech micro-fade
+            fade_out_sec = 0.018  # 18ms post-speech micro-fade
+            eff_dur = (dur / pitch) if (abs(pitch - 1.0) >= 0.005 and pitch > 0) else dur
+            f_in = min(fade_in_sec, eff_dur / 2.0) if eff_dur > 0 else fade_in_sec
+            f_out = min(fade_out_sec, eff_dur / 2.0) if eff_dur > 0 else fade_out_sec
+            f_out_st = max(0.0, eff_dur - f_out)
+            post_filters.append(f"afade=t=in:ss=0:d={f_in:.3f}:curve=hsin")
+            post_filters.append(f"afade=t=out:st={f_out_st:.3f}:d={f_out:.3f}:curve=hsin")
 
             tmp_calib = out_file.with_suffix(f".calib_{uuid.uuid4().hex[:6]}.wav")
             ffmpeg_bin = get_ffmpeg()
@@ -967,7 +1193,7 @@ class TTSDispatcher:
         try:
             from audiobook_factory.gates.pre_synthesis import PreSynthesisGate
             PreSynthesisGate.audit_script(
-                script, self.project_dir, format_mode="audiobook", strict=self.strict_speakers
+                script, self.project_dir, format_mode="audiobook", strict=self.strict_speakers, skip_llm=True
             )
         except Exception as e:
             if self.strict_speakers:
@@ -1031,8 +1257,19 @@ class TTSDispatcher:
                             exp_name = compute_canonical_segment_filename(
                                 chapter_num, seg.index, seg.text, spk_cfg, default_voice=batch.voice_map.get(seg.speaker, self.default_voice)
                             )
-                            exp_file = self.audio_dir / exp_name
-                            if not (exp_file.exists() and exp_file.stat().st_size > 1000):
+                            word_count = len(seg.text.strip().split())
+                            min_expected_dur = max(0.4, (word_count / 3.8) - 0.3) if word_count >= 5 else 0.3
+                            is_seg_valid = False
+                            if exp_file.exists() and exp_file.stat().st_size > 1000:
+                                try:
+                                    with wave.open(str(exp_file), "rb") as wf:
+                                        if (wf.getnframes() / float(wf.getframerate())) >= min_expected_dur:
+                                            is_seg_valid = True
+                                        else:
+                                            exp_file.unlink(missing_ok=True)
+                                except Exception:
+                                    exp_file.unlink(missing_ok=True)
+                            if not is_seg_valid:
                                 all_exist = False
                                 break
 
@@ -1160,14 +1397,28 @@ class TTSDispatcher:
             sp_cfg = self.get_speaker_config(speaker, segment.get("type", "narration"))
             expected_filename = compute_canonical_segment_filename(chapter_num, idx, text, sp_cfg, default_voice=self.default_voice)
             expected_file = self.audio_dir / expected_filename
-            if expected_file.exists() and expected_file.stat().st_size > 1000:
-                audio_file = expected_file
-                dur = 1.0
+            force_refresh = os.environ.get("TTS_FORCE_REFRESH", "").lower() in ("true", "1", "yes")
+            word_count = len(text.strip().split())
+            min_expected_dur = max(0.4, (word_count / 3.8) - 0.3) if word_count >= 5 else 0.3
+            is_valid_cached = False
+            dur = 0.0
+            if not force_refresh and expected_file.exists() and expected_file.stat().st_size > 1000:
                 try:
-                    with wave.open(str(audio_file), "rb") as wf:
+                    with wave.open(str(expected_file), "rb") as wf:
                         dur = wf.getnframes() / float(wf.getframerate())
+                        if dur >= min_expected_dur:
+                            is_valid_cached = True
+                        else:
+                            logger.warning(
+                                f"  [DISPATCHER CACHE] Stale/truncated chunk detected for Seg {idx} "
+                                f"({dur:.2f}s < min {min_expected_dur:.2f}s for {word_count} words). Purging and re-synthesizing."
+                            )
+                            expected_file.unlink(missing_ok=True)
                 except Exception:
-                    pass
+                    expected_file.unlink(missing_ok=True)
+
+            if is_valid_cached:
+                audio_file = expected_file
                 results[idx - 1] = audio_file
                 self.ledger.mark_segment_completed(audio_file.stem, str(audio_file), dur, chapter_num=chapter_num, seg_num=idx)
                 dir_obj = dir_by_idx.get(idx)

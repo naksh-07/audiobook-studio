@@ -56,7 +56,13 @@ class GeminiProviderAdapter(BaseProviderAdapter):
         """Constructs Google Gemini v1beta JSON request payload."""
         parts = kwargs.get("parts")
         if not parts:
-            parts = [{"text": prompt}]
+            speech_metadata = kwargs.get("speechMetadata") or kwargs.get("speech_metadata")
+            if speech_metadata:
+                parts = [{"text": prompt, "speechMetadata": speech_metadata}]
+            elif kwargs.get("style_desc"):
+                parts = [{"text": prompt, "speechMetadata": {"style": str(kwargs["style_desc"]).strip()}}]
+            else:
+                parts = [{"text": prompt}]
 
         payload: Dict[str, Any] = {
             "contents": [
@@ -84,27 +90,31 @@ class GeminiProviderAdapter(BaseProviderAdapter):
             gen_config["responseMimeType"] = "application/json"
 
         # 3. Critical Gemini 3.8 Thinking Token Configuration
-        # If thinking_budget == 0, explicitly disable thinking tokens to avoid empty output on small token limits
-        if thinking_budget is not None:
-            gen_config["thinkingConfig"] = {
-                "thinkingBudget": thinking_budget
-            }
-        elif "3.8" in model or "3.7" in model:
-            # Default thinking budget for 3.8/3.7 if not explicitly specified
-            gen_config["thinkingConfig"] = {
-                "thinkingBudget": 1024
-            }
+        # Thinking tokens are strictly for text reasoning models and must never be configured for TTS/audio models
+        if not is_audio and "-tts" not in model:
+            if thinking_budget is not None:
+                gen_config["thinkingConfig"] = {
+                    "thinkingBudget": thinking_budget
+                }
+            elif "3.8" in model or "3.7" in model:
+                # Default thinking budget for 3.8/3.7 if not explicitly specified
+                gen_config["thinkingConfig"] = {
+                    "thinkingBudget": 1024
+                }
 
         # 4. Audio Modality & Voice Config (for Gemini Flash TTS)
+        eff_voice = voice_name or kwargs.get("voice")
         if is_audio:
             gen_config["responseModalities"] = ["AUDIO"]
             if "speech_config" in kwargs and kwargs["speech_config"]:
                 gen_config["speechConfig"] = kwargs["speech_config"]
-            elif voice_name:
+            elif "speechConfig" in kwargs and kwargs["speechConfig"]:
+                gen_config["speechConfig"] = kwargs["speechConfig"]
+            elif eff_voice:
                 gen_config["speechConfig"] = {
                     "voiceConfig": {
                         "prebuiltVoiceConfig": {
-                            "voiceName": voice_name
+                            "voiceName": eff_voice
                         }
                     }
                 }
@@ -302,4 +312,5 @@ class GeminiProviderAdapter(BaseProviderAdapter):
             tokens_used=total_tokens,
             model_id=clean_model,
             provider="gemini",
+            metadata={"finish_reason": cand.get("finishReason", "UNKNOWN"), "raw_response": resp},
         )

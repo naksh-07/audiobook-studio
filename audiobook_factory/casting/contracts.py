@@ -6,10 +6,12 @@ Voice Audition Scenes, Multi-Dimensional Casting Evaluation, and Cast Locks.
 """
 
 from __future__ import annotations
+import re
 import json
 import datetime
+import unicodedata
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Literal
+from typing import Dict, Any, List, Optional, Literal, Set
 from pydantic import BaseModel, Field, ConfigDict, model_validator, AliasChoices
 
 
@@ -239,6 +241,30 @@ class CastingEvaluationRecord(BaseModel):
     evaluation_summary: str = ""
 
 
+HONORIFIC_BLACKLIST: Set[str] = {
+    "lord", "sir", "master", "lady", "king", "queen", "baron", "duke",
+    "captain", "witcher", "the", "alderman", "doctor", "dr", "father",
+    "brother", "sister", "dame", "count", "duchess", "prince", "princess",
+    "elder", "general", "chief", "officer", "inspector", "innkeeper",
+    "commander", "emperor", "empress", "mr", "mrs", "miss",
+    "chancellor", "leader", "mistress",
+    # Hindi honorifics & titles
+    "महाराज", "राजा", "रानी", "श्रीमान", "स्वामी", "प्रभु", "ठाकुर",
+    "मालिक", "कप्तान", "विचर", "मुखिया", "चौधरी", "सर", "लॉर्ड", "मास्टर",
+    # Common variations / transliterations
+    "लोर्ड", "किन्ग", "सिर", "मास्टेर",
+    "चान्सेल्लोर", "लीडेर", "मिस्ट्रेस्स",
+    # Generic occupations, titles, numbers, and descriptors
+    "man", "मान", "fat", "फ़ाट", "फाट", "yellow", "येल्लोव", "येलो",
+    "jerkin", "जेर्किन", "cobbler", "कोब्ब्लेर", "कॉबलर", "sorcerer", "सोर्सेरेर", "सोर्सरर",
+    "sorceress", "सोर्सेरेस्स", "सोर्सरेस", "halberdier", "हाल्बेर्डिेर", "हलबर्डियर",
+    "warrior", "वार्रिोर", "वॉरियर", "वारियर", "reaver", "रीवेर", "रीवर",
+    "denesle", "डेनेस्ले", "golden", "गोल्डेन", "गोल्डन", "dragon", "ड्रागोन", "ड्रैगन",
+    "little", "लिट्ट्ले", "लिटिल", "duke", "डुके", "ड्यूक", "baron", "बारोन", "बैरन",
+    "queen", "क्वीन", "miss", "मिस्स", "मिस", "mrs", "म्र्स", "मिसेज",
+}
+
+
 class CastLock(BaseModel):
     """
     Persistent, formal Cast Lock contract.
@@ -249,6 +275,8 @@ class CastLock(BaseModel):
 
     character_id: str = ""
     character_name: str = ""
+    display_name_hi: Optional[str] = None
+    aliases: List[str] = Field(default_factory=list)
     voice_id: str
     casting_version: str = "1.0.0"
     locked: bool = True
@@ -258,6 +286,7 @@ class CastLock(BaseModel):
     selection_rationale: str = ""
     casting_evidence: Dict[str, Any] = Field(default_factory=dict)
     calibration_overrides: Dict[str, Any] = Field(default_factory=dict)
+    eq_formant_profile: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -267,7 +296,70 @@ class CastLock(BaseModel):
             cname = data.get("character_name") or data.get("character_id") or ""
             data["character_id"] = cid
             data["character_name"] = cname
+            if "aliases" not in data or data["aliases"] is None:
+                data["aliases"] = []
         return data
+
+    @property
+    def pitch(self) -> float:
+        """Phase-safe pitch modifier from calibration overrides, defaulting to 1.0."""
+        if self.calibration_overrides and "pitch" in self.calibration_overrides:
+            try:
+                return float(self.calibration_overrides["pitch"])
+            except (ValueError, TypeError):
+                pass
+        return 1.0
+
+    @property
+    def speed(self) -> float:
+        """Pacing / tempo modifier from calibration overrides, defaulting to 1.0."""
+        if self.calibration_overrides and "speed" in self.calibration_overrides:
+            try:
+                return float(self.calibration_overrides["speed"])
+            except (ValueError, TypeError):
+                pass
+        return 1.0
+
+    def matches(self, name_or_alias: str) -> bool:
+        """
+        Case-insensitive, whitespace-insensitive, Devanagari nukta-normalized matching
+        across character_id, character_name, display_name_hi, and aliases.
+        Supports whole-word token matching for non-honorific queries of length >= 3.
+        """
+        if not name_or_alias:
+            return False
+
+        def _normalize(s: str) -> str:
+            if not s:
+                return ""
+            d = unicodedata.normalize("NFD", str(s))
+            d = d.replace("\u093c", "")
+            d = unicodedata.normalize("NFC", d)
+            d = d.strip().lower().replace("_", " ")
+            return re.sub(r"\s+", " ", d)
+
+        target = _normalize(name_or_alias)
+        if not target:
+            return False
+
+        candidates = [self.character_id, self.character_name]
+        if self.display_name_hi:
+            candidates.append(self.display_name_hi)
+        if self.aliases:
+            candidates.extend(self.aliases)
+
+        for cand in candidates:
+            if not cand:
+                continue
+            norm_cand = _normalize(cand)
+            if norm_cand == target:
+                return True
+            # Whole-word token matching for non-honorific targets of length >= 3
+            if len(target) >= 3 and target not in HONORIFIC_BLACKLIST:
+                cand_tokens = norm_cand.split()
+                if target in cand_tokens:
+                    return True
+        return False
 
 
 class CastLockManifest(BaseModel):
@@ -294,14 +386,24 @@ class CastLockManifest(BaseModel):
                         lock_val["character_name"] = key
         return data
 
-    def get_lock(self, character_name_or_id: str) -> Optional[CastLock]:
-        """Case-insensitive character lookup in cast locks."""
-        clean = character_name_or_id.strip().lower()
-        clean_norm = clean.replace("_", " ")
-        for cid, lock in self.locks.items():
-            if cid.lower() == clean or lock.character_name.lower() == clean:
-                return lock
-            if cid.lower().replace("_", " ") == clean_norm or lock.character_name.lower().replace("_", " ") == clean_norm:
+    def get_lock(self, identifier: str) -> Optional[CastLock]:
+        """Resolves cast lock leveraging matches() for bilingual and alias lookup."""
+        if not identifier:
+            return None
+        t_clean = str(identifier).strip()
+        t_low = t_clean.lower()
+        if t_low in HONORIFIC_BLACKLIST or t_clean in HONORIFIC_BLACKLIST:
+            return None
+        t_norm = unicodedata.normalize("NFD", t_clean).replace("\u093c", "")
+        t_norm = unicodedata.normalize("NFC", t_norm).strip().lower()
+        if t_norm in HONORIFIC_BLACKLIST:
+            return None
+        # 1. Direct dictionary key match
+        if identifier in self.locks:
+            return self.locks[identifier]
+        # 2. Match across all locks using lock.matches()
+        for lock in self.locks.values():
+            if lock.matches(identifier):
                 return lock
         return None
 

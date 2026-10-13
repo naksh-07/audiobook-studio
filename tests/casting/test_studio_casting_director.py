@@ -23,7 +23,7 @@ def test_01_cast_character_with_mock_llm():
 
         def mock_llm(prompt, **kwargs):
             return {
-                "assigned_voice_id": "hi-in-advisor-10",
+                "assigned_voice_id": "Charon",
                 "dialect": "Haryanvi Hindi",
                 "casting_rationale": "Blunt martial resonance matches veteran guard.",
                 "baseline_formants": {
@@ -43,7 +43,7 @@ def test_01_cast_character_with_mock_llm():
         )
 
         assert lock.character_name == "Captain Malik"
-        assert lock.voice_id == "hi-in-advisor-10"
+        assert lock.voice_id == "Charon"
         assert lock.locked is True
         assert lock.calibration_overrides.get("chest_resonance_150hz_db") == 2.0
 
@@ -55,7 +55,7 @@ def test_01_cast_character_with_mock_llm():
 
         reg_data = json.loads(reg_file.read_text(encoding="utf-8"))
         assert "Captain Malik" in reg_data
-        assert reg_data["Captain Malik"]["voice"] == "hi-in-advisor-10"
+        assert reg_data["Captain Malik"]["voice"] == "Charon"
 
 
 def test_02_anime_seiyu_child_rule():

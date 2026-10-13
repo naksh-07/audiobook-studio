@@ -141,7 +141,34 @@ def clean_screenplay_pass2(
         if is_action_beat:
             speaker = "Foley"
         elif not speaker or speaker_lower in ("narrator", "narration", "header", "chapter_header"):
-            speaker = "Narrator"
+            if item.get("type") == "dialogue":
+                # Spoken dialogue must NEVER be attributed to Narrator (Audible Flow Standard)
+                resolved = None
+                if final_script:
+                    prev_txt = final_script[-1].get("text", "")
+                    for al_k, al_target in alias_map.items():
+                        if len(al_k) >= 3 and al_k in prev_txt.lower():
+                            resolved = al_target
+                            break
+                if not resolved:
+                    prev_dialogue_speakers = [
+                        s.get("speaker") for s in final_script
+                        if s.get("type") == "dialogue" and s.get("speaker") not in ("Narrator", "Foley")
+                    ]
+                    if prev_dialogue_speakers:
+                        last_spk = prev_dialogue_speakers[-1]
+                        alt_speakers = [s for s in reversed(prev_dialogue_speakers) if s != last_spk]
+                        if alt_speakers:
+                            resolved = alt_speakers[0]
+                        else:
+                            resolved = last_spk
+                if not resolved and last_active_character != "Narrator":
+                    resolved = last_active_character
+                speaker = resolved if resolved else "Narrator"
+                if speaker == "Narrator" and last_active_character != "Narrator":
+                    speaker = last_active_character
+            else:
+                speaker = "Narrator"
 
         # Update active cast trackers
         if speaker not in ("Narrator", "Foley"):
@@ -400,6 +427,43 @@ def clean_screenplay_pass2(
                     entry["silence_intent"] = bt.silence_intent.purpose
                 if not entry.get("narrative_distance") and sc.narrative_distance:
                     entry["narrative_distance"] = sc.narrative_distance
+
+    # Final Safety Pass: Absolute Prohibition of Narrator Spoken Dialogue (Audible Flow Standard)
+    for i, seg in enumerate(final_script):
+        if seg.get("type") == "dialogue" and str(seg.get("speaker", "Narrator")).strip().lower() in ("narrator", "narration", "foley", ""):
+            prev_spk = None
+            for p in reversed(final_script[:i]):
+                if p.get("type") == "dialogue" and str(p.get("speaker", "")).strip().lower() not in ("narrator", "narration", "foley", ""):
+                    prev_spk = p.get("speaker")
+                    break
+            next_spk = None
+            for n in final_script[i + 1:]:
+                if n.get("type") == "dialogue" and str(n.get("speaker", "")).strip().lower() not in ("narrator", "narration", "foley", ""):
+                    next_spk = n.get("speaker")
+                    break
+
+            resolved = None
+            if prev_spk and next_spk and prev_spk == next_spk:
+                # Sandwiched turn: must be the interlocutor who spoke with prev_spk
+                for p in reversed(final_script[:i]):
+                    p_name = p.get("speaker")
+                    if p.get("type") == "dialogue" and p_name not in ("Narrator", "Foley", prev_spk):
+                        resolved = p_name
+                        break
+            elif prev_spk:
+                # Alternating partner
+                for p in reversed(final_script[:i]):
+                    p_name = p.get("speaker")
+                    if p.get("type") == "dialogue" and p_name not in ("Narrator", "Foley", prev_spk):
+                        resolved = p_name
+                        break
+                if not resolved:
+                    resolved = prev_spk
+            elif next_spk:
+                resolved = next_spk
+
+            if resolved:
+                seg["speaker"] = resolved
 
     # Deterministic Split-Quote Stitching (Audible Flow Standard)
     # Eliminates mid-sentence narrator stutter and unifies character speech turns.

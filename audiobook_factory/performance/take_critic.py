@@ -47,7 +47,15 @@ class TakeAuditionCritic:
         if len(candidates) == 1:
             return 0, "Single candidate defaulted."
 
-        model = self._resolve_model()
+        import os
+        if os.environ.get("ENABLE_PERCEPTUAL_LLM", "false").lower() not in ("true", "1", "yes"):
+            return 0, "Deterministic take selected (external LLM critic disabled for pure supersonic TTS)."
+
+        try:
+            model = self._resolve_model()
+        except Exception as e:
+            logger.debug(f"  [TakeAuditionCritic] Model resolution bypassed: {e}")
+            return 0, "Defaulted to baseline candidate (model unavailable)."
         fiction_framing = get_dramatic_fiction_framing()
 
         sys_prompt = (

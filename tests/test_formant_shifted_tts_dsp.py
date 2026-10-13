@@ -125,6 +125,7 @@ class TestFormantShiftedTTSDSP(unittest.TestCase):
 
     def test_take_audition_critic_deliberation(self):
         """Verifies TakeAuditionCritic selects superior candidate take for climactic lines."""
+        import os
         critic = TakeAuditionCritic(model="mock-critic")
 
         candidates = [
@@ -139,15 +140,16 @@ class TestFormantShiftedTTSDSP(unittest.TestCase):
 
         mock_llm = MagicMock(return_value=mock_critic_res)
 
-        win_idx, justification = critic.select_best_take_audition(
-            text="I thought I had lost you forever.",
-            speaker="Geralt",
-            subtext="Deep terror masked as stoicism",
-            emotion="vulnerable_relief",
-            intensity="high",
-            candidates=candidates,
-            call_llm_fn=mock_llm,
-        )
+        with patch.dict(os.environ, {"ENABLE_PERCEPTUAL_LLM": "true"}):
+            win_idx, justification = critic.select_best_take_audition(
+                text="I thought I had lost you forever.",
+                speaker="Protagonist",
+                subtext="Deep terror masked as stoicism",
+                emotion="vulnerable_relief",
+                intensity="high",
+                candidates=candidates,
+                call_llm_fn=mock_llm,
+            )
 
         self.assertEqual(win_idx, 1)
         self.assertIn("vulnerability", justification)

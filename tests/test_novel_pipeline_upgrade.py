@@ -132,7 +132,8 @@ class TestNovelPipelineUpgrade(unittest.TestCase):
             {"index": 2, "speaker": "Hermione", "type": "dialogue", "text": "Wait for me!", "emotion": "pleading"},
         ]
         sample = "Harry said, 'Let us move quickly.'\n\nHermione replied, 'Wait for me!'"
-        with patch("audiobook_factory.script_builder._parse_dramatized_chunk_llm", return_value=mock_chunks):
+        with patch.dict("os.environ", {"MOCK_OFFLINE": "true"}), \
+             patch("audiobook_factory.script_builder._parse_dramatized_chunk_llm", return_value=mock_chunks):
             script = build_dramatized_script_llm(sample, character_roster=roster)
         self.assertIsInstance(script, list)
         self.assertGreater(len(script), 0)

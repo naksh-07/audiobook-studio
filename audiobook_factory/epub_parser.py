@@ -12,6 +12,10 @@ from audiobook_factory.extraction.parsers.epub import (
     ForensicEPUBParser,
     extract_epub,
     _safe_xml_fromstring,
+    _is_subsection_label,
+    _flatten_nav_tree,
+    NavItem,
+    NavTarget,
 )
 
 __all__ = [
@@ -19,4 +23,8 @@ __all__ = [
     "ForensicEPUBParser",
     "extract_epub",
     "_safe_xml_fromstring",
+    "_is_subsection_label",
+    "_flatten_nav_tree",
+    "NavItem",
+    "NavTarget",
 ]

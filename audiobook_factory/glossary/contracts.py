@@ -36,7 +36,7 @@ class ChapterEntity(BaseModel):
     hindi_name: str = Field(..., description="Phonetic Devanagari transliteration or evocative Hindustani translation")
     category: EntityCategory = Field(default="PROPER_NAME", description="Tri-Partite entity classification")
     aliases: List[str] = Field(default_factory=list, description="All situational nicknames, aliases, and titles")
-    gender: Literal["male", "female", "neutral", "unknown"] = Field(default="unknown")
+    gender: Literal["male", "female"] = Field(default="male")
     voice_style: str = Field(default="", description="Descriptive vocal acting hint or acoustic demeanor")
     sociolect_archetype: str = Field(default="NEUTRAL", description="Hindustani dialect/social register archetype")
     confidence: float = Field(default=0.95, ge=0.0, le=1.0)

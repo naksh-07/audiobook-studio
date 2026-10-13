@@ -8,6 +8,7 @@ and Performance Bible delivery directives.
 
 from __future__ import annotations
 import os
+import re
 import json
 import logging
 from pathlib import Path
@@ -20,6 +21,7 @@ from audiobook_factory.model_manager import get_model_manager, TaskType, LLMUnav
 from audiobook_factory.key_manager import get_persistent_key_pool
 from audiobook_factory.script.staging_enricher import _parse_dramatized_chunk_llm
 from audiobook_factory.script.screenplay_cleaner import clean_screenplay_pass2
+from audiobook_factory.script.normalizer import normalize_speech_text
 
 logger = logging.getLogger("AudiobookFactory")
 
@@ -138,6 +140,47 @@ class AudiobookAdapter(BaseScriptAdapter):
         if not ch_text.strip():
             return []
 
+        # Isolate leading markdown header/title before beat slicing or LLM parsing
+        # to prevent the Screenplay LLM from bundling the title with the opening prose
+        header_segment = None
+        header_match = re.match(r"^(\s*#+\s+[^\n]+)\n*", ch_text)
+        if header_match:
+            raw_header = header_match.group(1).strip()
+            ch_text = ch_text[header_match.end():].lstrip()
+            clean_title = re.sub(r"^#+\s*", "", raw_header).strip()
+            norm_title = normalize_speech_text(clean_title, is_hindi)
+            if norm_title:
+                header_segment = {
+                    "index": 1,
+                    "type": "narration",
+                    "speaker": "Narrator",
+                    "text": norm_title,
+                    "emotion": "neutral",
+                    "pause_after_ms": 1200,
+                    "acting": {
+                        "delivery_style": "calm_authoritative",
+                        "pacing": 1.0,
+                        "tone": "objective_cinematic_observer",
+                    },
+                    "spatial": {
+                        "proximity": "normal_room",
+                        "pan": 0.0,
+                        "physical_blocking": "standing",
+                    },
+                    "acoustic_env": "stone_keep",
+                    "intensity_level": "medium",
+                    "actioning": "announce_title",
+                    "subtext": "",
+                    "underlying_emotion": "neutral",
+                    "narrative_mode": "narrator_exposition",
+                    "scene_id": "scene_001",
+                    "beat_id": "scene_001_b001",
+                    "dramatic_function": "setup",
+                    "surface_emotion": "neutral",
+                    "tension_before": 0.3,
+                    "tension_after": 0.3,
+                }
+
         max_chunk_words = int(os.environ.get("SCREENPLAY_CHUNK_WORDS", "500"))
         words_count = len(ch_text.split())
 
@@ -253,6 +296,11 @@ class AudiobookAdapter(BaseScriptAdapter):
             memory_context=memory_context,
             dramatic_plan=dramatic_plan,
         )
+
+        if header_segment:
+            cleaned.insert(0, header_segment)
+            for idx, item in enumerate(cleaned, 1):
+                item["index"] = idx
 
         return self.post_adapt(
             segments=cleaned,

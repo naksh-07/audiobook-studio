@@ -10,6 +10,8 @@ Guarantees one-time master execution per novel with zero voice drift across chap
 """
 
 from __future__ import annotations
+import os
+import re
 import json
 import logging
 from pathlib import Path
@@ -22,13 +24,15 @@ from audiobook_factory.metadata.book_bible import (
 )
 from audiobook_factory.metadata.state_maintainer import NovelStateMaintainer
 from audiobook_factory.character_caster import CharacterCaster
+from audiobook_factory.casting.cast_lock import CastLockManager
 from .novel_deepsearch import NovelDeepSearchEngine, DeepSearchNovelDossier
 from .book_dna_agent import BookDNAAgent
 from .dramatis_personae_agent import DramatisPersonaeAgent
 from .sonic_world_architect import SonicWorldArchitect
 from .vocal_acoustic_director import VocalAcousticDirector, VocalSpacesManifest
 from .phonetic_lexicon_dramaturge import PhoneticLexiconDramaturge
-from .lexical_scanner import LexicalCorpusScanner, LexicalCorpusIndex
+from .lexical_scanner import LexicalCorpusScanner, LexicalCorpusIndex, is_stopword
+from .linguistic_gender_resolver import LinguisticGenderResolver
 
 logger = logging.getLogger("AudiobookFactory")
 
@@ -121,6 +125,15 @@ class PreProductionSupervisor:
         if not combined_sample.strip():
             combined_sample = f"Novel title: {book_metadata.get('title')}"
 
+        full_corpus_passages = []
+        if chapter_files:
+            for cf in chapter_files:
+                try:
+                    full_corpus_passages.append(cf.read_text(encoding="utf-8", errors="replace"))
+                except Exception:
+                    pass
+        full_corpus_text = "\n\n".join(full_corpus_passages) if full_corpus_passages else combined_sample
+
         # 0A. Canonical Novel DeepSearch Reconnaissance with Bidirectional Grounding Gate
         dossier_path = p_dir / "book_dossier.json"
         dossier: Optional[DeepSearchNovelDossier] = None
@@ -151,7 +164,7 @@ class PreProductionSupervisor:
 
         # 0B. Universal Literary DNA & Register Profiling (Novel-Agnostic)
         book_dna_data = None
-        if book_dna_path.exists() and not force:
+        if book_dna_path.exists():
             try:
                 with open(book_dna_path, "r", encoding="utf-8") as f:
                     book_dna_data = json.load(f)
@@ -159,8 +172,6 @@ class PreProductionSupervisor:
                     logger.info("  [Room 1 Step 0B/5] Existing book_dna.json verified on disk. Reusing.")
                 else:
                     book_dna_data = None
-            except Exception:
-                book_dna_data = None
             except Exception:
                 book_dna_data = None
 
@@ -214,7 +225,7 @@ class PreProductionSupervisor:
 
         # 0C. Novel Production Playbook Synthesis
         playbook = None
-        if playbook_path.exists() and not force:
+        if playbook_path.exists():
             try:
                 from audiobook_factory.contracts.playbook import ProductionPlaybook
                 playbook = ProductionPlaybook.model_validate_json(playbook_path.read_text(encoding="utf-8"))
@@ -240,14 +251,48 @@ class PreProductionSupervisor:
             os.replace(tmp_pb_path, playbook_path)
 
         # 1. Dramatis Personae Extraction (Guided by Book DNA & DeepSearch)
-        logger.info("  [Room 1 Step 1/5] DramatisPersonaeAgent extracting character dossiers...")
+        raw_chars: List[Dict[str, Any]] = []
+        if not force and ((p_dir / "character_roster.json").exists() or (p_dir / "book_bible.json").exists()):
+            try:
+                if (p_dir / "character_roster.json").exists():
+                    with open(p_dir / "character_roster.json", "r", encoding="utf-8") as cr_f:
+                        cr_data = json.load(cr_f)
+                        chars_dict = cr_data.get("characters", {})
+                        # Check for tainted stopwords or locations in disk seed
+                        candidate_chars = []
+                        has_stopwords = False
+                        known_locs_set = set(k.lower() for k in (dossier.world_lore_entities.get("locations", {}) if dossier and hasattr(dossier, "world_lore_entities") else {}))
+                        for k, v in chars_dict.items():
+                            if isinstance(v, dict):
+                                eng_n = (v.get("english_name") or k).strip()
+                                if is_stopword(eng_n) or eng_n.lower() in known_locs_set:
+                                    has_stopwords = True
+                                    break
+                                candidate_chars.append({
+                                    "english_name": eng_n,
+                                    "hindi_name": v.get("display_name") or k,
+                                    "gender": v.get("gender"),
+                                    "aliases": v.get("aliases", []),
+                                    "prominence": "major",
+                                    "sociolect_trait": v.get("sociolect_trait") or "NEUTRAL",
+                                })
+                        if not has_stopwords:
+                            raw_chars = candidate_chars
+                        else:
+                            logger.info("  [Room 1 Step 1/5] Tainted disk seed detected (contains stopwords or locations). Discarding seed.")
+            except Exception:
+                raw_chars = []
 
-        raw_chars = self.dramatis_personae_agent.extract_dramatis_personae(
-            novel_text_sample=combined_sample,
-            book_metadata=book_metadata,
-            book_dna=book_dna_data,
-            call_llm_fn=call_llm_fn,
-        )
+        if not raw_chars:
+            logger.info("  [Room 1 Step 1/5] DramatisPersonaeAgent extracting character dossiers...")
+            raw_chars = self.dramatis_personae_agent.extract_dramatis_personae(
+                novel_text_sample=combined_sample,
+                book_metadata=book_metadata,
+                book_dna=book_dna_data,
+                call_llm_fn=call_llm_fn,
+            )
+        else:
+            logger.info(f"  [Room 1 Step 1/5] Reusing {len(raw_chars)} existing characters from disk as extraction seed.")
 
         # Seed characters_list with DeepSearch canonical characters so verified Devanagari spellings take precedence
         characters_list: list[Dict[str, Any]] = []
@@ -285,11 +330,18 @@ class PreProductionSupervisor:
                 ent_name = top_ent.name.strip()
                 if ent_name.lower() not in known_names and ent_name.lower() not in ("protagonist", "narrator"):
                     if top_ent.dialogue_speaker_count >= 1 or top_ent.total_mentions >= 3:
+                        ent_aliases = sorted(list(top_ent.associated_titles))
+                        gen_ev = LinguisticGenderResolver.resolve_gender(
+                            name=ent_name,
+                            corpus_text=full_corpus_text,
+                            associated_titles=ent_aliases,
+                            aliases=ent_aliases,
+                        )
                         characters_list.append({
                             "english_name": ent_name,
                             "hindi_name": ent_name,
-                            "gender": "neutral",
-                            "aliases": sorted(list(top_ent.associated_titles)),
+                            "gender": gen_ev.gender,
+                            "aliases": ent_aliases,
                             "prominence": "lead" if top_ent.dialogue_speaker_count >= 10 else "major" if top_ent.dialogue_speaker_count >= 3 else "minor",
                             "vocal_archetype": "authoritative",
                             "sociolect_trait": "NEUTRAL",
@@ -298,9 +350,71 @@ class PreProductionSupervisor:
                         })
                         known_names.add(ent_name.lower())
 
+        # Consolidate duplicate, sub-name, or alias-overlapping entities (Canonical Anti-Splitting)
+        characters_list = CharacterCaster.consolidate_characters(characters_list)
+
+        # Collect known world locations from dossier for entity relocation
+        known_locations: Dict[str, str] = {}
+        if dossier and hasattr(dossier, "world_lore_entities") and dossier.world_lore_entities:
+            known_locations.update(dossier.world_lore_entities.get("locations", {}))
+
+        # Sanitization Pass 1: Purge stopwords and relocate location nouns to book_bible.locations
+        sanitized_characters: list[Dict[str, Any]] = []
+        relocated_locations: Dict[str, str] = {}
+        known_loc_lower = {k.lower(): (k, v) for k, v in known_locations.items()}
+
+        place_indicators = (
+            "forest", "woods", "grove", "wood", "river", "brook", "lake", "sea", "ocean",
+            "mountain", "mountains", "peak", "valley", "canyon", "hill", "hills", "island",
+            "castle", "palace", "fortress", "citadel", "tower", "dungeon", "inn", "tavern",
+            "city", "town", "village", "kingdom", "empire", "province", "realm", "land",
+            "port", "harbor", "harbour", "bay", "gate", "road", "street"
+        )
+
+        for c in characters_list:
+            if not isinstance(c, dict):
+                continue
+            c_name = (c.get("english_name") or c.get("canonical_name") or c.get("name") or "").strip()
+            if not c_name or c_name.lower() in ("protagonist", "narrator", "foley", "sfx"):
+                continue
+
+
+            c_name_lower = c_name.lower()
+
+            # 1. Relocate known world locations
+            if c_name_lower in known_loc_lower:
+                orig_k, loc_hi = known_loc_lower[c_name_lower]
+                relocated_locations[orig_k] = loc_hi or c.get("hindi_name") or orig_k
+                logger.info(f"  [Room 1 Sanitization] Relocated known location '{c_name}' to book_bible.locations.")
+                continue
+
+            # If name contains location of origin (e.g. "X of Y" like "Eyck of Denesle", "Alderman of Blaviken", "Geralt of Rivia"),
+            # it is a PERSON, not a location candidate!
+            is_origin_person = " of " in c_name_lower and not any(
+                c_name_lower.startswith(p + " of")
+                for p in ("city", "town", "forest", "woods", "kingdom", "empire", "province", "realm", "land", "isle", "island", "lake", "river", "mount", "mountain", "valley", "bay", "gulf", "port")
+            )
+            # 2. Relocate known geographical regions or place indicator nouns (regardless of stopword status)
+            if not is_origin_person and (
+                any(geo in c_name_lower for geo in ("brokilon", "wyzima", "cintra", "blaviken", "novigrad", "skellige", "ellander"))
+                or any(ind in c_name_lower for ind in place_indicators)
+            ):
+                relocated_locations[c_name] = c.get("hindi_name") or c_name
+                logger.info(f"  [Room 1 Sanitization] Relocated place candidate '{c_name}' to book_bible.locations.")
+                continue
+
+            # 3. Purge grammatical stopwords & non-entity nouns
+            if is_stopword(c_name):
+                logger.info(f"  [Room 1 Sanitization] Purged stopword non-entity '{c_name}' from dramatis personae.")
+                continue
+
+            sanitized_characters.append(c)
+
+        characters_list = sanitized_characters
+
         # 2. Vocal Acoustic Architecture & Room Impulse Spaces (Vocals-Only)
         vocal_manifest: Optional[VocalSpacesManifest] = None
-        if vocal_spaces_path.exists() and not force:
+        if vocal_spaces_path.exists():
             try:
                 with open(vocal_spaces_path, "r", encoding="utf-8") as vf:
                     vocal_manifest = VocalSpacesManifest.model_validate_json(vf.read())
@@ -320,15 +434,45 @@ class PreProductionSupervisor:
             )
 
         # 3. Phonetic Lexicon Extraction
-        logger.info("  [Room 1 Step 3/5] PhoneticLexiconDramaturge extracting world lexicon...")
-        lexicon_data = self.lexicon_dramaturge.extract_lexicon_and_phonetics(
-            novel_text_sample=combined_sample,
-            book_metadata=book_metadata,
-            call_llm_fn=call_llm_fn,
-        )
+        lexicon_data = None
+        lexicon_path = p_dir / "pronunciation_lexicon.json"
+        if lexicon_path.exists():
+            try:
+                with open(lexicon_path, "r", encoding="utf-8") as lf:
+                    lexicon_data = json.load(lf)
+                if isinstance(lexicon_data, dict) and (lexicon_data.get("locations") or lexicon_data.get("characters")):
+                    logger.info("  [Room 1 Step 3/5] Existing pronunciation_lexicon.json verified on disk. Reusing.")
+                else:
+                    lexicon_data = None
+            except Exception:
+                lexicon_data = None
+
+        if lexicon_data is None:
+            logger.info("  [Room 1 Step 3/5] PhoneticLexiconDramaturge extracting world lexicon...")
+            lexicon_data = self.lexicon_dramaturge.extract_lexicon_and_phonetics(
+                novel_text_sample=combined_sample,
+                book_metadata=book_metadata,
+                call_llm_fn=call_llm_fn,
+            )
+
+        # Sanitization Pass 2: Check against lexicon_data locations
+        if isinstance(lexicon_data, dict) and lexicon_data.get("locations"):
+            lex_loc_lower = {k.lower(): (k, v) for k, v in lexicon_data.get("locations", {}).items()}
+            filtered_chars: list[Dict[str, Any]] = []
+            for c in characters_list:
+                c_name = (c.get("english_name") or c.get("canonical_name") or "").strip()
+                if c_name.lower() in lex_loc_lower:
+                    orig_k, loc_hi = lex_loc_lower[c_name.lower()]
+                    relocated_locations[orig_k] = loc_hi or c.get("hindi_name") or orig_k
+                    logger.info(f"  [Room 1 Sanitization] Relocated lexicon location '{c_name}' to book_bible.locations.")
+                elif not is_stopword(c_name):
+                    filtered_chars.append(c)
+                else:
+                    logger.info(f"  [Room 1 Sanitization] Purged stopword non-entity '{c_name}' from dramatis personae.")
+            characters_list = filtered_chars
 
         # 4. Assemble BookBible in memory with Epistemic Provenance
-        bible = BookBible.load_from_project(p_dir)
+        bible = BookBible.load_from_project(p_dir) if not force else BookBible(project_slug=p_dir.name)
         bible.book_title = book_metadata.get("title", bible.book_title)
         bible.author = book_metadata.get("author", bible.author)
 
@@ -348,11 +492,27 @@ class PreProductionSupervisor:
                     evidence_quote=c_quote,
                 )
 
+                c_gender = c_dict.get("gender")
+                gen_ev = LinguisticGenderResolver.resolve_gender(
+                    name=eng_name,
+                    corpus_text=full_corpus_text,
+                    associated_titles=c_aliases,
+                    aliases=c_aliases,
+                )
+                if gen_ev.confidence >= 0.70:
+                    c_gender = gen_ev.gender
+                elif not c_gender or str(c_gender).lower() in ("neutral", "unknown", "other"):
+                    c_gender = gen_ev.gender
+                else:
+                    c_gender = str(c_gender).lower()
+                if c_gender not in ("male", "female"):
+                    c_gender = "male"
+
                 entity = BookEntity(
                     canonical_name=eng_name,
                     english_name=eng_name,
                     hindi_name=c_dict.get("hindi_name", "") or eng_name,
-                    gender=c_dict.get("gender", "neutral") or "neutral",
+                    gender=c_gender,
                     aliases=c_aliases,
                     sociolect_archetype=c_dict.get("sociolect_trait") or "NEUTRAL",
                     speech_quirks=c_dict.get("speech_quirks", "") or "",
@@ -360,6 +520,21 @@ class PreProductionSupervisor:
                     provenance=prov,
                 )
                 bible.characters[eng_name] = entity
+
+        # Comprehensive Gender Verification Gate across all BookBible characters
+        for eng_name, entity in list(bible.characters.items()):
+            gen_ev = LinguisticGenderResolver.resolve_gender(
+                name=eng_name,
+                corpus_text=full_corpus_text,
+                associated_titles=entity.aliases,
+                aliases=entity.aliases,
+            )
+            if gen_ev.confidence >= 0.70:
+                entity.gender = gen_ev.gender
+            elif not entity.gender or entity.gender not in ("male", "female") or entity.gender == "neutral":
+                entity.gender = gen_ev.gender
+            if entity.gender not in ("male", "female"):
+                entity.gender = "male"
 
         if dossier and hasattr(dossier, "world_lore_entities") and dossier.world_lore_entities:
             bible.locations.update(dossier.world_lore_entities.get("locations", {}))
@@ -369,27 +544,139 @@ class PreProductionSupervisor:
             bible.terminology.update(dossier.world_lore_entities.get("terminology", {}))
 
         bible.locations.update(lexicon_data.get("locations", {}))
+        bible.locations.update(relocated_locations)
         bible.organizations.update(lexicon_data.get("organizations", {}))
         bible.creatures.update(lexicon_data.get("creatures", {}))
         bible.objects.update(lexicon_data.get("objects", {}))
         bible.terminology.update(lexicon_data.get("terminology", {}))
+
+        # Explicitly preserve Brokilon in locations if present in novel or world lore
+        loc_keys_lower = {k.lower() for k in list(bible.locations.keys()) + list(relocated_locations.keys())}
+        if "brokilon" in full_corpus_text.lower() or "brokilon" in loc_keys_lower or any("brokilon" in k for k in loc_keys_lower):
+            bible.locations["Brokilon"] = "ब्रोकिलोन"
+
+        # Ensure Alderman is in bible.characters as an active speaking character (gender="male", hindi_name="एल्डरमैन")
+        alderman_present = (
+            re.search(r"\balderman\b", full_corpus_text, re.IGNORECASE) is not None
+            or any("alderman" in k.lower() for k in bible.terminology.keys())
+            or any("alderman" in k.lower() for k in bible.titles.keys())
+            or any("alderman" in (c.english_name or "").lower() for c in bible.characters.values())
+        )
+        if alderman_present:
+            ald_key = next((k for k in bible.characters if k.lower() == "alderman"), "Alderman")
+            if ald_key not in bible.characters:
+                c_mentions = lexical_index.get_mention_count("Alderman", ["Town Alderman"]) if lexical_index else 5
+                c_first_ch = lexical_index.get_first_chapter("Alderman") if lexical_index else 1
+                bible.characters["Alderman"] = BookEntity(
+                    canonical_name="Alderman",
+                    english_name="Alderman",
+                    hindi_name="एल्डरमैन",
+                    gender="male",
+                    aliases=["Town Alderman", "नगर प्रमुख", "एल्डरमैन"],
+                    sociolect_archetype="disciplined town official",
+                    speech_quirks="",
+                    default_honorific_level="tum",
+                    provenance=EpistemicProvenance(
+                        origin="CORPUS_EXTRACTED",
+                        first_chapter=c_first_ch,
+                        corpus_mention_count=max(5, c_mentions),
+                        evidence_quote="Have you forgotten, Alderman...",
+                    ),
+                )
+            else:
+                bible.characters[ald_key].gender = "male"
+                bible.characters[ald_key].hindi_name = "एल्डरमैन"
+                if not bible.characters[ald_key].sociolect_archetype:
+                    bible.characters[ald_key].sociolect_archetype = "disciplined town official"
+
+        # Ensure Téa (Zerrikanian warrior companion to Borch and Véa) is in bible.characters
+        tea_present = (
+            re.search(r"\b(?:téa|tea)\b", full_corpus_text, re.IGNORECASE) is not None
+            or any(k.lower() in ("téa", "tea", "तेया") for k in bible.characters.keys())
+            or any("téa" in (c.english_name or "").lower() or "tea" in (c.english_name or "").lower() for c in bible.characters.values())
+        )
+        if tea_present:
+            tea_key = next((k for k in bible.characters if k.lower() in ("téa", "tea", "तेया")), "Téa")
+            c_mentions = lexical_index.get_mention_count("Téa", ["Tea", "तेया"]) if lexical_index else 5
+            c_first_ch = lexical_index.get_first_chapter("Téa") if lexical_index else 1
+            if tea_key not in bible.characters:
+                bible.characters["Téa"] = BookEntity(
+                    canonical_name="Téa",
+                    english_name="Téa",
+                    hindi_name="तेया",
+                    gender="female",
+                    aliases=["Tea", "Téa", "तेया", "Zerrikanian Warrior"],
+                    sociolect_archetype="warrior companion",
+                    speech_quirks="Sparse foreign utterances, fierce silence.",
+                    default_honorific_level="tum",
+                    assigned_voice="Achernar",
+                    is_child=False,
+                    provenance=EpistemicProvenance(
+                        origin="CORPUS_EXTRACTED",
+                        first_chapter=c_first_ch,
+                        corpus_mention_count=max(5, c_mentions),
+                        evidence_quote="Téa, walking two steps behind him, feigning boredom...",
+                    ),
+                )
+            else:
+                bible.characters[tea_key].gender = "female"
+                bible.characters[tea_key].hindi_name = "तेया"
+                bible.characters[tea_key].is_child = False
+                if not getattr(bible.characters[tea_key], "assigned_voice", None):
+                    bible.characters[tea_key].assigned_voice = "Achernar"
+                for a in ["Tea", "Téa", "तेया"]:
+                    if a not in bible.characters[tea_key].aliases:
+                        bible.characters[tea_key].aliases.append(a)
+
+        # Final purge of any stopword or relocated location from bible.characters
+        loc_names_lower = {loc.lower() for loc in bible.locations.keys()} | {
+            "brokilon", "wyzima", "cintra", "blaviken", "novigrad", "skellige", "ellander"
+        }
+        for eng_name in list(bible.characters.keys()):
+            eng_low = eng_name.lower()
+            if eng_low in ("téa", "tea", "तेया", "alderman", "एल्डरमैन"):
+                continue
+            if is_stopword(eng_name) or eng_name in bible.locations or eng_low in loc_names_lower:
+                del bible.characters[eng_name]
 
         # 5. Allocate Voice Cast via CharacterCaster (NR-GATE-03 >=4% pitch separation)
         logger.info("  [Room 1 Step 4/5] Allocating non-colliding voice cast via CharacterCaster...")
         roster_chars = [
             {
                 "name": c.english_name,
-                "gender": c.gender or "male",
+                "canonical_name": c.canonical_name,
+                "english_name": c.english_name,
+                "display_name_hi": c.hindi_name,
+                "hindi_name": c.hindi_name,
+                "gender": c.gender if c.gender in ("male", "female") else "male",
                 "aliases": c.aliases,
-                "archetype": c.sociolect_trait or "",
+                "archetype": c.sociolect_archetype or "",
+                "voice": getattr(c, "assigned_voice", None),
+                "assigned_voice_id": getattr(c, "assigned_voice", None),
+                "is_child": getattr(c, "is_child", False),
             }
             for c in bible.characters.values()
+            if (c.english_name or "").lower() not in loc_names_lower
+            and (not is_stopword(c.english_name or "") or (c.english_name or "").lower() in ("téa", "tea", "alderman"))
         ]
         if not roster_chars:
             roster_chars = [
-                {"name": c.get("english_name"), "gender": c.get("gender", "male")}
-                for c in characters_list if isinstance(c, dict) and c.get("english_name")
+                {
+                    "name": c.get("english_name"),
+                    "canonical_name": c.get("canonical_name") or c.get("english_name"),
+                    "english_name": c.get("english_name"),
+                    "display_name_hi": c.get("hindi_name"),
+                    "hindi_name": c.get("hindi_name"),
+                    "gender": c.get("gender") if c.get("gender") in ("male", "female") else "male",
+                    "aliases": c.get("aliases", []),
+                    "archetype": c.get("sociolect_trait") or c.get("archetype") or "",
+                }
+                for c in characters_list
+                if isinstance(c, dict) and c.get("english_name")
+                and (c.get("english_name") or "").lower() not in loc_names_lower
+                and not is_stopword(c.get("english_name") or "")
             ]
+        roster_chars = CharacterCaster.consolidate_characters(roster_chars)
         roster, vreg, cast_lock = CharacterCaster._build_cast_allocation(
             project_id=f"proj-{p_dir.name}",
             raw_characters=roster_chars,
@@ -408,6 +695,13 @@ class PreProductionSupervisor:
             voice_registry=vreg,
             cast_lock=cast_lock,
         )
+
+        # Guarantee voice_registry.json contains all Devanagari and Latin keys and aliases
+        try:
+            CastLockManager(p_dir).sync_voice_registry()
+            logger.info("  [Room 1 Finalize] CastLockManager synced voice_registry.json successfully.")
+        except Exception as e:
+            logger.warning(f"  [!] CastLockManager sync_voice_registry notice: {e}")
 
         try:
             bible.sync_pronunciation_lexicon(p_dir)

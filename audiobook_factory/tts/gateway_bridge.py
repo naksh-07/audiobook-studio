@@ -31,6 +31,7 @@ from typing import Any, Dict, Optional, Tuple, Union, List
 
 from audiobook_factory.logger import logger
 from audiobook_factory.core.models.adapters.base import SpeechResult
+from audiobook_factory.tts.constants import DEFAULT_MODEL
 
 
 def extract_pcm_and_duration_from_audio(
@@ -79,26 +80,80 @@ def execute_tts_synthesize(
     Executes a Room 4 Speech Synthesis request strictly through ModelGateway.
     Returns SpeechResult containing decoded audio bytes and operational metadata.
     """
-    # Clamped temperature (Narrator locked at 0.32, dialogue clamped between 0.30 and 0.52)
-    if speaker == "Narrator":
+    # Dynamic Temperature Clamping:
+    # - Narrator: Locked strictly to 0.32 (calm, steady, articulate, measured audiobook delivery).
+    # - Character Dialogue: Dynamic temperature based on emotion/intensity, strictly clamped between 0.35 and 0.50 (0.52 max for extreme drama).
+    # - Zero histrionics or screeching (never allow temperature > 0.52).
+    is_narrator = str(speaker or "").strip().lower() in ("narrator", "narration")
+    if is_narrator:
         clamped_temp = 0.32
     else:
-        clamped_temp = max(0.30, min(temperature, 0.52))
+        target_temp = temperature
+        eff_intensity = str(kwargs.get("intensity") or kwargs.get("intensity_level") or "").lower()
+        eff_emotion = str(kwargs.get("emotion") or "").lower()
+        eff_style = str(style_desc or "").lower()
 
-    # Construct payload parts with speechMetadata styling if available
+        # If temperature is at default (0.35), scale dynamically based on dramatic context
+        if target_temp == 0.35:
+            if eff_intensity in ("explosive", "extreme", "maximum") or any(k in eff_emotion or k in eff_style for k in ("rage", "screaming", "bellowing", "fury")):
+                target_temp = 0.50
+            elif eff_intensity in ("high",) or any(k in eff_emotion or k in eff_style for k in ("angry", "terror", "panic", "shout")):
+                target_temp = 0.45
+            elif eff_intensity in ("low",) or any(k in eff_emotion or k in eff_style for k in ("subdued", "whisper", "tender")):
+                target_temp = 0.36
+            elif any(k in eff_emotion or k in eff_style for k in ("excited", "urgent", "intense")):
+                target_temp = 0.42
+
+        clamped_temp = max(0.35, min(target_temp, 0.52))
+
+    # Sanitize spoken text by preserving acoustic reflexes and extracting non-acoustic cues
+    from audiobook_factory.tts.providers.gemini import (
+        sanitize_spoken_text_and_extract_stage_directions,
+        resolve_speech_metadata_style,
+    )
+    clean_text, extracted_cues = sanitize_spoken_text_and_extract_stage_directions(text)
+    spoken_text = clean_text or text
+
+    if extracted_cues and not is_narrator:
+        cue_str = ", ".join(extracted_cues)
+        if style_desc and style_desc.lower() not in ("neutral", "standard"):
+            style_desc = f"{style_desc}, {cue_str}"
+        else:
+            style_desc = cue_str
+
+    if not style_desc and not is_narrator:
+        acting_cue = kwargs.get("acting")
+        emotion_cue = kwargs.get("emotion")
+        intensity_cue = kwargs.get("intensity") or kwargs.get("intensity_level")
+        mem_vc = kwargs.get("memory_vocal_constraint")
+        if acting_cue or emotion_cue or intensity_cue or mem_vc:
+            try:
+                style_desc = resolve_speech_metadata_style(
+                    acting_cue,
+                    str(emotion_cue or "neutral"),
+                    str(intensity_cue or "medium"),
+                    memory_vocal_constraint=mem_vc,
+                    is_narrator=False,
+                )
+            except Exception:
+                pass
+
+    # Payload parts construction:
+    # Certified: speechMetadata.style is 100% valid and effective on Gemini 3.8 Flash audio modality.
+    # Preserve existing parts if explicitly supplied; otherwise construct speechMetadata.style for character dialogue.
     parts = kwargs.pop("parts", None)
     if not parts:
-        part_dict: Dict[str, Any] = {"text": text}
-        if style_desc:
-            part_dict["speechMetadata"] = {"style": style_desc}
-        parts = [part_dict]
+        if not is_narrator and style_desc and style_desc.strip() and style_desc.strip().lower() not in ("neutral", "standard"):
+            parts = [{"text": spoken_text, "speechMetadata": {"style": style_desc.strip()}}]
+        else:
+            parts = [{"text": spoken_text}]
 
     try:
         from audiobook_factory.core.models.gateway import get_model_gateway
         gateway = get_model_gateway()
 
         speech_result = gateway.synthesize_speech(
-            text=text,
+            text=spoken_text,
             voice_name=voice_name,
             model=model,
             preferred_provider="gemini",
@@ -143,6 +198,67 @@ def execute_tts_synthesize(
         raise
 
 
+def split_text_into_speech_chunks(
+    text: str,
+    max_words: int = 28,
+    is_dialogue: bool = False,
+) -> List[Tuple[str, float]]:
+    """
+    Splits long literary/dialogue text into smaller speech-synthesis chunks (<= max_words)
+    to prevent Gemini Flash TTS vocoder attention horizon truncation.
+    Returns list of (chunk_text, pause_sec_after_chunk).
+    """
+    text = text.strip()
+    if not text:
+        return []
+
+    sentence_pause = 0.25 if is_dialogue else 0.35
+    clause_pause = 0.15
+
+    # 1. Split on sentence boundaries: । ? ! \n
+    raw_sents = [s.strip() for s in re.split(r"(?<=[।?!|\n])\s*", text) if s.strip()]
+
+    # Single short sentence: process as single utterance
+    if len(raw_sents) <= 1 and len(text.split()) <= max_words:
+        return [(text, 0.0)]
+
+    chunks: List[Tuple[str, float]] = []
+    for s_idx, sent in enumerate(raw_sents):
+        is_last_sent = (s_idx == len(raw_sents) - 1)
+        s_words = sent.split()
+        if len(s_words) <= max_words:
+            pause = 0.0 if is_last_sent else sentence_pause
+            chunks.append((sent, pause))
+        else:
+            # Further split by clause boundaries: , ; — :
+            clauses = [c.strip() for c in re.split(r"(?<=[,;—:])\s*", sent) if c.strip()]
+            sub_chunks = []
+            cur_words: List[str] = []
+            for c in clauses:
+                c_w = c.split()
+                if len(c_w) > max_words:
+                    if cur_words:
+                        sub_chunks.append(" ".join(cur_words))
+                        cur_words = []
+                    for i in range(0, len(c_w), max_words):
+                        sub_chunks.append(" ".join(c_w[i : i + max_words]))
+                elif len(cur_words) + len(c_w) <= max_words:
+                    cur_words.extend(c_w)
+                else:
+                    if cur_words:
+                        sub_chunks.append(" ".join(cur_words))
+                    cur_words = list(c_w)
+            if cur_words:
+                sub_chunks.append(" ".join(cur_words))
+
+            for sub_idx, sub in enumerate(sub_chunks):
+                is_last_sub = (sub_idx == len(sub_chunks) - 1)
+                pause = (0.0 if is_last_sent else sentence_pause) if is_last_sub else clause_pause
+                chunks.append((sub, pause))
+
+    return chunks
+
+
 def execute_tts_to_file(
     text: str,
     output_file: Union[str, Path],
@@ -166,8 +282,11 @@ def execute_tts_to_file(
     **kwargs: Any,
 ) -> Tuple[Path, float]:
     """
-    Synthesizes single-utterance speech strictly routed through ModelGateway
-    and writes verified audio into output_file. Returns (output_path, duration_sec).
+    Synthesizes speech strictly routed through ModelGateway and writes verified
+    audio into output_file. Automatically splits utterances exceeding the Gemini
+    Flash TTS attention horizon (<= 28 words) on natural sentence/clause boundaries
+    with contextual breathing pauses to prevent vocoder dead-air truncation.
+    Returns (output_path, duration_sec).
     """
     if os.environ.get("TTS_PRIMARY_BACKEND", "").lower() == "local_winrt":
         from audiobook_factory.tts.providers.winrt import _synthesize_local_winrt_fallback
@@ -189,47 +308,128 @@ def execute_tts_to_file(
         except Exception as e:
             logger.debug(f"Performance adapter fallback: {e}")
 
-    if not style_desc:
-        try:
-            from audiobook_factory.tts.providers.gemini import resolve_speech_metadata_style
-            style_desc = resolve_speech_metadata_style(
-                acting, emotion, intensity, memory_vocal_constraint=memory_vocal_constraint
+    eff_speaker = speaker or getattr(performance_direction, "speaker", None) or "Narrator"
+    is_narrator = str(eff_speaker).strip().lower() in ("narrator", "narration")
+
+    from audiobook_factory.tts.providers.gemini import (
+        sanitize_spoken_text_and_extract_stage_directions,
+        resolve_speech_metadata_style,
+    )
+    clean_text, extracted_cues = sanitize_spoken_text_and_extract_stage_directions(text)
+    spoken_text = clean_text or text
+
+    if not is_narrator:
+        if not style_desc:
+            try:
+                style_desc = resolve_speech_metadata_style(
+                    acting, emotion, intensity, memory_vocal_constraint=memory_vocal_constraint
+                )
+            except Exception:
+                pass
+        if extracted_cues:
+            cue_str = ", ".join(extracted_cues)
+            if style_desc and style_desc.lower() not in ("neutral", "standard"):
+                style_desc = f"{style_desc}, {cue_str}"
+            else:
+                style_desc = cue_str
+    else:
+        style_desc = None
+
+    if is_narrator:
+        eff_temp = 0.32
+    elif base_temp is not None:
+        eff_temp = max(0.35, min(base_temp, 0.52))
+    else:
+        eff_intensity = str(intensity or getattr(performance_direction, "intensity", "medium")).lower()
+        eff_emo = str(emotion or getattr(performance_direction, "emotion", "")).lower()
+        acting_dict = acting if isinstance(acting, dict) else (acting.__dict__ if hasattr(acting, "__dict__") else {})
+        style_val = str(acting_dict.get("delivery_style", "")).lower()
+
+        if eff_intensity in ("explosive", "extreme", "maximum") or any(k in eff_emo or k in style_val for k in ("rage", "bellowing", "screaming", "fury")):
+            eff_temp = 0.50
+        elif eff_intensity in ("high",) or any(k in eff_emo or k in style_val for k in ("angry", "terror", "panic", "shout")):
+            eff_temp = 0.45
+        elif eff_intensity == "low" or any(k in eff_emo or k in style_val for k in ("subdued", "whisper", "tender")):
+            eff_temp = 0.36
+        else:
+            eff_temp = 0.40
+
+    speech_chunks = split_text_into_speech_chunks(
+        spoken_text,
+        max_words=28,
+        is_dialogue=(not is_narrator),
+    )
+
+    if len(speech_chunks) > 1:
+        # Multi-chunk synthesis to prevent vocoder horizon dead air truncation
+        combined_pcm = bytearray()
+        sample_rate = 24000
+        for chunk_idx, (chunk_text, pause_sec) in enumerate(speech_chunks):
+            chunk_res = execute_tts_synthesize(
+                text=chunk_text,
+                voice_name=voice,
+                model=model or DEFAULT_MODEL,
+                speaker=eff_speaker,
+                temperature=eff_temp,
+                session_id=session_id,
+                user_id=user_id,
+                max_retries=max_retries,
+                timeout_sec=timeout_sec,
+                style_desc=style_desc,
+                **kwargs,
             )
+            c_pcm, c_dur, c_rate = extract_pcm_and_duration_from_audio(
+                chunk_res.audio_bytes,
+                mime_type=chunk_res.mime_type,
+                default_sample_rate=chunk_res.sample_rate or 24000,
+            )
+            sample_rate = c_rate or sample_rate
+            try:
+                from audiobook_factory.audio_qc_agent import AudioQCAgent
+                qc_agent = AudioQCAgent(sample_rate=sample_rate, safety_buffer_ms=300.0)
+                clean_pcm, _, _ = qc_agent.surgical_clean_chunk(c_pcm)
+                c_pcm = clean_pcm
+            except Exception:
+                pass
+
+            combined_pcm.extend(c_pcm)
+            if pause_sec > 0:
+                silence_bytes = b"\x00" * int(sample_rate * pause_sec * 2)
+                combined_pcm.extend(silence_bytes)
+
+        pcm_bytes = bytes(combined_pcm)
+        dur_sec = len(pcm_bytes) / float(sample_rate * 2) if sample_rate > 0 else 0.0
+    else:
+        # Single utterance path
+        speech_result = execute_tts_synthesize(
+            text=spoken_text,
+            voice_name=voice,
+            model=model or DEFAULT_MODEL,
+            speaker=eff_speaker,
+            temperature=eff_temp,
+            session_id=session_id,
+            user_id=user_id,
+            max_retries=max_retries,
+            timeout_sec=timeout_sec,
+            style_desc=style_desc,
+            **kwargs,
+        )
+
+        pcm_bytes, dur_sec, sample_rate = extract_pcm_and_duration_from_audio(
+            speech_result.audio_bytes,
+            mime_type=speech_result.mime_type,
+            default_sample_rate=speech_result.sample_rate or 24000,
+        )
+
+        # Optional dead-air and C2PA burst clamp (ADR-028)
+        try:
+            from audiobook_factory.audio_qc_agent import AudioQCAgent
+            qc_agent = AudioQCAgent(sample_rate=sample_rate, safety_buffer_ms=300.0)
+            clean_pcm, _, _ = qc_agent.surgical_clean_chunk(pcm_bytes)
+            pcm_bytes = clean_pcm
+            dur_sec = len(pcm_bytes) / float(sample_rate * 2) if sample_rate > 0 else dur_sec
         except Exception:
             pass
-
-    eff_speaker = speaker or getattr(performance_direction, "speaker", None) or "Narrator"
-    eff_temp = base_temp if base_temp is not None else (0.32 if eff_speaker == "Narrator" else 0.35)
-
-    speech_result = execute_tts_synthesize(
-        text=text,
-        voice_name=voice,
-        model=model or "gemini-3.8-flash",
-        speaker=eff_speaker,
-        temperature=eff_temp,
-        session_id=session_id,
-        user_id=user_id,
-        max_retries=max_retries,
-        timeout_sec=timeout_sec,
-        style_desc=style_desc,
-        **kwargs,
-    )
-
-    pcm_bytes, dur_sec, sample_rate = extract_pcm_and_duration_from_audio(
-        speech_result.audio_bytes,
-        mime_type=speech_result.mime_type,
-        default_sample_rate=speech_result.sample_rate or 24000,
-    )
-
-    # Optional dead-air and C2PA burst clamp (ADR-028)
-    try:
-        from audiobook_factory.audio_qc_agent import AudioQCAgent
-        qc_agent = AudioQCAgent(sample_rate=sample_rate, safety_buffer_ms=150.0)
-        clean_pcm, _, _ = qc_agent.surgical_clean_chunk(pcm_bytes)
-        pcm_bytes = clean_pcm
-        dur_sec = len(pcm_bytes) / float(sample_rate * 2) if sample_rate > 0 else dur_sec
-    except Exception:
-        pass
 
     tmp_path = out_path.with_suffix(f".tmp_{uuid.uuid4().hex[:6]}.wav")
     try:
@@ -362,7 +562,7 @@ def execute_multispeaker_batch_to_file(
     speech_result = execute_tts_synthesize(
         text=combined_prompt,
         voice_name=voice_map.get(speakers[0], "Aoede"),
-        model=model or "gemini-3.8-flash",
+        model=model or DEFAULT_MODEL,
         speaker=speakers[0],
         temperature=temperature or 0.38,
         session_id=session_id,

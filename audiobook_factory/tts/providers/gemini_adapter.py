@@ -35,9 +35,13 @@ GEMINI_PERMISSIVE_SAFETY: List[Dict[str, str]] = [
     {"category": "HARM_CATEGORY_CIVIC_INTEGRITY", "threshold": "BLOCK_NONE"},
 ]
 
+GEMINI_14_STUDIO_VOICES: List[str] = [
+    "Charon", "Fenrir", "Algenib", "Enceladus", "Orus", "Algieba", "Achird",
+    "Puck", "Zephyr", "Aoede", "Kore", "Leda", "Achernar", "Callisto"
+]
+
 GEMINI_SUPPORTED_VOICES: Set[str] = {
-    "Puck", "Charon", "Kore", "Fenrir", "Aoede", "Zephyr", "Leda", "Orus",
-    "puck", "charon", "kore", "fenrir", "aoede", "zephyr", "leda", "orus"
+    v for name in GEMINI_14_STUDIO_VOICES for v in (name, name.lower(), name.capitalize())
 }
 
 
@@ -57,7 +61,8 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
         warnings: List[str] = []
         is_compat = True
 
-        if request.voice_id not in GEMINI_SUPPORTED_VOICES:
+        clean_vid = request.voice_id.strip() if request.voice_id else ""
+        if clean_vid not in GEMINI_SUPPORTED_VOICES and clean_vid.title() not in GEMINI_SUPPORTED_VOICES:
             warnings.append(f"Voice '{request.voice_id}' not in recognized Gemini prebuilt voice roster.")
 
         if len(request.spoken_text) > 3000:

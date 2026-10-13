@@ -8,6 +8,7 @@ and enforces strict minimum quality floor gates with fail-closed production halt
 
 from __future__ import annotations
 import os
+import sys
 import re
 import time
 import json
@@ -228,7 +229,29 @@ class ModelManager:
         # Tier 2 Balanced: Standard balanced flash models
         return ModelTier.TIER_2_BALANCED
 
-    def get_candidate_models_for_task(self, task: TaskType, refresh: bool = False) -> List[str]:
+    @staticmethod
+    def _get_cli_model_override() -> Optional[str]:
+        """Extracts --model argument from sys.argv if provided on CLI."""
+        try:
+            for idx, arg in enumerate(sys.argv):
+                if arg == "--model" and idx + 1 < len(sys.argv):
+                    val = sys.argv[idx + 1].strip()
+                    if val and not val.startswith("-"):
+                        return val
+                elif arg.startswith("--model="):
+                    val = arg.split("=", 1)[1].strip()
+                    if val:
+                        return val
+        except Exception:
+            pass
+        return None
+
+    def get_candidate_models_for_task(
+        self,
+        task: TaskType,
+        refresh: bool = False,
+        preferred_model: Optional[str] = None,
+    ) -> List[str]:
         """
         Returns all discovered models that satisfy the minimum quality floor for the task,
         sorted by capability tier (Tier 1 first, then Tier 2) and Gemini version descending.
@@ -248,7 +271,7 @@ class ModelManager:
                 version = float(match.group(1)) if match else (2.0 if "gemini" in name else 1.0)
                 eligible.append((tier, version, name))
 
-        env_pref = os.environ.get("GEMINI_TEXT_MODEL")
+        env_pref = preferred_model or os.environ.get("GEMINI_TEXT_MODEL") or self._get_cli_model_override()
         if env_pref and any(name == env_pref for name in discovered):
             tier = self.classify_model_tier(env_pref)
             is_blacklisted = task in CREATIVE_TASKS and any(b in env_pref.lower() for b in CREATIVE_BLACKLIST)
@@ -256,12 +279,12 @@ class ModelManager:
                 match = re.search(r"gemini-(\d+(?:\.\d+)?)", env_pref)
                 version = float(match.group(1)) if match else 2.0
                 if not any(e[2] == env_pref for e in eligible):
-                    eligible.insert(0, (tier, version, env_pref))
+                    eligible.append((tier, version, env_pref))
             else:
-                logger.warning(
-                    f"  [MODEL MANAGER] GEMINI_TEXT_MODEL='{env_pref}' rejected for task '{task.value}' "
-                    f"(Floor: {floor.name}, Blacklisted: {is_blacklisted}). Strictly adhering to quality gate."
-                )
+                    logger.warning(
+                        f"  [MODEL MANAGER] Model preference '{env_pref}' rejected for task '{task.value}' "
+                        f"(Floor: {floor.name}, Blacklisted: {is_blacklisted}). Strictly adhering to quality gate."
+                    )
 
         if not eligible:
             raise ModelTierFloorBreachError(
@@ -271,42 +294,108 @@ class ModelManager:
 
         # Sort: Primary by tier ascending (Tier 1 before Tier 2), Secondary by version descending (3.8 before 3.6), Tertiary by name
         eligible.sort(key=lambda x: (x[0].value, -x[1], x[2]))
-        return [x[2] for x in eligible]
+        candidates = [x[2] for x in eligible]
+        if env_pref and env_pref in candidates:
+            candidates = [env_pref] + [m for m in candidates if m != env_pref]
+        return candidates
 
     def ping_candidate_models(
         self,
         candidates: List[str],
         api_key: Optional[str] = None,
-        timeout: float = 30.0,
+        timeout: float = 15.0,
     ) -> List[Tuple[str, bool, float, Optional[str]]]:
         """
-        Concurrently pings 2-3 candidate models with a minimal dry-run request.
+        Concurrently pings candidate models with a minimal dry-run request.
+        Uses distinct API keys from the key pool for concurrent probes to prevent HTTP 429 throttling.
+        If a probe hits HTTP 429 or 503, performs one key rotation before marking failed.
         Returns a list of tuples: (model_name, is_ok, latency_ms, error_msg).
         """
-        key = api_key or self.pool.get_key(service="text")
-        if not key:
-            raise LLMUnavailableError("STRICT HALT: No API key available to ping candidate models.")
+        if not candidates:
+            return []
+
+        if not api_key and not self.pool:
+            raise LLMUnavailableError("STRICT HALT: No API key or key pool available to ping candidate models.")
 
         payload_bytes = json.dumps({
             "contents": [{"parts": [{"text": "ping"}]}],
             "generationConfig": {"maxOutputTokens": 1, "temperature": 0.0},
         }).encode("utf-8")
-        headers = get_stealth_sdk_headers(key)
 
-        def _probe_single(model_name: str) -> Tuple[str, bool, float, Optional[str]]:
+        def _execute_single_probe(model_name: str, target_key: str) -> Tuple[bool, float, Optional[str]]:
             t0 = time.time()
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={target_key}"
+            headers = get_stealth_sdk_headers(target_key)
             req = urllib.request.Request(url, data=payload_bytes, headers=headers, method="POST")
             try:
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     dur_ms = (time.time() - t0) * 1000.0
-                    return (model_name, True, dur_ms, None)
+                    return (True, dur_ms, None)
             except urllib.error.HTTPError as e:
                 dur_ms = (time.time() - t0) * 1000.0
-                return (model_name, False, dur_ms, f"HTTP {e.code}")
+                return (False, dur_ms, f"HTTP {e.code}")
             except Exception as e:
                 dur_ms = (time.time() - t0) * 1000.0
-                return (model_name, False, dur_ms, str(e))
+                return (False, dur_ms, str(e))
+
+        def _probe_single(model_name: str) -> Tuple[str, bool, float, Optional[str]]:
+            # Acquire distinct key from the pool if not explicitly provided
+            if api_key:
+                active_key = api_key
+            else:
+                try:
+                    active_key = self.pool.get_key(service="text")
+                except Exception as e:
+                    return (model_name, False, 0.0, f"No API key from pool: {e}")
+
+            if not active_key:
+                return (model_name, False, 0.0, "No API key available")
+
+            ok, dur_ms, err = _execute_single_probe(model_name, active_key)
+            if ok:
+                if hasattr(self, "pool") and hasattr(self.pool, "record_success"):
+                    try:
+                        self.pool.record_success(active_key, model=model_name)
+                    except Exception:
+                        pass
+                return (model_name, True, dur_ms, None)
+
+            # If a probe hits HTTP 429 or 503, attempt one key rotation with another key from the pool
+            err_lower = (err or "").lower()
+            is_rate_limited_or_unavailable = any(
+                code in err_lower for code in ("429", "503", "too many requests", "rate limit", "service unavailable")
+            )
+            if is_rate_limited_or_unavailable:
+                if hasattr(self, "pool") and hasattr(self.pool, "mark_temporary_backoff"):
+                    try:
+                        self.pool.mark_temporary_backoff(active_key, backoff_seconds=15.0, error_msg=err or "", model=model_name)
+                    except Exception:
+                        pass
+
+                rotated_key = None
+                if hasattr(self, "pool") and hasattr(self.pool, "get_key"):
+                    try:
+                        rotated_key = self.pool.get_key(service="text")
+                    except Exception:
+                        rotated_key = None
+
+                if rotated_key and rotated_key != active_key:
+                    logger.debug(
+                        f"  [MODEL MANAGER] Candidate '{model_name}' hit {err} on key {active_key[:8]}... "
+                        f"Attempting key rotation to {rotated_key[:8]}..."
+                    )
+                    ok2, dur_ms2, err2 = _execute_single_probe(model_name, rotated_key)
+                    total_dur = dur_ms + dur_ms2
+                    if ok2:
+                        if hasattr(self, "pool") and hasattr(self.pool, "record_success"):
+                            try:
+                                self.pool.record_success(rotated_key, model=model_name)
+                            except Exception:
+                                pass
+                        return (model_name, True, total_dur, None)
+                    return (model_name, False, total_dur, err2)
+
+            return (model_name, False, dur_ms, err)
 
         results: List[Tuple[str, bool, float, Optional[str]]] = []
         with ThreadPoolExecutor(max_workers=min(4, len(candidates))) as executor:
@@ -324,20 +413,22 @@ class ModelManager:
         task: TaskType,
         api_key: Optional[str] = None,
         force_refresh: bool = False,
+        preferred_model: Optional[str] = None,
     ) -> str:
         """
         Resolves the optimal active model for a task by:
         1. Checking the dynamic minimum quality floor.
-        2. Selecting top favorable candidates in batches (up to 3 at a time).
-        3. Concurrently pinging candidates to evaluate real-time health and latency.
+        2. Selecting top favorable candidates in batches (prioritizing explicit models directly).
+        3. Concurrently pinging candidates to evaluate real-time health and latency using distinct keys.
         4. Selecting the healthiest candidate (banishing latency sorting for creative tasks).
         5. If a batch fails, probing the next batch of eligible candidates.
         6. Strictly halting (raising LLMUnavailableError) if all eligible candidates fail.
         """
         now = time.time()
+        explicit_pref = preferred_model or os.environ.get("GEMINI_TEXT_MODEL") or self._get_cli_model_override()
         is_mock = os.environ.get("MOCK_OFFLINE", "").lower() in ("true", "1")
         if is_mock or os.environ.get("GEMINI_API_KEY", "").startswith("mock"):
-            return os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-pro")
+            return explicit_pref or "gemini-2.5-pro"
 
         # Check active cached model for this task
         with self._lock:
@@ -347,10 +438,7 @@ class ModelManager:
                     return cached_model
 
         # 1. Get candidate models satisfying minimum quality floor
-        candidates = self.get_candidate_models_for_task(task, refresh=force_refresh)
-        env_pref = os.environ.get("GEMINI_TEXT_MODEL")
-        if env_pref and env_pref in candidates:
-            candidates = [env_pref] + [m for m in candidates if m != env_pref]
+        candidates = self.get_candidate_models_for_task(task, refresh=force_refresh, preferred_model=explicit_pref)
 
         floor = TASK_MINIMUM_TIERS.get(task, ModelTier.TIER_2_BALANCED)
         if not candidates:
@@ -358,14 +446,24 @@ class ModelManager:
                 f"STRICT HALT: No models meet quality floor {floor.name} for task '{task.value}'."
             )
 
-        # 2. Probe candidates in batches of 3 until a healthy candidate is found
+        # 2. Probe candidates: Prioritize explicit preference directly with a single ping to avoid overhead
         batch_size = 3
         all_probed_results: List[Tuple[str, bool, float, Optional[str]]] = []
+        batches: List[List[str]] = []
 
-        for i in range(0, min(len(candidates), 9), batch_size):
-            batch = candidates[i:i + batch_size]
+        if explicit_pref and candidates and candidates[0] == explicit_pref:
+            batches.append([explicit_pref])
+            remaining = [m for m in candidates[1:9]]
+            for i in range(0, len(remaining), batch_size):
+                batches.append(remaining[i:i + batch_size])
+        else:
+            for i in range(0, min(len(candidates), 9), batch_size):
+                batches.append(candidates[i:i + batch_size])
+
+        for batch in batches:
             logger.info(f"[*] Model Manager: Concurrently pinging favorable candidates for {task.value}: {batch}")
-            probe_results = self.ping_candidate_models(batch, api_key=api_key, timeout=30.0)
+            probe_key = api_key if len(batch) == 1 else None
+            probe_results = self.ping_candidate_models(batch, api_key=probe_key, timeout=15.0)
             all_probed_results.extend(probe_results)
 
             healthy = [r for r in probe_results if r[1] is True]
@@ -377,7 +475,7 @@ class ModelManager:
                 # Scoring: For creative tasks, banish latency sorting completely!
                 def _score(item: Tuple[str, bool, float, Optional[str]]) -> Tuple[int, int, float, float]:
                     m_name, _, latency, _ = item
-                    is_pref = 0 if (env_pref and m_name == env_pref) else 1
+                    is_pref = 0 if (explicit_pref and m_name == explicit_pref) else 1
                     tier = self.classify_model_tier(m_name)
                     match = re.search(r"gemini-(\d+(?:\.\d+)?)", m_name)
                     version = float(match.group(1)) if match else (2.0 if "gemini" in m_name else 1.0)

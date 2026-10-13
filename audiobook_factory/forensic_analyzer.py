@@ -81,7 +81,7 @@ class MathematicalAcousticAnalyzer:
         self,
         samples: np.ndarray,
         silence_threshold_dbfs: float = -48.0,
-        safety_buffer_ms: float = 40.0
+        safety_buffer_ms: float = 300.0
     ) -> Tuple[float, float, List[Dict[str, Any]]]:
         """
         Scans for silence valleys and isolated trailing bursts to pinpoint
@@ -160,10 +160,10 @@ class MathematicalAcousticAnalyzer:
             })
 
         else:
-            # Case C: Standard backward scan looking for speech energy drop below -38 dBFS
+            # Case C: Standard backward scan looking for speech energy drop below silence threshold
             speech_end_t = total_dur
             for idx in range(len(rms_arr) - 1, -1, -1):
-                if rms_arr[idx] > -38.0:
+                if rms_arr[idx] > silence_threshold_dbfs:
                     speech_end_t = times[idx] + (safety_buffer_ms / 1000.0)
                     break
 
@@ -176,7 +176,7 @@ class MathematicalAcousticAnalyzer:
 def extract_acoustic_telemetry(
     pcm_bytes: bytes,
     sample_rate: int = 24000,
-    safety_buffer_ms: float = 40.0
+    safety_buffer_ms: float = 300.0
 ) -> Dict[str, Any]:
     """
     Convenience function: analyzes raw PCM bytes and returns structured forensic telemetry.

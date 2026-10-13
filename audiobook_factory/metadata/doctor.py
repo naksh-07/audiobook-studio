@@ -189,9 +189,16 @@ class MetadataDoctor:
                 # Verify pitch safety bounds and pitch separation
                 pitch_violations = []
                 voice_allocation_map: Dict[str, List[tuple[str, float]]] = {}
+                seen_char_ids: Dict[str, set] = {}
                 for cname, lk in locks.items():
                     if isinstance(lk, dict):
+                        cid = lk.get("character_id") or cname.lower()
                         vid = lk.get("voice_id", "Aoede")
+                        if vid not in seen_char_ids:
+                            seen_char_ids[vid] = set()
+                        if cid in seen_char_ids[vid]:
+                            continue  # Skip alias duplicate of the same character
+                        seen_char_ids[vid].add(cid)
                         p_ratio = float(lk.get("calibration_overrides", {}).get("pitch", 1.0))
                         if p_ratio < 0.85 or p_ratio > 1.15:
                             pitch_violations.append(f"{cname}: pitch {p_ratio} outside 0.85-1.15")

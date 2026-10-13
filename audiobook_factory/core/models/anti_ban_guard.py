@@ -150,7 +150,7 @@ class HumanCadenceController:
     ) -> float:
         """Applies human cadence pause. If fast_mode=True, returns delay without full sleep."""
         delay, breakdown = self.calculate_delay(word_count, prev_audio_duration_sec)
-        if fast_mode:
+        if fast_mode or os.environ.get("STUDIO_CADENCE_FAST", "").lower() in ("true", "1", "yes"):
             return delay
 
         if breakdown["t_director"] > 0:
@@ -418,7 +418,7 @@ class AntiBanGuard:
             return 0.0
 
         delay = random.uniform(self.key_switch_min_cooldown, self.key_switch_max_cooldown)
-        if fast_mode:
+        if fast_mode or os.environ.get("STUDIO_CADENCE_FAST", "").lower() in ("true", "1", "yes"):
             return delay
 
         logger.info(
@@ -454,6 +454,7 @@ class AntiBanGuard:
 
         # Determine context identifier to avoid cross-worker key-switch collision
         context_id = session_id or "default_context"
+        is_fast = fast_mode or os.environ.get("STUDIO_CADENCE_FAST", "").lower() in ("true", "1", "yes")
 
         with self._lock:
             effective_prev_key = prev_key_alias or self._last_used_by_context.get(context_id)
@@ -461,16 +462,16 @@ class AntiBanGuard:
             self._last_used_key_alias = key_alias
 
         # 2. Shield 3: Anti-Correlation Key-Switch Delay
-        switch_delay = self.enforce_key_switch_cooldown(effective_prev_key, key_alias, fast_mode=fast_mode)
+        switch_delay = self.enforce_key_switch_cooldown(effective_prev_key, key_alias, fast_mode=is_fast)
 
         # 3. Shield 5: Rate Limiter Token Bucket Clamping
-        rate_delay = self.rate_limiter.acquire(key_alias, fast_mode=fast_mode)
+        rate_delay = self.rate_limiter.acquire(key_alias, fast_mode=is_fast)
 
         # 4. Shield 4: Human Cadence Shaping
         cadence_delay = self.cadence.apply_cadence(
             word_count=word_count,
             prev_audio_duration_sec=prev_audio_duration_sec,
-            fast_mode=fast_mode,
+            fast_mode=is_fast,
         )
 
         return {

@@ -25,7 +25,7 @@ class AudioQCAgent:
     surgical decay tapering and Gemini multimodal fallback.
     """
 
-    def __init__(self, sample_rate: int = 24000, safety_buffer_ms: float = 40.0, fade_ms: float = 18.0):
+    def __init__(self, sample_rate: int = 24000, safety_buffer_ms: float = 300.0, fade_ms: float = 18.0):
         self.sample_rate = sample_rate
         self.safety_buffer_ms = safety_buffer_ms
         self.fade_ms = fade_ms
@@ -35,7 +35,7 @@ class AudioQCAgent:
         self,
         pcm_bytes: bytes,
         snap_zero_crossing: bool = True,
-        fade_in_ms: float = 12.0,
+        fade_in_ms: float = 3.0,
         fade_out_ms: float = 18.0
     ) -> Tuple[bytes, int, Dict[str, Any]]:
         """

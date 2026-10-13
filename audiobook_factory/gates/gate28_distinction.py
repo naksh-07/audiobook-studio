@@ -86,6 +86,64 @@ class AuditoryDistinctionGate:
             except Exception as e:
                 logger.warning(f"  [Gate 2.8] Failed to read cast_lock.json: {e}")
 
+        # Load character canon genders & alias mappings from character_roster and book_bible
+        roster_file = p_dir / "character_roster.json"
+        bible_file = p_dir / "book_bible.json"
+        char_gender_map: Dict[str, str] = {}
+        alias_to_canonical: Dict[str, str] = {}
+
+        if roster_file.exists():
+            try:
+                with open(roster_file, "r", encoding="utf-8") as rf:
+                    rdata = json.load(rf)
+                for cname, cinfo in rdata.get("characters", {}).items():
+                    if isinstance(cinfo, dict):
+                        alias_to_canonical[cname.lower()] = cname
+                        if cinfo.get("display_name"):
+                            alias_to_canonical[cinfo["display_name"].lower()] = cname
+                        if cinfo.get("english_name"):
+                            alias_to_canonical[cinfo["english_name"].lower()] = cname
+                        for a in cinfo.get("aliases", []):
+                            alias_to_canonical[a.lower()] = cname
+                        if cinfo.get("gender"):
+                            g = cinfo["gender"].lower()
+                            if g in ("male", "female"):
+                                char_gender_map[cname.lower()] = g
+                                if cinfo.get("display_name"):
+                                    char_gender_map[cinfo["display_name"].lower()] = g
+                                if cinfo.get("english_name"):
+                                    char_gender_map[cinfo["english_name"].lower()] = g
+                                for a in cinfo.get("aliases", []):
+                                    char_gender_map[a.lower()] = g
+            except Exception as e:
+                logger.warning(f"  [Gate 2.8] Failed to read character_roster.json: {e}")
+
+        if bible_file.exists():
+            try:
+                with open(bible_file, "r", encoding="utf-8") as bf:
+                    bdata = json.load(bf)
+                for cname, cinfo in bdata.get("characters", {}).items():
+                    if isinstance(cinfo, dict):
+                        alias_to_canonical[cname.lower()] = cname
+                        if cinfo.get("hindi_name"):
+                            alias_to_canonical[cinfo["hindi_name"].lower()] = cname
+                        if cinfo.get("english_name"):
+                            alias_to_canonical[cinfo["english_name"].lower()] = cname
+                        for a in cinfo.get("aliases", []):
+                            alias_to_canonical[a.lower()] = cname
+                        if cinfo.get("gender"):
+                            g = cinfo["gender"].lower()
+                            if g in ("male", "female"):
+                                char_gender_map[cname.lower()] = g
+                                if cinfo.get("hindi_name"):
+                                    char_gender_map[cinfo["hindi_name"].lower()] = g
+                                if cinfo.get("english_name"):
+                                    char_gender_map[cinfo["english_name"].lower()] = g
+                                for a in cinfo.get("aliases", []):
+                                    char_gender_map[a.lower()] = g
+            except Exception as e:
+                logger.warning(f"  [Gate 2.8] Failed to read book_bible.json: {e}")
+
         violations: List[str] = []
         warnings: List[str] = []
         dialogue_count = 0
@@ -108,22 +166,46 @@ class AuditoryDistinctionGate:
 
                 if not is_narr:
                     dialogue_count += 1
+                    canon_spk = alias_to_canonical.get(spk.lower(), spk)
+                    v_cfg = voice_map.get(spk) or voice_map.get(canon_spk) or {}
+                    if not v_cfg:
+                        for k, v in voice_map.items():
+                            if k.lower() in (spk.lower(), canon_spk.lower()):
+                                v_cfg = v
+                                break
+
                     # Whitelist & Lock Verification
-                    if spk not in voice_map and spk.lower() not in [k.lower() for k in voice_map.keys()]:
+                    if not v_cfg:
                         violations.append(f"Scene '{sc_id}': Speaker '{spk}' has no voice assignment in voice_registry.json!")
 
-                    if locked_chars and spk.lower() not in locked_chars:
+                    is_locked = (
+                        spk.lower() in locked_chars or 
+                        canon_spk.lower() in locked_chars
+                    )
+                    if locked_chars and not is_locked:
                         warnings.append(f"Scene '{sc_id}': Speaker '{spk}' is not formally locked in cast_lock.json.")
                     elif not locked_chars and strict:
                         warnings.append(f"Scene '{sc_id}': cast_lock.json is empty or missing; speaker '{spk}' has no persistent lock.")
 
-                    # Check voice_id validity
-                    v_cfg = voice_map.get(spk) or {}
+                    # Check voice_id validity & Gender Congruence (Fail-Closed)
                     vid = v_cfg.get("voice") or v_cfg.get("assigned_voice_id")
+                    v_prof = registry.get_profile(vid) if vid else None
                     if not vid:
                         violations.append(f"Scene '{sc_id}': Speaker '{spk}' has null or unassigned voice_id.")
-                    elif not registry.get_profile(vid):
+                    elif not v_prof:
                         warnings.append(f"Scene '{sc_id}': Speaker '{spk}' assigned voice '{vid}' not in curated VoiceProfileRegistry.")
+                    else:
+                        # Fail-Closed Gender Congruence Audit
+                        expected_gender = char_gender_map.get(spk.lower()) or char_gender_map.get(canon_spk.lower())
+                        if expected_gender in ("male", "female"):
+                            voice_gender = (v_prof.gender or "").lower()
+                            # Anime Seiyū rule: child boys may have youthful female voices
+                            is_child = getattr(v_prof, "is_child", False) or "child" in str(getattr(v_prof, "archetypes", [])).lower()
+                            if voice_gender and voice_gender != expected_gender and not is_child:
+                                violations.append(
+                                    f"Scene '{sc_id}': Casting Congruence Violation! Character '{spk}' has canon gender '{expected_gender}', "
+                                    f"but assigned voice '{vid}' is '{voice_gender}'! Cross-gender casting is forbidden for adult roles."
+                                )
 
                 # Phase-Safe Invariant: Assert zero asetrate or atempo in eq_filters
                 eq_filters = s.get("eq_filters", [])
@@ -134,11 +216,20 @@ class AuditoryDistinctionGate:
                         if "atempo" in f:
                             violations.append(f"Scene '{sc_id}' Segment #{s.get('index', '?')}: WSOLA time-stretching (atempo) is strictly forbidden!")
 
+            # Build normalized voice map for calibrator with canonical aliases
+            calib_voice_map = dict(voice_map)
+            for a_key, c_key in alias_to_canonical.items():
+                if c_key in voice_map and a_key not in calib_voice_map:
+                    calib_voice_map[a_key] = voice_map[c_key]
+                for orig_k, orig_v in voice_map.items():
+                    if orig_k.lower() == c_key.lower() and a_key not in calib_voice_map:
+                        calib_voice_map[a_key] = orig_v
+
             # Scene-Level Acoustic Contrast Check
             _, matrix = calibrator.calibrate_scene_segments(
                 scene_id=sc_id,
                 segments=sc_segs,
-                voice_map=voice_map,
+                voice_map=calib_voice_map,
             )
             scene_matrices.append(matrix)
 

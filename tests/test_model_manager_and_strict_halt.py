@@ -394,6 +394,92 @@ class TestModelManagerAndStrictHalt(unittest.TestCase):
                 # 3.8-flash must win due to version superiority, despite higher ping latency!
                 self.assertEqual(chosen, "gemini-3.8-flash")
 
+    def test_17_ping_candidate_models_acquires_distinct_keys(self):
+        """Validates that concurrent candidate probes acquire distinct keys from the pool."""
+        keys_provided = ["key_alpha_111", "key_beta_222", "key_gamma_333"]
+        key_idx = 0
+        keys_captured = []
+
+        def mock_get_key(service="text"):
+            nonlocal key_idx
+            k = keys_provided[key_idx % len(keys_provided)]
+            key_idx += 1
+            return k
+
+        def mock_urlopen(req, timeout=15.0):
+            match = re.search(r"key=([^&]+)", req.full_url)
+            if match:
+                keys_captured.append(match.group(1))
+            mock_resp = MagicMock()
+            mock_resp.__enter__.return_value = mock_resp
+            mock_resp.read.return_value = b"{}"
+            return mock_resp
+
+        with patch.object(self.manager.pool, "get_key", side_effect=mock_get_key):
+            with patch("urllib.request.urlopen", side_effect=mock_urlopen):
+                results = self.manager.ping_candidate_models(
+                    ["candidate-a", "candidate-b", "candidate-c"],
+                    api_key=None,
+                    timeout=5.0,
+                )
+                self.assertEqual(len(results), 3)
+                self.assertTrue(all(r[1] is True for r in results))
+                self.assertEqual(len(set(keys_captured)), 3)
+
+    def test_18_ping_candidate_models_rotates_key_on_429(self):
+        """Validates that if a probe hits HTTP 429, it rotates key from the pool and retries."""
+        keys_provided = ["key_rate_limited_001", "key_healthy_002"]
+        key_idx = 0
+        attempts = []
+
+        def mock_get_key(service="text"):
+            nonlocal key_idx
+            k = keys_provided[min(key_idx, len(keys_provided) - 1)]
+            key_idx += 1
+            return k
+
+        def mock_urlopen(req, timeout=15.0):
+            match = re.search(r"key=([^&]+)", req.full_url)
+            k = match.group(1) if match else "unknown"
+            attempts.append(k)
+            if k == "key_rate_limited_001":
+                import urllib.error
+                raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+            mock_resp = MagicMock()
+            mock_resp.__enter__.return_value = mock_resp
+            mock_resp.read.return_value = b"{}"
+            return mock_resp
+
+        with patch.object(self.manager.pool, "get_key", side_effect=mock_get_key):
+            with patch.object(self.manager.pool, "mark_temporary_backoff") as mock_backoff:
+                with patch("urllib.request.urlopen", side_effect=mock_urlopen):
+                    results = self.manager.ping_candidate_models(
+                        ["candidate-single"],
+                        api_key=None,
+                        timeout=5.0,
+                    )
+                    self.assertEqual(len(results), 1)
+                    model_name, ok, latency, err = results[0]
+                    self.assertTrue(ok)
+                    self.assertIsNone(err)
+                    self.assertEqual(attempts, ["key_rate_limited_001", "key_healthy_002"])
+                    mock_backoff.assert_called_once()
+
+    def test_19_explicit_model_single_ping_prioritization(self):
+        """Validates that explicit GEMINI_TEXT_MODEL or --model is probed alone first without excessive ping overhead."""
+        pings_recorded = []
+
+        def mock_ping(candidates, api_key=None, timeout=15.0):
+            pings_recorded.append(list(candidates))
+            return [(c, True, 50.0, None) for c in candidates]
+
+        with patch.dict(os.environ, {"GEMINI_TEXT_MODEL": "gemini-3.7-flash"}):
+            with patch.object(self.manager, "discover_available_models", return_value=["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]):
+                with patch.object(self.manager, "ping_candidate_models", side_effect=mock_ping):
+                    chosen = self.manager.resolve_active_model(TaskType.TRANSLATION, force_refresh=True)
+                    self.assertEqual(chosen, "gemini-3.7-flash")
+                    self.assertEqual(pings_recorded, [["gemini-3.7-flash"]])
+
 
 def json_bytes(obj) -> bytes:
     return json.dumps(obj).encode("utf-8")

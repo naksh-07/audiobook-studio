@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from audiobook_factory.preproduction.gateway_bridge import execute_preproduction_llm
 from audiobook_factory.model_manager import get_model_manager, TaskType
+from audiobook_factory.preproduction.linguistic_gender_resolver import LinguisticGenderResolver
 
 logger = logging.getLogger("AudiobookFactory")
 
@@ -41,7 +42,7 @@ class CanonicalCharacter(BaseModel):
     english_name: str
     hindi_name: str = Field(default="", description="Phonetically verified Devanagari transliteration")
     role_prominence: str = Field(default="major", description="'lead', 'major', 'minor', 'incidental'")
-    gender: str = Field(default="neutral", description="'male', 'female', 'neutral'")
+    gender: str = Field(default="male", description="'male' or 'female'")
     age_group: str = Field(default="adult", description="'child', 'youth', 'adult', 'elder'")
     occupation_status: str = Field(default="", description="Social standing, job, or role in narrative")
     vocal_weight: str = Field(default="balanced", description="'heavy_deep', 'light_agile', 'authoritative', 'rustic_weathered', 'melodic_soft'")
@@ -212,7 +213,7 @@ Output JSON Schema:
       "english_name": "string",
       "hindi_name": "string (Devanagari)",
       "role_prominence": "lead | major | minor | incidental",
-      "gender": "male | female | neutral",
+      "gender": "male | female",
       "age_group": "child | youth | adult | elder",
       "occupation_status": "string",
       "vocal_weight": "heavy_deep | light_agile | authoritative | rustic_weathered | melodic_soft",
@@ -344,7 +345,7 @@ Output JSON Schema:
         """Dynamically extracts prominent character names from sample prose without hardcoded rosters."""
         if not sample_text:
             return [
-                {"english_name": "Protagonist", "hindi_name": "मुख्य पात्र", "role_prominence": "lead", "gender": "neutral", "age_group": "adult", "vocal_weight": "balanced"}
+                {"english_name": "Protagonist", "hindi_name": "मुख्य पात्र", "role_prominence": "lead", "gender": "male", "age_group": "adult", "vocal_weight": "balanced"}
             ]
 
         # Look for English dialogue attributions: "Name said", "said Name", "Name asked", etc.
@@ -363,16 +364,17 @@ Output JSON Schema:
         top_names = [n for n, c in counts.most_common(3)]
         if not top_names:
             return [
-                {"english_name": "Protagonist", "hindi_name": "मुख्य पात्र", "role_prominence": "lead", "gender": "neutral", "age_group": "adult", "vocal_weight": "balanced"}
+                {"english_name": "Protagonist", "hindi_name": "मुख्य पात्र", "role_prominence": "lead", "gender": "male", "age_group": "adult", "vocal_weight": "balanced"}
             ]
 
         chars = []
         for i, name in enumerate(top_names):
+            resolved_gender = LinguisticGenderResolver.resolve_gender(name, sample_text).gender
             chars.append({
                 "english_name": name,
                 "hindi_name": name,
                 "role_prominence": "lead" if i == 0 else "major",
-                "gender": "neutral",
+                "gender": resolved_gender,
                 "age_group": "adult",
                 "vocal_weight": "balanced" if i == 0 else "light_agile",
             })

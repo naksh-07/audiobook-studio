@@ -17,7 +17,7 @@ import struct
 import wave
 import hashlib
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple, Literal
+from typing import Dict, Any, List, Optional, Tuple, Literal, TYPE_CHECKING
 from pydantic import BaseModel, Field, ConfigDict
 
 from audiobook_factory.performance.contracts import (
@@ -28,19 +28,17 @@ from audiobook_factory.performance.contracts import (
 )
 from audiobook_factory.performance.evaluator import PerformanceEvaluator
 from audiobook_factory.performance.chemistry import ConversationalChemistry
-from audiobook_factory.forced_aligner import (
-    WorkstationForcedAligner,
-    normalize_text_for_alignment,
-)
-from audiobook_factory.pronunciation import (
-    PronunciationLexicon,
-    PronunciationEntry,
-    PronunciationSource,
-    PronunciationResolver,
-    SpokenTextEngine,
-    PronunciationAudioQA,
+
+if TYPE_CHECKING:
+    from audiobook_factory.forced_aligner import WorkstationForcedAligner
+from audiobook_factory.pronunciation.contracts import (
     PronunciationStatus,
+    PronunciationSource,
+    PronunciationEntry,
 )
+from audiobook_factory.pronunciation.lexicon import PronunciationLexicon
+from audiobook_factory.pronunciation.resolver import PronunciationResolver
+from audiobook_factory.pronunciation.spoken_text import SpokenTextEngine
 from audiobook_factory.dialogue_editing.pause_editor import PauseEditor
 
 
@@ -576,7 +574,11 @@ class GoldenPerformanceSuite:
         pause_editor: Optional[PauseEditor] = None,
     ):
         self.evaluator = evaluator or PerformanceEvaluator(sample_rate=24000)
-        self.aligner = aligner or WorkstationForcedAligner(use_cuda=False)
+        if aligner is None:
+            from audiobook_factory.forced_aligner import WorkstationForcedAligner
+            self.aligner = WorkstationForcedAligner(use_cuda=False)
+        else:
+            self.aligner = aligner
         self.pause_editor = pause_editor or PauseEditor()
 
         # Pronunciation Lexicon and Resolver
@@ -605,6 +607,7 @@ class GoldenPerformanceSuite:
         ))
         self.resolver = PronunciationResolver(self.lexicon)
         self.spoken_engine = SpokenTextEngine(self.resolver)
+        from audiobook_factory.pronunciation.auditor import PronunciationAudioQA
         self.audio_qa = PronunciationAudioQA()
 
     def evaluate_scene(
