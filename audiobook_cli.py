@@ -101,6 +101,7 @@ def main():
     p_script.add_argument("--chapter", type=int, default=None, help="Specific chapter number to script")
     p_script.add_argument("--chapters", type=str, default=None, help="Comma-separated or range of chapters (e.g. 1-2 or 1,2)")
     p_script.add_argument("--overwrite", action="store_true", help="Overwrite existing script files")
+    p_script.add_argument("--model", type=str, default=None, help="LLM model override for screenplay attribution")
 
     # podcast
     p_podcast = subparsers.add_parser("podcast", help="Generate 2-Host conversational narrative podcast episodes or whitepaper audio")

@@ -27,14 +27,17 @@ class DialogueTurnIsolator:
         preceding_context: str = "",
         is_hindi: bool = False,
         character_roster: Optional[Dict[str, Any]] = None,
+        model: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Isolates dialogue turns and attributes speakers cleanly."""
+        eff_model = model or self.model
         logger.info("  [DialogueTurnIsolator] Isolating dialogue turns from prose...")
         turns = _parse_dialogue_turns_llm(
             chunk_text=chunk_text,
             preceding_context=preceding_context,
             is_hindi=is_hindi,
             character_roster=character_roster,
+            model=eff_model,
         )
         logger.info(f"  [DialogueTurnIsolator] Successfully extracted {len(turns)} turns.")
         return turns

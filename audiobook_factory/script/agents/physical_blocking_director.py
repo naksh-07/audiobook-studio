@@ -122,7 +122,7 @@ Output JSON: A list of objects matching by "index":
                     response_mime_type="application/json",
                     max_output_tokens=16384,
                     thinking_budget=1024,
-                    max_retries=6,
+                    max_retries=8,
                     model=model,
                 )
         except Exception as e:

@@ -28,6 +28,7 @@ def build_dramatized_script_llm(
     return_dramatic_plan: bool = False,
     adapter: Optional[Any] = None,
     performance_bible: Optional[Any] = None,
+    model: Optional[str] = None,
 ) -> Any:
     """
     Option C Dramatized Screenplay Builder:
@@ -70,7 +71,7 @@ def build_dramatized_script_llm(
     # 2. Format Adaptation Layer with Performance Bible
     if adapter is None:
         from audiobook_factory.adapters.audiobook import AudiobookAdapter
-        active_adapter = AudiobookAdapter(performance_bible=performance_bible)
+        active_adapter = AudiobookAdapter(model=model, performance_bible=performance_bible)
     else:
         active_adapter = adapter
     cleaned = active_adapter.adapt(

@@ -18,7 +18,8 @@ def _parse_dialogue_turns_llm(
     preceding_context: str = "",
     is_hindi: bool = False,
     character_roster: Optional[Dict[str, Any]] = None,
-    max_retries: int = 3,
+    max_retries: int = 8,
+    model: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Pass 1: Pure Dialogue Isolation & Speaker Attribution.
@@ -125,6 +126,7 @@ Output JSON: A list of objects where each object has:
         max_output_tokens=65536,
         thinking_budget=1024,
         max_retries=max_retries,
+        model=model,
     )
     if isinstance(res, list):
         return res
@@ -142,6 +144,7 @@ def parse_and_audit_dialogue_turns(
     is_hindi: bool = False,
     character_roster: Optional[Dict[str, Any]] = None,
     audit_attribution: bool = True,
+    model: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Pass 1 + Pass 1.5: Parses dialogue turns and executes Forensic Dialogue Attribution Audit
@@ -152,11 +155,12 @@ def parse_and_audit_dialogue_turns(
         preceding_context=preceding_context,
         is_hindi=is_hindi,
         character_roster=character_roster,
+        model=model,
     )
     if audit_attribution and turns:
         try:
             from audiobook_factory.script.agents.dialogue_attribution_auditor import DialogueAttributionAuditor
-            auditor = DialogueAttributionAuditor()
+            auditor = DialogueAttributionAuditor(model=model)
             turns, _ = auditor.audit_and_correct(
                 turns=turns,
                 chunk_text=chunk_text,

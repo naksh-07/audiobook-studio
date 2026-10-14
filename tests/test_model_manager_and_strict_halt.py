@@ -22,6 +22,8 @@ import ast
 import json
 import re
 import unittest
+import tempfile
+import hashlib
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -480,6 +482,262 @@ class TestModelManagerAndStrictHalt(unittest.TestCase):
                     self.assertEqual(chosen, "gemini-3.7-flash")
                     self.assertEqual(pings_recorded, [["gemini-3.7-flash"]])
 
+    def test_20_explicit_model_override_honored_for_creative_task(self):
+        """Validates that explicit model override (e.g. gemini-3.6-flash) is honored for screenplay attribution without floor breach error."""
+        with patch.object(self.manager, "discover_available_models", return_value=["gemini-3.8-flash", "gemini-3.6-flash"]):
+            with patch.object(self.manager, "ping_candidate_models", return_value=[("gemini-3.6-flash", True, 45.0, None)]):
+                chosen = self.manager.resolve_active_model(TaskType.SCREENPLAY, preferred_model="gemini-3.6-flash", force_refresh=True)
+                self.assertEqual(chosen, "gemini-3.6-flash")
+
+    def test_21_resilient_tier_2_fallback_on_503_or_timeout(self):
+        """Validates that if all Tier 1 models fail with 503/timeout, resolve_active_model falls back to healthy Tier 2."""
+        def mock_ping(candidates, api_key=None, timeout=15.0):
+            res = []
+            for c in candidates:
+                if "3.8" in c:
+                    res.append((c, False, 500.0, "HTTP 503"))
+                elif "3.7" in c:
+                    res.append((c, False, 15000.0, "Timed out"))
+                elif "3.6" in c:
+                    res.append((c, True, 100.0, None))
+                else:
+                    res.append((c, False, 500.0, "HTTP 503"))
+            return res
+
+        with patch.object(self.manager, "discover_available_models", return_value=["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]):
+            with patch.object(self.manager, "ping_candidate_models", side_effect=mock_ping):
+                chosen = self.manager.resolve_active_model(TaskType.SCREENPLAY, force_refresh=True)
+                self.assertEqual(chosen, "gemini-3.6-flash")
+
+    def test_22_subpar_model_override_still_rejected_with_floor_breach(self):
+        """Validates that requesting a sub-par utility model (e.g. flash-lite) for screenplay still raises ModelTierFloorBreachError."""
+        with patch.object(self.manager, "discover_available_models", return_value=["gemini-3.1-flash-lite"]):
+            with self.assertRaises(ModelTierFloorBreachError):
+                self.manager.resolve_active_model(TaskType.SCREENPLAY, preferred_model="gemini-3.1-flash-lite", force_refresh=True)
+
+    def test_23_cli_script_subcommand_model_flag(self):
+        """Validates that audiobook_cli.py script subcommand parses --model flag and passes it to generate_project_scripts."""
+        import sys
+        from unittest.mock import MagicMock
+        with patch.object(sys, "argv", ["audiobook-factory", "script", "sample_book", "--model", "gemini-3.6-flash"]):
+            with patch("audiobook_factory.cli.commands.pipeline.generate_project_scripts") as mock_gen:
+                with patch("pathlib.Path.exists", return_value=True):
+                    with patch("pathlib.Path.is_dir", return_value=True):
+                        from audiobook_cli import main
+                        try:
+                            main()
+                        except SystemExit:
+                            pass
+                        mock_gen.assert_called_once()
+                        _, kwargs = mock_gen.call_args
+                        self.assertEqual(kwargs.get("model"), "gemini-3.6-flash")
+
+    def test_24_explicit_model_sticks_across_retries(self):
+        """Validates that an explicitly passed model sticks across retries and does not rotate to other candidates."""
+        from audiobook_factory.llm_client import call_gemini
+        from audiobook_factory.key_manager import get_persistent_key_pool
+        import urllib.request
+        from unittest.mock import MagicMock
+
+        models_contacted = []
+
+        def mock_urlopen(req, timeout=45.0):
+            url = req.full_url
+            for m in ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.7-flash"]:
+                if m in url:
+                    models_contacted.append(m)
+            if len(models_contacted) == 1:
+                import urllib.error
+                raise urllib.error.HTTPError(url, 429, "Rate Limit", {}, None)
+            mock_resp = MagicMock()
+            mock_resp.__enter__.return_value = mock_resp
+            mock_resp.read.return_value = json.dumps({
+                "candidates": [{"content": {"parts": [{"text": '{"result": "success"}'}]}}]
+            }).encode("utf-8")
+            return mock_resp
+
+        with patch("urllib.request.urlopen", side_effect=mock_urlopen):
+            with patch("audiobook_factory.llm_client.get_model_manager", return_value=self.manager):
+                with patch.object(self.manager, "get_candidate_models_for_task", return_value=["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]):
+                    with patch.object(get_persistent_key_pool(), "get_key", return_value="AIzaSyDummyKey"):
+                        res = call_gemini("test prompt", model="gemini-3.6-flash", max_retries=3)
+                        self.assertEqual(res, {"result": "success"})
+                        # Both attempts must contact gemini-3.6-flash without switching to 3.8 or 3.7
+                        self.assertEqual(models_contacted, ["gemini-3.6-flash", "gemini-3.6-flash"])
+
+    def test_25_explicit_model_rotates_on_safety_or_circuit_breaker(self):
+        """Validates that if an explicitly passed model is safety-blocked, retries rotate to healthy candidates."""
+        from audiobook_factory.llm_client import call_gemini
+        from audiobook_factory.key_manager import get_persistent_key_pool
+        import urllib.request
+        from unittest.mock import MagicMock
+
+        models_contacted = []
+
+        def mock_urlopen(req, timeout=45.0):
+            url = req.full_url
+            if "?key=" in url:
+                mock_resp = MagicMock()
+                mock_resp.__enter__.return_value = mock_resp
+                mock_resp.read.return_value = b"{}"
+                return mock_resp
+
+            for m in ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.7-flash"]:
+                if m in url:
+                    models_contacted.append(m)
+            # First attempt: safety blocked response (no candidates)
+            if len(models_contacted) == 1:
+                mock_resp = MagicMock()
+                mock_resp.__enter__.return_value = mock_resp
+                mock_resp.read.return_value = json.dumps({
+                    "promptFeedback": {"blockReason": "SAFETY"}
+                }).encode("utf-8")
+                return mock_resp
+            mock_resp = MagicMock()
+            mock_resp.__enter__.return_value = mock_resp
+            mock_resp.read.return_value = json.dumps({
+                "candidates": [{"content": {"parts": [{"text": '{"result": "fallback_success"}'}]}}]
+            }).encode("utf-8")
+            return mock_resp
+
+        with patch("urllib.request.urlopen", side_effect=mock_urlopen):
+            with patch("audiobook_factory.llm_client.get_model_manager", return_value=self.manager):
+                with patch.object(self.manager, "get_candidate_models_for_task", return_value=["gemini-3.6-flash", "gemini-3.8-flash"]):
+                    with patch.object(get_persistent_key_pool(), "get_key", return_value="AIzaSyDummyKey"):
+                        res = call_gemini("test prompt", model="gemini-3.6-flash", max_retries=3)
+                        self.assertEqual(res, {"result": "fallback_success"})
+                        # First attempt: gemini-3.6-flash (safety blocked), second attempt rotated to gemini-3.8-flash
+                        self.assertEqual(models_contacted, ["gemini-3.6-flash", "gemini-3.8-flash"])
+
+    def test_26_model_aware_key_leasing_passes_model_to_pool(self):
+        """Validates that pool.get_key receives model=model or env_model during key leasing in call_gemini."""
+        from audiobook_factory.llm_client import call_gemini
+        from audiobook_factory.key_manager import get_persistent_key_pool
+        import urllib.request
+        from unittest.mock import MagicMock
+
+        leased_models = []
+
+        def mock_get_key(service="text", provider="gemini", model=None, max_wait_seconds=60.0):
+            leased_models.append(model)
+            return "AIzaSyDummyKey"
+
+        mock_resp = MagicMock()
+        mock_resp.__enter__.return_value = mock_resp
+        mock_resp.read.return_value = json.dumps({
+            "candidates": [{"content": {"parts": [{"text": '{"result": "ok"}'}]}}]
+        }).encode("utf-8")
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            with patch("audiobook_factory.llm_client.get_model_manager", return_value=self.manager):
+                with patch.object(self.manager, "get_candidate_models_for_task", return_value=["gemini-3.6-flash"]):
+                    with patch.object(get_persistent_key_pool(), "get_key", side_effect=mock_get_key):
+                        # Case A: explicit model passed
+                        call_gemini("test prompt", model="gemini-3.6-flash", max_retries=1)
+                        self.assertEqual(leased_models[-1], "gemini-3.6-flash")
+
+                        # Case B: env model set
+                        with patch.dict(os.environ, {"GEMINI_TEXT_MODEL": "gemini-3.8-flash"}):
+                            call_gemini("test prompt", model=None, max_retries=1)
+                            self.assertEqual(leased_models[-1], "gemini-3.8-flash")
+
+    def test_27_preflight_fulfillment_reuse(self):
+        """Validates that call_gemini reuses existing Antigravity In-Session fulfillment files before retries or network calls."""
+        import tempfile
+        import hashlib
+        from audiobook_factory.llm_client import call_gemini
+        from audiobook_factory.safety import get_dramatic_fiction_framing
+        from audiobook_factory.model_manager import TaskType
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            handoff_dir = Path(tmp_dir) / "pending_handoffs"
+            handoff_dir.mkdir(parents=True, exist_ok=True)
+
+            prompt = "Translate this dramatic text"
+            system_instruction = "You are a master literary translator."
+            # Account for dramatic fiction framing applied to creative fiction tasks
+            prefix = get_dramatic_fiction_framing()
+            framed_sys = f"{prefix}{system_instruction}"
+            framed_prompt = f"{prefix}{prompt}"
+            p_hash = hashlib.sha256((framed_sys + framed_prompt).encode("utf-8")).hexdigest()[:10]
+
+            # Case A: JSON fulfillment file
+            result_json_path = handoff_dir / f"handoff_{TaskType.TRANSLATION.value}_{p_hash}.result.json"
+            result_json_path.write_text(json.dumps({"translated_text": "अनुवादित पाठ"}), encoding="utf-8")
+
+            with patch.dict(os.environ, {"CURRENT_PROJECT_DIR": tmp_dir}):
+                with patch("urllib.request.urlopen") as mock_urlopen:
+                    with patch("audiobook_factory.key_manager.get_persistent_key_pool") as mock_pool:
+                        res = call_gemini(
+                            prompt=prompt,
+                            system_instruction=system_instruction,
+                            task_type=TaskType.TRANSLATION,
+                            response_mime_type="application/json",
+                        )
+                        self.assertEqual(res, {"translated_text": "अनुवादित पाठ"})
+                        mock_urlopen.assert_not_called()
+                        mock_pool.assert_not_called()
+
+            # Case B: TXT fulfillment file
+            result_json_path.unlink()
+            result_txt_path = handoff_dir / f"handoff_{TaskType.TRANSLATION.value}_{p_hash}.result.txt"
+            result_txt_path.write_text('{"translated_text": "अनुवादित पाठ 2"}', encoding="utf-8")
+
+            with patch.dict(os.environ, {"CURRENT_PROJECT_DIR": tmp_dir}):
+                with patch("urllib.request.urlopen") as mock_urlopen:
+                    with patch("audiobook_factory.key_manager.get_persistent_key_pool") as mock_pool:
+                        res = call_gemini(
+                            prompt=prompt,
+                            system_instruction=system_instruction,
+                            task_type=TaskType.TRANSLATION,
+                            response_mime_type="application/json",
+                        )
+                        self.assertEqual(res, {"translated_text": "अनुवादित पाठ 2"})
+                        mock_urlopen.assert_not_called()
+                        mock_pool.assert_not_called()
+
+    def test_28_semantic_scene_fulfillment_fallback(self):
+        """Validates that call_gemini reuses existing fulfillment via scene signature when prompt hashes diverge."""
+        from audiobook_factory.llm_client import call_gemini
+        from audiobook_factory.safety import get_dramatic_fiction_framing
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            handoff_dir = Path(tmp_dir) / "pending_handoffs"
+            handoff_dir.mkdir(parents=True, exist_ok=True)
+
+            distinctive_scene = "This is a dramatic confrontation in the ancient ruins between the swordsman and the shadow sorcerer."
+            candidate_prompt = f'Earlier context: [whispers] Soft footfalls echo.\n\nCurrent Scene Text:\n"""{distinctive_scene}"""\n\nGenerate screenplay.'
+            cand_hash = "cand123456"
+            cand_handoff_path = handoff_dir / f"handoff_{TaskType.SCREENPLAY.value}_{cand_hash}.json"
+            cand_result_path = handoff_dir / f"handoff_{TaskType.SCREENPLAY.value}_{cand_hash}.result.json"
+
+            cand_handoff_path.write_text(json.dumps({"prompt": candidate_prompt}), encoding="utf-8")
+            cand_result_path.write_text(json.dumps([{"speaker": "Swordsman", "text": "Halt!"}]), encoding="utf-8")
+
+            # New call has different context/whispers but identical scene text
+            new_prompt = f'Earlier context: [gasps] Louder breathing in dark.\n\nCurrent Scene Text:\n"""{distinctive_scene}"""\n\nGenerate screenplay.'
+
+            with patch.dict(os.environ, {"CURRENT_PROJECT_DIR": tmp_dir}):
+                with patch("urllib.request.urlopen") as mock_urlopen:
+                    with patch("audiobook_factory.key_manager.get_persistent_key_pool") as mock_pool:
+                        res = call_gemini(
+                            prompt=new_prompt,
+                            system_instruction="You are a master screenplay adapter.",
+                            task_type=TaskType.SCREENPLAY,
+                            response_mime_type="application/json",
+                        )
+                        self.assertEqual(res, [{"speaker": "Swordsman", "text": "Halt!"}])
+                        mock_urlopen.assert_not_called()
+                        mock_pool.assert_not_called()
+
+                        # Also verify it cached to the new p_hash
+                        prefix = get_dramatic_fiction_framing()
+                        framed_sys = f"{prefix}You are a master screenplay adapter."
+                        framed_prompt = f"{prefix}{new_prompt}"
+                        p_hash = hashlib.sha256((framed_sys + framed_prompt).encode("utf-8")).hexdigest()[:10]
+                        cached_result_file = handoff_dir / f"handoff_{TaskType.SCREENPLAY.value}_{p_hash}.result.json"
+                        self.assertTrue(cached_result_file.exists())
+
 
 def json_bytes(obj) -> bytes:
     return json.dumps(obj).encode("utf-8")
@@ -487,3 +745,4 @@ def json_bytes(obj) -> bytes:
 
 if __name__ == "__main__":
     unittest.main()
+

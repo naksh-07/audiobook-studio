@@ -26,6 +26,7 @@ def generate_project_scripts(
     dramatized: bool = False,
     overwrite: bool = False,
     chapters: Optional[List[int]] = None,
+    model: Optional[str] = None,
 ) -> Path:
     """Generates JSON screenplay scripts for all chapters in project."""
     project_dir = Path(project_dir).resolve()
@@ -152,6 +153,7 @@ def generate_project_scripts(
                 chapter_id=chap_file.stem,
                 return_dramatic_plan=True,
                 performance_bible=pb,
+                model=model,
             )
             try:
                 d_plan.save_to_file(dramaturgy_dir / f"{chap_file.stem}_dramatic_plan.json")
@@ -187,6 +189,7 @@ def generate_project_scripts(
                                 prompt=f"{system_instruction}\n\n{prompt}",
                                 task_type=TaskType.SCREENPLAY,
                                 response_mime_type="application/json",
+                                model=model,
                             )
                         )
                     )

@@ -159,17 +159,105 @@ def call_gemini(
     if task_type in _THINKING_TASK_TYPES:
         effective_thinking_budget = thinking_budget if thinking_budget is not None else _DEFAULT_THINKING_BUDGET
 
+    # Pre-flight check for existing fulfillment
+    if task_type in CREATIVE_TASKS:
+        from pathlib import Path
+        import hashlib
+        curr_proj = os.environ.get("CURRENT_PROJECT_DIR")
+        target_dir = Path(curr_proj) / "pending_handoffs" if curr_proj else Path("pending_handoffs")
+        p_hash = hashlib.sha256(((system_instruction or "") + prompt).encode("utf-8")).hexdigest()[:10]
+        res_json_pre = target_dir / f"handoff_{task_type.value}_{p_hash}.result.json"
+        res_txt_pre = target_dir / f"handoff_{task_type.value}_{p_hash}.result.txt"
+        if res_json_pre.exists():
+            try:
+                with open(res_json_pre, "r", encoding="utf-8") as f:
+                    logger.info(f"[+] Reusing existing Antigravity In-Session fulfillment from {res_json_pre}")
+                    return json.load(f)
+            except Exception:
+                pass
+        if res_txt_pre.exists():
+            try:
+                with open(res_txt_pre, "r", encoding="utf-8") as f:
+                    txt = f.read().strip()
+                logger.info(f"[+] Reusing existing Antigravity In-Session fulfillment from {res_txt_pre}")
+                if response_mime_type == "application/json":
+                    try:
+                        return json.loads(txt)
+                    except Exception:
+                        return json_repair.loads(txt)
+                return txt
+            except Exception:
+                pass
+
+        # Semantic scene text matching fallback for screenplay / translation
+        if target_dir.exists():
+            # Extract distinctive scene text signature
+            scene_sig = ""
+            if "Current Scene Text:" in prompt:
+                try:
+                    scene_sig = prompt.split("Current Scene Text:")[1].split('"""')[1].strip()[:200]
+                except Exception:
+                    pass
+            elif '"""' in prompt:
+                parts = prompt.split('"""')
+                if len(parts) >= 3:
+                    scene_sig = parts[1].strip()[:200]
+
+            if scene_sig and len(scene_sig) >= 30:
+                for candidate_handoff in target_dir.glob(f"handoff_{task_type.value}_*.json"):
+                    if candidate_handoff.name.endswith(".result.json"):
+                        continue
+                    cand_res_json = candidate_handoff.with_name(f"{candidate_handoff.stem}.result.json")
+                    cand_res_txt = candidate_handoff.with_name(f"{candidate_handoff.stem}.result.txt")
+                    if not cand_res_json.exists() and not cand_res_txt.exists():
+                        continue
+                    try:
+                        with open(candidate_handoff, "r", encoding="utf-8") as f:
+                            cand_data = json.load(f)
+                        cand_prompt = cand_data.get("prompt", "")
+                        if scene_sig in cand_prompt:
+                            if cand_res_json.exists():
+                                with open(cand_res_json, "r", encoding="utf-8") as rf:
+                                    res_obj = json.load(rf)
+                                logger.info(f"[+] Reusing matching Antigravity In-Session fulfillment from {cand_res_json} (matched scene text)")
+                                # Cache to current p_hash for future runs
+                                try:
+                                    with open(res_json_pre, "w", encoding="utf-8") as wf:
+                                        json.dump(res_obj, wf, ensure_ascii=False, indent=2)
+                                except Exception:
+                                    pass
+                                return res_obj
+                            if cand_res_txt.exists():
+                                with open(cand_res_txt, "r", encoding="utf-8") as rf:
+                                    res_txt = rf.read().strip()
+                                logger.info(f"[+] Reusing matching Antigravity In-Session fulfillment from {cand_res_txt} (matched scene text)")
+                                try:
+                                    with open(res_txt_pre, "w", encoding="utf-8") as wf:
+                                        wf.write(res_txt)
+                                except Exception:
+                                    pass
+                                if response_mime_type == "application/json":
+                                    try:
+                                        return json.loads(res_txt)
+                                    except Exception:
+                                        return json_repair.loads(res_txt)
+                                return res_txt
+                    except Exception:
+                        continue
+
     last_error: Optional[Exception] = None
     _max_tokens_retried = False  # guard: only retry once on MAX_TOKENS
     _thinking_disabled = False   # guard: disable thinkingConfig if model rejects it
     _models_safety_blocked: set[str] = set()
+    _transient_error_keys: set[str] = set()
 
     for attempt in range(max_retries):
         # Subtle non-hammering pacing jitter between parallel threads (100ms - 350ms)
         time.sleep(random.uniform(0.10, 0.35))
 
+        env_model = os.environ.get("GEMINI_TEXT_MODEL")
         try:
-            curr_key = explicit_key if explicit_key else pool.get_key(service=service)
+            curr_key = explicit_key if explicit_key else pool.get_key(service=service, model=model or env_model)
         except Exception as e:
             logger.error(f"  [!] KeyPool key acquisition failure: {e}")
             raise LLMUnavailableError(f"No available Gemini API keys in pool: {e}") from e
@@ -185,7 +273,6 @@ def call_gemini(
         except Exception:
             candidate_models = []
 
-        env_model = os.environ.get("GEMINI_TEXT_MODEL")
         if env_model:
             if env_model in candidate_models:
                 candidate_models = [env_model] + [m for m in candidate_models if m != env_model]
@@ -209,11 +296,11 @@ def call_gemini(
         healthy_candidates = [m for m in available_candidates if breaker.is_available("gemini", m)]
         effective_candidates = healthy_candidates if healthy_candidates else available_candidates
 
-        if attempt > 0 and len(effective_candidates) > 1:
-            # Automatic candidate rotation on retries/errors (never hammer a single model)
-            curr_model = effective_candidates[attempt % len(effective_candidates)]
-        elif model and model not in _models_safety_blocked and breaker.is_available("gemini", model):
+        if model and model not in _models_safety_blocked and breaker.is_available("gemini", model):
             curr_model = model
+        elif attempt > 0 and len(effective_candidates) > 1:
+            # Automatic candidate rotation on retries/errors when model is not explicitly pinned
+            curr_model = effective_candidates[attempt % len(effective_candidates)]
         else:
             try:
                 curr_model = model_mgr.resolve_active_model(task_type, api_key=curr_key)
@@ -413,8 +500,10 @@ def call_gemini(
             elif error_type == "INVALID_KEY":
                 pool.mark_invalid(curr_key, msg, provider="gemini")
             elif error_type == "TRANSIENT_SERVER_ERROR":
+                _transient_error_keys.add(curr_key)
                 pool.mark_temporary_backoff(curr_key, wait_sec, msg, model=curr_model, provider="gemini")
-                get_circuit_breaker().record_failure("gemini", curr_model, msg)
+                if attempt == max_retries - 1 or len(_transient_error_keys) > 1:
+                    get_circuit_breaker().record_failure("gemini", curr_model, msg)
             else:
                 pool.mark_temporary_backoff(curr_key, 6.0, msg, model=curr_model, provider="gemini")
 

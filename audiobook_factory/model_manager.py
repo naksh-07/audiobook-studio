@@ -274,17 +274,18 @@ class ModelManager:
         env_pref = preferred_model or os.environ.get("GEMINI_TEXT_MODEL") or self._get_cli_model_override()
         if env_pref and any(name == env_pref for name in discovered):
             tier = self.classify_model_tier(env_pref)
-            is_blacklisted = task in CREATIVE_TASKS and any(b in env_pref.lower() for b in CREATIVE_BLACKLIST)
-            if tier <= floor and not is_blacklisted:
+            is_subpar = any(x in env_pref.lower() for x in ("nano", "gemma", "8b", "lite"))
+            if not is_subpar:
+                # Explicit preference is honored as long as it's not a sub-par utility model
                 match = re.search(r"gemini-(\d+(?:\.\d+)?)", env_pref)
                 version = float(match.group(1)) if match else 2.0
                 if not any(e[2] == env_pref for e in eligible):
                     eligible.append((tier, version, env_pref))
             else:
-                    logger.warning(
-                        f"  [MODEL MANAGER] Model preference '{env_pref}' rejected for task '{task.value}' "
-                        f"(Floor: {floor.name}, Blacklisted: {is_blacklisted}). Strictly adhering to quality gate."
-                    )
+                logger.warning(
+                    f"  [MODEL MANAGER] Model preference '{env_pref}' rejected for task '{task.value}' "
+                    f"(Sub-par utility model). Strictly adhering to quality gate."
+                )
 
         if not eligible:
             raise ModelTierFloorBreachError(
@@ -344,6 +345,8 @@ class ModelManager:
                 active_key = api_key
             else:
                 try:
+                    active_key = self.pool.get_key(service="text", model=model_name)
+                except TypeError:
                     active_key = self.pool.get_key(service="text")
                 except Exception as e:
                     return (model_name, False, 0.0, f"No API key from pool: {e}")
@@ -375,6 +378,8 @@ class ModelManager:
                 rotated_key = None
                 if hasattr(self, "pool") and hasattr(self.pool, "get_key"):
                     try:
+                        rotated_key = self.pool.get_key(service="text", model=model_name)
+                    except TypeError:
                         rotated_key = self.pool.get_key(service="text")
                     except Exception:
                         rotated_key = None
@@ -489,7 +494,7 @@ class ModelManager:
                 chosen_latency = healthy[0][2]
                 chosen_tier = self.classify_model_tier(chosen_model)
 
-                if chosen_tier > floor:
+                if chosen_tier > floor and chosen_model != explicit_pref:
                     raise ModelTierFloorBreachError(
                         f"STRICT HALT: Candidate '{chosen_model}' ({chosen_tier.name}) breaches minimum "
                         f"quality floor {floor.name} for '{task.value}'. Production halted."
@@ -499,6 +504,56 @@ class ModelManager:
                 with self._lock:
                     self._active_task_models[task] = (chosen_model, now)
                 return chosen_model
+
+        # All eligible candidates in primary batches failed health pings.
+        # Resilient Tier 2 Fallback on Provider Downtime:
+        # If all Tier 1 candidates failed with HTTP 503 (model unavailable / high demand) or network timeout,
+        # probe healthy Tier 2 balanced models (e.g. gemini-3.6-flash, gemini-3.5-flash) to prevent pipeline crash.
+        tier1_failed = [r for r in all_probed_results if self.classify_model_tier(r[0]) == ModelTier.TIER_1_FLAGSHIP]
+        has_503_or_timeout = any(
+            any(ind in (r[3] or "").lower() for ind in ("503", "timeout", "timed out", "unavailable", "high demand", "overloaded"))
+            for r in tier1_failed
+        )
+        all_tier1_failed = bool(tier1_failed) and all(r[1] is False for r in tier1_failed)
+
+        if all_tier1_failed and has_503_or_timeout:
+            discovered = self.discover_available_models(refresh=False)
+            probed_names = {r[0] for r in all_probed_results}
+            tier2_candidates = [
+                m for m in discovered
+                if self.classify_model_tier(m) == ModelTier.TIER_2_BALANCED
+                and not any(x in m.lower() for x in ("nano", "gemma", "8b", "lite"))
+                and m not in probed_names
+            ]
+            if tier2_candidates:
+                def _t2_sort(m: str) -> Tuple[float, str]:
+                    match = re.search(r"gemini-(\d+(?:\.\d+)?)", m)
+                    v = float(match.group(1)) if match else 2.0
+                    return (-v, m)
+
+                tier2_candidates.sort(key=_t2_sort)
+                probe_key = api_key if (len(tier2_candidates[:3]) == 1 or not self.pool) else None
+                t2_results = self.ping_candidate_models(tier2_candidates[:3], api_key=probe_key, timeout=15.0)
+                all_probed_results.extend(t2_results)
+                healthy_t2 = [r for r in t2_results if r[1] is True]
+                for m_name, ok, lat, err in t2_results:
+                    status_str = f"HEALTHY ({lat:.0f}ms)" if ok else f"FAILED ({err}, {lat:.0f}ms)"
+                    logger.info(f"    - [TIER 2 FALLBACK] {m_name}: {status_str}")
+
+                if healthy_t2:
+                    healthy_t2.sort(key=lambda r: (
+                        -float(re.search(r"gemini-(\d+(?:\.\d+)?)", r[0]).group(1)) if re.search(r"gemini-(\d+(?:\.\d+)?)", r[0]) else -2.0,
+                        r[2]
+                    ))
+                    fallback_model = healthy_t2[0][0]
+                    fallback_latency = healthy_t2[0][2]
+                    logger.warning(
+                        f"[WARN] All Tier 1 flagship models unavailable (503/timeout). "
+                        f"Resiliently falling back to Tier 2 balanced model '{fallback_model}' to prevent pipeline crash."
+                    )
+                    with self._lock:
+                        self._active_task_models[task] = (fallback_model, now)
+                    return fallback_model
 
         # All eligible candidates failed ping
         raise LLMUnavailableError(

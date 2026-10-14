@@ -426,7 +426,7 @@ class CircuitBreaker:
 
     def __init__(
         self,
-        failure_threshold: int = 3,
+        failure_threshold: int = 8,
         recovery_timeout_sec: float = 30.0,
     ):
         self.failure_threshold = failure_threshold

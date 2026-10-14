@@ -13,6 +13,7 @@ from audiobook_factory.script_builder import generate_project_scripts
 from audiobook_factory.tts_dispatcher import TTSDispatcher
 from audiobook_factory.mastering import concatenate_and_master_chapter
 from audiobook_factory.orchestrator import PipelineOrchestrator
+from audiobook_factory.guard_shield import get_circuit_breaker
 
 def cmd_extract(args):
     input_file = Path(args.file)
@@ -89,6 +90,10 @@ def cmd_translate(args):
 
 
 def cmd_script(args):
+    if getattr(args, "model", None):
+        os.environ["GEMINI_TEXT_MODEL"] = str(args.model)
+    get_circuit_breaker().force_reset()
+
     b_path = Path(args.book)
     project_dir = b_path if (b_path.exists() and b_path.is_dir()) else (get_projects_dir() / args.book)
     os.environ["CURRENT_PROJECT_DIR"] = str(project_dir.resolve())
@@ -129,6 +134,7 @@ def cmd_script(args):
         dramatized=dramatized,
         overwrite=getattr(args, "overwrite", False),
         chapters=chapters,
+        model=getattr(args, "model", None),
     )
     print(f"\n[OK] Scripts ready at: {scripts_dir} (Mode: {cast_mode.upper()})")
 

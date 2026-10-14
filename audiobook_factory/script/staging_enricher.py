@@ -23,6 +23,7 @@ def _enrich_performance_and_staging_llm(
     dramatic_context: str = "",
     is_hindi: bool = False,
     character_roster: Optional[Dict[str, Any]] = None,
+    model: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Pass 2: Performance Director & Spatial Audio Staging.
@@ -89,6 +90,7 @@ Output JSON: A list of objects where each object corresponds by "index" to the i
             max_output_tokens=65536,
             thinking_budget=1024,
             max_retries=8,
+            model=model,
         )
     except Exception as e:
         logger.warning(f"  [!] Pass 2 performance enrichment notice: {e}. Preserving Pass 1 baseline.")
@@ -178,7 +180,7 @@ def _parse_dramatized_chunk_llm(
     character_roster: Optional[Dict[str, Any]] = None,
     api_key: str = "",
     model: str = "",
-    max_retries: int = 3,
+    max_retries: int = 8,
     dramatic_context: str = "",
     director_card: Optional[Any] = None,
     playbook: Optional[Any] = None,
@@ -219,6 +221,7 @@ def _parse_dramatized_chunk_llm(
         is_hindi=is_hindi,
         character_roster=character_roster,
         max_retries=max_retries,
+        model=model,
     )
     if not pass1_turns:
         if chunk_text.strip():
@@ -233,6 +236,7 @@ def _parse_dramatized_chunk_llm(
         dramatic_context=dramatic_context,
         is_hindi=is_hindi,
         character_roster=character_roster,
+        model=model,
     )
     return enriched_turns
 
