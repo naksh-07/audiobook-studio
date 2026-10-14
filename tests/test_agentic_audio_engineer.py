@@ -48,107 +48,26 @@ class TestAgenticAudioEngineer(unittest.TestCase):
         self.assertTrue(res.startswith("ERROR"))
         self.assertIn("Stream [3:a] does not exist", res)
 
-    def test_04_agent_self_healing_tool_loop(self):
-        """Verify agent receives tool error, feeds back to model, and finalizes valid graph."""
-        # Simulated responses:
-        # Turn 1: Model calls test_filter_graph with bad syntax
-        mock_resp_1 = MagicMock()
-        mock_resp_1.read.return_value = json.dumps({
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "functionCall": {
-                            "name": "test_filter_graph",
-                            "args": {"filter_complex": "[0:a]badfilter[out]"},
-                        }
-                    }]
-                }
-            }]
-        }).encode("utf-8")
-        mock_resp_1.__enter__.return_value = mock_resp_1
+    def test_04_agent_deadbolt_disabled_by_policy(self):
+        """Verify build_ffmpeg_filter_graph_via_agent raises RuntimeError under pure vocals-only mandate."""
+        with self.assertRaises(RuntimeError) as ctx:
+            build_ffmpeg_filter_graph_via_agent(
+                soundscape_plan={"scenes": [{"id": 1, "emotion": "tense"}]},
+                cue_sheet={"foley_cues": []},
+                vocal_dur=10.0,
+                has_foley=False,
+            )
+        self.assertIn("disabled", str(ctx.exception).lower())
 
-        # Turn 2: Model calls test_filter_graph with corrected syntax
-        mock_resp_2 = MagicMock()
-        mock_resp_2.read.return_value = json.dumps({
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "functionCall": {
-                            "name": "test_filter_graph",
-                            "args": {"filter_complex": "[0:a][1:a]amix=inputs=2[out]"},
-                        }
-                    }]
-                }
-            }]
-        }).encode("utf-8")
-        mock_resp_2.__enter__.return_value = mock_resp_2
-
-        # Turn 3: Model returns final markdown code block
-        final_code = "```ffmpeg\n[0:a][1:a]amix=inputs=2[out]\n```"
-        mock_resp_3 = MagicMock()
-        mock_resp_3.read.return_value = json.dumps({
-            "candidates": [{
-                "content": {
-                    "parts": [{"text": final_code}]
-                }
-            }]
-        }).encode("utf-8")
-        mock_resp_3.__enter__.return_value = mock_resp_3
-
-        with patch("urllib.request.urlopen", side_effect=[mock_resp_1, mock_resp_2, mock_resp_3]):
-            with patch("audiobook_factory.ffmpeg_agent.get_persistent_key_pool") as mock_pool_fn, \
-                 patch("audiobook_factory.model_manager.get_model_manager") as mock_mm_fn:
-                mock_mm = MagicMock()
-                mock_mm.resolve_active_model.return_value = "gemini-2.5-flash"
-                mock_mm_fn.return_value = mock_mm
-
-                mock_pool = MagicMock()
-                mock_pool.get_key.return_value = "fake_key_for_test"
-                mock_pool_fn.return_value = mock_pool
-
-                graph = build_ffmpeg_filter_graph_via_agent(
-                    soundscape_plan={"scenes": [{"id": 1, "emotion": "tense"}]},
-                    cue_sheet={"foley_cues": []},
-                    vocal_dur=10.0,
-                    has_foley=False,
-                )
-
-                self.assertIsNotNone(graph)
-                self.assertEqual(graph, "[0:a][1:a]amix=inputs=2[out]")
-
-    def test_05_agent_retries_on_transient_loop_error(self):
-        """Verify agent continues retrying when a transient socket/exception occurs."""
-        mock_resp_success = MagicMock()
-        mock_resp_success.read.return_value = json.dumps({
-            "candidates": [{
-                "content": {
-                    "parts": [{"text": "```ffmpeg\n[0:a][1:a]amix=inputs=2[out]\n```"}]
-                }
-            }]
-        }).encode("utf-8")
-        mock_resp_success.__enter__.return_value = mock_resp_success
-
-        # Turn 1 raises RuntimeError (transient error), Turn 2 returns success
-        with patch("urllib.request.urlopen", side_effect=[RuntimeError("Transient connection reset"), mock_resp_success]):
-            with patch("audiobook_factory.ffmpeg_agent.get_persistent_key_pool") as mock_pool_fn, \
-                 patch("audiobook_factory.model_manager.get_model_manager") as mock_mm_fn:
-                mock_mm = MagicMock()
-                mock_mm.resolve_active_model.return_value = "gemini-2.5-flash"
-                mock_mm_fn.return_value = mock_mm
-
-                mock_pool = MagicMock()
-                mock_pool.get_key.return_value = "fake_key_for_test"
-                mock_pool_fn.return_value = mock_pool
-
-                graph = build_ffmpeg_filter_graph_via_agent(
-                    soundscape_plan={"scenes": [{"id": 1, "emotion": "tense"}]},
-                    cue_sheet={"foley_cues": []},
-                    vocal_dur=10.0,
-                    has_foley=False,
-                )
-
-                self.assertIsNotNone(graph)
-                self.assertEqual(graph, "[0:a][1:a]amix=inputs=2[out]")
+    def test_05_manifest_mastering_agent_deadbolt_disabled_by_policy(self):
+        """Verify build_manifest_mastering_filter_graph_via_agent raises RuntimeError under pure vocals-only mandate."""
+        from audiobook_factory.ffmpeg_agent import build_manifest_mastering_filter_graph_via_agent
+        with self.assertRaises(RuntimeError) as ctx:
+            build_manifest_mastering_filter_graph_via_agent(
+                manifest_data={},
+                vocal_dur=10.0,
+            )
+        self.assertIn("disabled", str(ctx.exception).lower())
 
 
 if __name__ == "__main__":

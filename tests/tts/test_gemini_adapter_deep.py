@@ -90,7 +90,7 @@ def test_gemini_synthesis_success(mock_urlopen):
     }).encode("utf-8")
     mock_urlopen.return_value.__enter__.return_value = mock_response
 
-    adapter = GeminiTTSAdapter(model_name="gemini-3.8-flash")
+    adapter = GeminiTTSAdapter(model_name="gemini-3.8-flash-tts")
     req = CanonicalTTSRequest(
         segment_uid="seg_gem_01",
         literary_text="यह एक परीक्षण है।",
@@ -102,7 +102,7 @@ def test_gemini_synthesis_success(mock_urlopen):
 
     chunk = adapter.synthesize_chunk(req)
     assert chunk.segment_uid == "seg_gem_01"
-    assert chunk.provider_model == "gemini-3.8-flash"
+    assert chunk.provider_model == "gemini-3.8-flash-tts"
     assert chunk.duration_sec == pytest.approx(0.8, rel=1e-2)
     assert len(chunk.pcm_bytes) > 0
 
@@ -138,7 +138,7 @@ def test_gemini_synthesis_retry_on_http_429(mock_urlopen):
 
     mock_urlopen.side_effect = [error_response, MagicMock(__enter__=MagicMock(return_value=success_response))]
 
-    adapter = GeminiTTSAdapter(model_name="gemini-3.8-flash", config={"max_retries": 2})
+    adapter = GeminiTTSAdapter(model_name="gemini-3.8-flash-tts", config={"max_retries": 2})
     req = CanonicalTTSRequest(
         segment_uid="seg_retry_01",
         literary_text="पुनः प्रयास।",

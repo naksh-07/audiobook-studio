@@ -179,43 +179,11 @@ def probe_key_health(
 ) -> List[str]:
     """
     Meso-Tier Verification Guard:
-    Performs pre-flight health probe across candidate API keys and evicts invalid,
-    rate-limited, or exhausted keys before initiating batch synthesis.
+    Performs fast offline validation across candidate API keys without live network pings.
     """
     if not keys:
         return []
 
-    healthy_keys: List[str] = []
-
-    def _default_ping(key: str) -> bool:
-        if not key or not isinstance(key, str) or len(key.strip()) < 8:
-            return False
-        import urllib.request
-        import urllib.error
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key.strip()}&pageSize=1"
-        try:
-            req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=10.0) as resp:
-                return resp.status == 200
-        except urllib.error.HTTPError:
-            return False
-        except Exception:
-            return False
-
-    tester = ping_fn if ping_fn is not None else _default_ping
-
-    for k in keys:
-        k_clean = k.strip() if isinstance(k, str) else ""
-        if not k_clean:
-            continue
-        try:
-            if tester(k_clean):
-                healthy_keys.append(k_clean)
-            else:
-                logger.warning(f"  [KEY PROBE] Evicted unhealthy/exhausted key: {k_clean[:6]}...{k_clean[-4:] if len(k_clean)>=10 else ''}")
-        except Exception as e:
-            logger.warning(f"  [KEY PROBE] Evicted failing key ({e}): {k_clean[:6]}...{k_clean[-4:] if len(k_clean)>=10 else ''}")
-            continue
-
-    return healthy_keys
+    # ponytail: offline validation without live network pings
+    return [k.strip() for k in keys if isinstance(k, str) and len(k.strip()) >= 8]
 

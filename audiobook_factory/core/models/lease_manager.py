@@ -200,7 +200,8 @@ class KeyLeaseManager:
         tier: str = "free",
     ) -> None:
         """Registers or syncs API keys in key_inventory without wiping quota history."""
-        services_json = json.dumps(allowed_services or ["text", "tts"])
+        # ponytail: strict TTS-only service scoping
+        services_json = json.dumps(allowed_services or ["tts"])
         today = self._today_str(provider)
 
         with self._lock, self._connection() as conn:
@@ -412,6 +413,7 @@ class KeyLeaseManager:
                     LEFT JOIN model_quota_ledger m ON (k.key_hash = m.key_hash AND m.model = ?)
                     WHERE k.provider = ?
                       AND {key_status_clause}
+                      AND k.allowed_services LIKE '%"tts"%'
                       AND (k.backoff_until IS NULL OR k.backoff_until <= ?)
                       AND (m.status IS NULL OR m.status = 'ACTIVE' OR (m.status = 'TEMP_BACKOFF' AND m.backoff_until <= ?))
                       AND (m.exhausted_date IS NULL OR m.exhausted_date != ?)
@@ -432,6 +434,7 @@ class KeyLeaseManager:
                     FROM key_inventory k
                     WHERE k.provider = ?
                       AND {key_status_clause}
+                      AND k.allowed_services LIKE '%"tts"%'
                       AND (k.backoff_until IS NULL OR k.backoff_until <= ?)
                       AND NOT EXISTS (
                           SELECT 1 FROM key_leases l
