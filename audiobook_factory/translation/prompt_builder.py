@@ -11,7 +11,7 @@ from .chunker import MacroChunk
 
 
 
-RAW_UNRATED_DIRECTIVES = """### CORE DIRECTIVES - 11 GOLDEN INVARIANTS (RAW UNRATED ADULT FIDELITY):
+RAW_UNRATED_DIRECTIVES = """### CORE DIRECTIVES - 16 GOLDEN INVARIANTS (RAW UNRATED ADULT FIDELITY):
 1. LITERARY ANTI-BOWDLERIZATION: Never sanitize, dilute, or soften raw violence, tavern profanity, visceral combat gore, or sexual intimacy.
 2. 70/30 ANTI-PARODY & WORLD-ANCHOR: 70% Canon Sacredness / 30% Sensory Desi Amplification. Never map European/foreign fantasy to Indian village panchayat terms ('पंच जी', 'लंबरदार', 'पटवारी', 'फतुही' are strictly prohibited; use 'एल्डरमैन/मेयर', 'सिक्के', 'जैकेट').
 3. PERIOD TAVERN GRIT & RAW PROFANITY: Translate medieval/coarse insults into earthy Hindustani ('गांड', 'भोसड़ीके', 'लंड', 'रांड/रंडी', 'भड़वा', 'मादरचोद', 'बकचोदी', 'सूअर का पेशाब'). Polite TV-serial substitutions ('दुष्ट', 'बुरी स्त्री') are strictly banned.
@@ -24,7 +24,10 @@ RAW_UNRATED_DIRECTIVES = """### CORE DIRECTIVES - 11 GOLDEN INVARIANTS (RAW UNRA
 10. ANTI-SANSKRITIZATION & NATURAL SPOKEN DIALOGUE: Ban stiff, textbook Sanskrit ('युवतियां' -> 'लड़कियां/औरतें'; 'दर्पण' -> 'आईना'). Use living spoken Hindustani of premium OTT drama and Audible originals.
 11. CANON ADHERENCE & ZERO CHATTER: Output ONLY complete unabridged Devanagari Markdown. Never summarize, truncate, or include preambles, notes, or explanations.
 12. ZERO ENGLISH ARTICLES IN DEVANAGARI: English articles ('The', 'A', 'An') do not exist in Hindi and MUST NEVER be transliterated as 'द' or 'ए'. Always strip leading articles completely before proper names, locations, and titles (e.g. 'The Golden Inn' -> 'गोल्डन इन', NEVER 'द गोल्डन इन'; 'The Butcher' -> 'कसाई', NEVER 'द कसाई').
-13. PHONETIC FIDELITY FOR BEASTS, ORDERS & PROPER NAMES: Transliterate mythical monster/beast species (dragon -> 'ड्रैगन', basilisk -> 'बैसिलिस्क', warlock -> 'वॉरलॉक') and titular orders/professions phonetically into Devanagari; NEVER invent literal compound calques. Pronounce foreign proper names phonetically (e.g. final 'a' as 'आ'/'या', e.g. Elena -> 'एलेना', Freya -> 'फ्रेया'); NEVER transliterate names as single English letter sounds (e.g. NEVER 'टी और वी') or common English nouns."""
+13. PHONETIC FIDELITY FOR BEASTS, ORDERS & PROPER NAMES: Transliterate mythical monster/beast species (dragon -> 'ड्रैगन', basilisk -> 'बैसिलिस्क', warlock -> 'वॉरलॉक') and titular orders/professions phonetically into Devanagari; NEVER invent literal compound calques. Pronounce foreign proper names phonetically (e.g. final 'a' as 'आ'/'या', e.g. Elena -> 'एलेना', Freya -> 'फ्रेया'); NEVER transliterate names as single English letter sounds (e.g. NEVER 'टी और वी') or common English nouns.
+14. STRICT NOVEL PROSE FORMAT: You are translating a NOVEL, NOT writing a stage screenplay or drama script. NEVER output character speaker tags (e.g. NEVER use '**Character Name:**' or 'Name:'). NEVER wrap narrative exposition or character actions in parentheses '()'. All narrative prose must remain natural prose paragraphs. All spoken dialogue must remain natural quoted dialogue within or beside narrative prose, enclosed in standard double quotation marks ("...").
+15. UNIFORM DIALOGUE QUOTATION MARKS: All spoken dialogue MUST be enclosed in standard double quotation marks ("..."). Never use British single quotes ('...'). Every dialogue opening quote must have a matching closing quote. Never leave quotes unclosed across paragraph breaks.
+16. SECTION HEADINGS PRESERVATION: Retain the exact markdown headings from the source text (e.g. '# Title', '## I', '## II', '## III'). Do not change Roman numerals to words."""
 
 
 CLASSIC_REVERENT_DIRECTIVES = """### CORE DIRECTIVES - DIGNIFIED HERITAGE & PATHOS:
@@ -35,7 +38,10 @@ CLASSIC_REVERENT_DIRECTIVES = """### CORE DIRECTIVES - DIGNIFIED HERITAGE & PATH
 5. SENSORY ELEGANCE: Describe beauty, nature, sorrow, and longing with classical grace.
 6. CANON ADHERENCE & ZERO CHATTER: Output ONLY complete unabridged Devanagari Markdown. Never summarize, truncate, or include conversational chatter.
 7. ZERO ENGLISH ARTICLES IN DEVANAGARI: Strip leading English articles ('The', 'A', 'An'); never transliterate 'The' as 'द'.
-8. PHONETIC FIDELITY: Transliterate proper names, places, beast species, and titular orders phonetically into Devanagari without awkward calques."""
+8. PHONETIC FIDELITY: Transliterate proper names, places, beast species, and titular orders phonetically into Devanagari without awkward calques.
+9. STRICT NOVEL PROSE FORMAT: You are translating a NOVEL, NOT writing a stage screenplay or drama script. NEVER output character speaker tags (e.g. NEVER use '**Character Name:**' or 'Name:'). NEVER wrap narrative exposition or character actions in parentheses '()'. All narrative prose must remain natural prose paragraphs. All spoken dialogue must remain natural quoted dialogue within or beside narrative prose, enclosed in standard double quotation marks ("...").
+10. UNIFORM DIALOGUE QUOTATION MARKS: All spoken dialogue MUST be enclosed in standard double quotation marks ("..."). Never use British single quotes ('...'). Every dialogue opening quote must have a matching closing quote. Never leave quotes unclosed across paragraph breaks.
+11. SECTION HEADINGS PRESERVATION: Retain the exact markdown headings from the source text (e.g. '# Title', '## I', '## II', '## III'). Do not change Roman numerals to words."""
 
 
 class DynamicPromptBuilder:
@@ -44,9 +50,9 @@ class DynamicPromptBuilder:
     @classmethod
     def build_system_instruction(cls, tier: FidelityTier, playbook: Optional[Any] = None) -> str:
         base = (
-            "You are a Master Literary Adapter and Dialogue Director for premier full-cast audio fiction. "
-            "Your task is adapting dramatic scene text into spoken, natural, rhythmically compelling Hindustani "
-            "in pristine Devanagari script for professional voice actors. "
+            "You are a Master Literary Translator specializing in novel prose localization for audiobooks. "
+            "Your task is translating novel chapters into spoken, natural, rhythmically compelling Hindustani prose "
+            "in pristine Devanagari script for professional audiobook narration. "
             "Deliver a complete, unabridged localization of all dialogue and prose without summarizing or omitting any content.\n\n"
         )
         cust_prompt = None
@@ -57,9 +63,24 @@ class DynamicPromptBuilder:
 
         if cust_prompt and str(cust_prompt).strip():
             custom_prompt = str(cust_prompt).strip()
-            if "You are a Master Literary Adapter" not in custom_prompt:
-                return base + custom_prompt
-            return custom_prompt
+            prose_rules = ""
+            if "STRICT NOVEL PROSE FORMAT" not in custom_prompt:
+                prose_rules = (
+                    "\n\n### MANDATORY NOVEL PROSE FORMAT INVARIANTS:\n"
+                    "1. STRICT NOVEL PROSE FORMAT: You are translating a NOVEL, NOT writing a stage screenplay or drama script. "
+                    "NEVER output character speaker tags (e.g. NEVER use '**Character Name:**' or 'Name:'). "
+                    "NEVER wrap narrative exposition or character actions in parentheses '()'. "
+                    "All narrative prose must remain natural prose paragraphs. "
+                    "All spoken dialogue must remain natural quoted dialogue within or beside narrative prose, enclosed in standard double quotation marks (\"...\").\n"
+                    "2. UNIFORM DIALOGUE QUOTATION MARKS: All spoken dialogue MUST be enclosed in standard double quotation marks (\"...\"). "
+                    "Never use British single quotes ('...'). Every dialogue opening quote must have a matching closing quote. "
+                    "Never leave quotes unclosed across paragraph breaks.\n"
+                    "3. SECTION HEADINGS PRESERVATION: Retain the exact markdown headings from the source text (e.g. '# Title', '## I', '## II', '## III'). "
+                    "Do not change Roman numerals to words."
+                )
+            if "You are a Master Literary" not in custom_prompt:
+                return base + custom_prompt + prose_rules
+            return custom_prompt + prose_rules
 
         if tier == FidelityTier.RAW_UNRATED:
             return base + RAW_UNRATED_DIRECTIVES
@@ -96,13 +117,24 @@ class DynamicPromptBuilder:
                 parts.append(card_ctx)
                 parts.append("")
 
-        # Dynamic Entity Glossary
+        # Dynamic Entity Glossary (Surgically scoped to entities actually present in this chunk)
         if request.dynamic_glossary:
-            parts.append("### CANONICAL ENTITY GLOSSARY:")
-            parts.append("Follow these exact Devanagari translations/transliterations for consistent entity naming:")
+            import re
+            chunk_raw = chunk.text
+            active_terms = []
             for en, hi in sorted(request.dynamic_glossary.items()):
-                parts.append(f"- **{en}** -> {hi}")
-            parts.append("")
+                if not en or not hi:
+                    continue
+                pattern = rf"(?<![\w\u0900-\u097F]){re.escape(en)}(?![\w\u0900-\u097F])"
+                if re.search(pattern, chunk_raw, re.IGNORECASE):
+                    active_terms.append((en, hi))
+
+            if active_terms:
+                parts.append("### CANONICAL ENTITY GLOSSARY:")
+                parts.append("Follow these exact Devanagari translations/transliterations for consistent entity naming:")
+                for en, hi in active_terms:
+                    parts.append(f"- **{en}** -> {hi}")
+                parts.append("")
 
         # Preceding Context (if present)
         if chunk.preceding_source_context or chunk.preceding_target_context:
@@ -116,7 +148,7 @@ class DynamicPromptBuilder:
         # Text to Localize
         parts.append("### SCENE MANUSCRIPT TO LOCALIZE (OUTPUT COMPLETE SPOKEN HINDUSTANI IN DEVANAGARI SCRIPT ONLY):")
         parts.append(chunk.text)
-        parts.append("\nEmit the full, unabridged Hindustani localization below:")
+        parts.append("\nEmit the full, unabridged Hindustani novel prose localization below (strictly prose paragraphs with inline quoted dialogue, NO screenplay tags):")
 
         return "\n".join(parts)
 

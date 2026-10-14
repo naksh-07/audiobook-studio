@@ -61,6 +61,34 @@ class TestDeterministicParityGate(unittest.TestCase):
         self.assertFalse(metrics.passed_all_gates)
         self.assertTrue(any("conversational preamble" in r.lower() for r in metrics.rejection_reasons))
 
+    def test_07_single_quote_dialogue_passes(self):
+        # British publication style with single quotes and contractions in source
+        source = (
+            "'He won't escape,' the guard shouted. 'Don't let him pass!'\n\n"
+            "'I'm trying,' the captain replied. 'Hold the line!'"
+        )
+        target = (
+            '"वह बच नहीं पाएगा," पहरेदार चिल्लाया। "उसे आगे मत जाने दो!"\n\n'
+            '"मैं कोशिश कर रहा हूँ," कप्तान ने जवाब दिया। "कतार बनाए रखो!"'
+        )
+        metrics = self.gate.verify(source, target)
+        self.assertTrue(metrics.passed_all_gates, f"Failed reasons: {metrics.rejection_reasons}")
+        self.assertEqual(metrics.source_quote_count, 8)
+        self.assertEqual(metrics.target_quote_count, 8)
+
+    def test_08_screenplay_leak_fails(self):
+        source = (
+            "'Who are you?' he asked.\n\n"
+            "'I am a traveller,' she said."
+        )
+        target = (
+            "**गेराल्ट:** तुम कौन हो?\n\n"
+            "**अजनबी:** मैं एक मुसाफिर हूँ।"
+        )
+        metrics = self.gate.verify(source, target)
+        self.assertFalse(metrics.passed_all_gates)
+        self.assertTrue(any("screenplay speaker tag leakage" in r.lower() for r in metrics.rejection_reasons))
+
 
 if __name__ == "__main__":
     unittest.main()

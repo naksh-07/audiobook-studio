@@ -10,7 +10,10 @@ import os
 import re
 import time
 import json
+import logging
 from typing import Any, Callable, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from .contracts import (
     FidelityTier,
@@ -125,6 +128,25 @@ class TranslationEngine:
             llm_calls_made += 1
 
             clean_chunk = self._sanitize_output(chunk_output)
+
+            # Self-healing retry if output suffered severe truncation (<50% word ratio)
+            src_chunk_words = max(1, len(chunk.text.split()))
+            out_words = len(clean_chunk.split())
+            if out_words < src_chunk_words * 0.50 and src_chunk_words > 100:
+                logger.warning(
+                    f"  [!] Translation chunk severely truncated ({out_words} vs {src_chunk_words} words). Retrying..."
+                )
+                retry_output = self._call_llm(
+                    user_prompt=user_prompt,
+                    system_instruction=system_instruction,
+                    thinking_budget=request.thinking_budget,
+                    temperature=request.temperature,
+                )
+                llm_calls_made += 1
+                clean_retry = self._sanitize_output(retry_output)
+                if len(clean_retry.split()) > out_words:
+                    clean_chunk = clean_retry
+
             translated_parts.append(clean_chunk)
 
         # 3. Assemble complete translated Markdown

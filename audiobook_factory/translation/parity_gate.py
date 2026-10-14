@@ -66,8 +66,26 @@ class DeterministicParityGate:
 
     @staticmethod
     def _count_dialogue_quotes(text: str) -> int:
-        # Count paired quotation marks across common Unicode types
+        # Count paired double quotation marks across common Unicode types
         double_quotes = text.count('"') + text.count('“') + text.count('”')
+        if double_quotes >= 10:
+            return double_quotes
+
+        # Check for single dialogue quotes (common in British literary texts, e.g. 'Dialogue')
+        single_quotes = text.count("'") + text.count('‘') + text.count('’')
+        if single_quotes >= 4:
+            # Match single quotes that enclose dialogue, excluding internal apostrophes (don't, it's, etc.)
+            # Opening quote: preceded by start of string/line, whitespace, or opening punctuation
+            # Closing quote: followed by end of string/line, whitespace, or clause punctuation
+            single_dialogue_matches = re.findall(
+                r"(?:^|[\s(\[«])['‘]([^\n]+?)['’](?=[\s)\]».,;:!?]|$)",
+                text,
+            )
+            if single_dialogue_matches:
+                single_count = len(single_dialogue_matches) * 2
+                if single_count > double_quotes:
+                    return single_count
+
         return double_quotes
 
     @staticmethod
@@ -147,6 +165,13 @@ class DeterministicParityGate:
         for pat in check_patterns:
             if re.search(pat, target_text):
                 rejection_reasons.append(f"Forbidden pattern detected in translation: '{pat}'")
+
+        # Guard against screenplay formatting leakage in novel prose
+        screenplay_tags = re.findall(r"^\s*\*\*[^\n*]+:\*\*", target_text, re.MULTILINE)
+        if screenplay_tags and not re.search(r"^\s*\*\*[^\n*]+:\*\*", source_text, re.MULTILINE):
+            rejection_reasons.append(
+                f"Screenplay speaker tag leakage detected in novel prose translation ({len(screenplay_tags)} instances, e.g. '{screenplay_tags[0].strip()}'). Output must be novel prose with inline quoted dialogue."
+            )
 
         first_line = target_text.strip().split("\n")[0].lower() if target_text.strip() else ""
         for pat in PREAMBLE_PATTERNS:

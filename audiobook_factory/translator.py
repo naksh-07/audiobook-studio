@@ -26,7 +26,7 @@ from audiobook_factory.chunking_policy import chunking_policy
 
 ADULT_LITERARY_MODE = os.environ.get("ADULT_LITERARY_MODE", "true").lower() in ("true", "1", "yes")
 TRANSLATOR_VERSION = "3.0.0"
-PROMPT_VERSION = "3.0.0"
+PROMPT_VERSION = "3.1.0"
 
 
 from audiobook_factory.key_manager import get_persistent_key_pool
@@ -836,7 +836,7 @@ def translate_book_project(
 
     # Streamlined Vocals-Only Translation Loop (Token-Optimized Single Pass)
     print(f"[*] Starting token-optimized literary translation of {total} chapters using {model}...", flush=True)
-    preceding_summary = f"Novel title: {meta.get('title')}. Setting out on journey."
+    preceding_summary = ""
 
     for idx, chap_file in enumerate(chapter_files, 1):
         target_file = trans_dir / f"{chap_file.stem}_hi.md"

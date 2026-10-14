@@ -98,9 +98,17 @@ class ChapterGlossary(BaseModel):
                 norm_c = "".join(c for c in unicodedata.normalize("NFD", c_name) if unicodedata.category(c) != "Mn")
                 if norm_c and norm_c not in glossary:
                     glossary[norm_c] = c_ent.hindi_name
-                # Also map aliases if they have clean mappings
+                # Also map clean component aliases (e.g., 'Borch' for 'Borch Three Jackdaws')
+                # Exclude multi-word descriptive phrases ('the stranger', 'man in...') and spoiler aliases
                 for a in c_ent.aliases:
-                    if a and a not in glossary:
+                    if not a or a in glossary:
+                        continue
+                    a_lower = a.lower().strip()
+                    if a_lower.startswith(("the ", "a ", "an ", "man in", "giant in", "young woman", "fat man", "spotty")):
+                        continue
+                    if len(a.split()) > 3:
+                        continue
+                    if any(part.lower() in c_name.lower() for part in a.split()) or any(part.lower() in a.lower() for part in c_name.lower().split()):
                         glossary[a] = c_ent.hindi_name
                         norm_a = "".join(c for c in unicodedata.normalize("NFD", a) if unicodedata.category(c) != "Mn")
                         if norm_a and norm_a not in glossary:

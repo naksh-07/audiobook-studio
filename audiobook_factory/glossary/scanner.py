@@ -72,8 +72,11 @@ class ChapterLexicalScanner:
         active_known: Set[str] = set()
         if known_lexicon:
             for k in known_lexicon:
-                active_known.add(k.lower())
-                active_known.add(_strip_accents(k).lower())
+                if isinstance(k, tuple):
+                    k = k[0]
+                if isinstance(k, str):
+                    active_known.add(k.lower())
+                    active_known.add(_strip_accents(k).lower())
         if book_bible:
             for c_name, c_ent in book_bible.characters.items():
                 active_known.add(c_name.lower())
