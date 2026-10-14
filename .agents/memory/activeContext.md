@@ -41,9 +41,10 @@
   - Preserved certified acoustic reflexes (`[laughs]`, `[sighs]`, `[whispers]`, `[growls]`, `[gasp]`, `[chuckles]`, `[pant]`, `[groan]`) in spoken text; routed non-acoustic descriptors (`[cold menace]`, `[angrily]`, `[धीमी आवाज़ में]`) to `speechMetadata.style`.
   - Preserved `speechMetadata` and mapped `voiceName` in [`gemini.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/adapters/gemini.py). 15/15 target tests + 23/23 regression tests 100% green.
 - **Room 2 Forensic Translation Remediation (100% PASS CERTIFIED)**: Fixed screenplay leakage (Rules 14-16), single-quote parity gate, scoped prompt glossary (~25 terms vs 109), clean 'बोर्च थ्री जैकडॉज़' & 'वेया'. Chapter 1 re-translated (490 lines, 96KB, 0 leaks, 0.99 para parity). 86/86 tests green.
-- **TTS-Only Architecture & Key Quarantine Protocol (Ponytail Standard Certified)**:
-  - Enforced strict TTS-only API policy: all external text generation & discovery pings deadbolted at root (`gateway.py`, `gemini.py`, `openai_compat.py`, `llm_client.py`, `lease_manager.py`, `vision_extractor.py`, `ffmpeg_agent.py`, `cadence.py`).
-  - All creative/text tasks routed to Antigravity subagent invocations. Only `gemini-3.8-flash-tts` is configured for Google API calls.
-  - Quarantined 15 permanently dead/banned keys in `key_quarantine` (`is_permanent=1`). Zero overlap with active inventory (113 active keys, all scoped to `["tts"]`).
+- **TTS-Only Architecture & Fleet Key Purge (Ponytail & AntiBanGuard Certified)**:
+  - Enforced strict TTS-only API policy: all external text generation & discovery pings deadbolted at root (`gateway.py`, `gemini.py`, `openai_compat.py`, `llm_client.py`, `lease_manager.py`, `vision_extractor.py`, `ffmpeg_agent.py`, `cadence.py`). Only `gemini-3.8-flash-tts` allowed.
+  - Full Fleet Audit (113 keys) via AntiBanGuard: purged 60 dead/banned keys (55 deleted service accounts 401, 4 invalid 400, 1 suspended 403) permanently to `key_quarantine` (75 total).
+  - 53 verified active keys in inventory (48 healthy 200 OK + 5 daily rate-limited 429). 0 overlap between active and quarantine.
   - Full suite verified: 17/17 tests green + comprehensive forensic audit passed 100%. Live TTS verified with strictly 1 request (146KB audio).
+
 
