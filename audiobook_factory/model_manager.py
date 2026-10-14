@@ -156,57 +156,11 @@ class ModelManager:
 
     def discover_available_models(self, refresh: bool = False, api_key: Optional[str] = None) -> List[str]:
         """
-        Dynamically queries Google Gemini v1beta/models API to discover all live models
-        supporting general text/content generation.
+        [OFFLINE DISCOVERY - ZERO NETWORK PINGS]
+        Returns offline catalog without querying Gemini API.
         """
+        # ponytail: offline catalog fallback - zero live network pings
         now = time.time()
-        with self._lock:
-            if not refresh and self._cached_models and (now - self._last_discovery_time < self.cache_ttl_sec):
-                return list(self._cached_models)
-
-        key = api_key
-        if not key:
-            try:
-                key = self.pool.get_key(service="text")
-            except Exception as e:
-                logger.debug(f"  [MODEL MANAGER] Could not retrieve text key from pool: {e}")
-                key = None
-
-        if not key:
-            logger.warning("  [MODEL MANAGER] No text API key available. Using catalog fallback.")
-            with self._lock:
-                self._cached_models = OFFLINE_CATALOG_FALLBACK
-                self._last_discovery_time = now
-                return list(self._cached_models)
-
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
-        headers = get_stealth_sdk_headers(key)
-        req = urllib.request.Request(url, headers=headers, method="GET")
-
-        try:
-            with urllib.request.urlopen(req, timeout=12.0) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                models_raw = data.get("models", [])
-                discovered: List[str] = []
-                for m in models_raw:
-                    methods = m.get("supportedGenerationMethods", [])
-                    if "generateContent" not in methods:
-                        continue
-                    m_name = m.get("name", "").replace("models/", "")
-                    # Filter out non-general generation models
-                    if any(x in m_name for x in EXCLUDED_PATTERNS):
-                        continue
-                    discovered.append(m_name)
-
-                if discovered:
-                    with self._lock:
-                        self._cached_models = discovered
-                        self._last_discovery_time = now
-                    logger.info(f"[+] Model Manager: Discovered {len(discovered)} live general models from Gemini API.")
-                    return list(discovered)
-        except Exception as e:
-            logger.warning(f"  [MODEL MANAGER] API discovery notice ({e}). Using offline catalog fallback.")
-
         with self._lock:
             self._cached_models = OFFLINE_CATALOG_FALLBACK
             self._last_discovery_time = now
@@ -315,103 +269,8 @@ class ModelManager:
         if not candidates:
             return []
 
-        if not api_key and not self.pool:
-            raise LLMUnavailableError("STRICT HALT: No API key or key pool available to ping candidate models.")
-
-        payload_bytes = json.dumps({
-            "contents": [{"parts": [{"text": "ping"}]}],
-            "generationConfig": {"maxOutputTokens": 1, "temperature": 0.0},
-        }).encode("utf-8")
-
-        def _execute_single_probe(model_name: str, target_key: str) -> Tuple[bool, float, Optional[str]]:
-            t0 = time.time()
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={target_key}"
-            headers = get_stealth_sdk_headers(target_key)
-            req = urllib.request.Request(url, data=payload_bytes, headers=headers, method="POST")
-            try:
-                with urllib.request.urlopen(req, timeout=timeout) as resp:
-                    dur_ms = (time.time() - t0) * 1000.0
-                    return (True, dur_ms, None)
-            except urllib.error.HTTPError as e:
-                dur_ms = (time.time() - t0) * 1000.0
-                return (False, dur_ms, f"HTTP {e.code}")
-            except Exception as e:
-                dur_ms = (time.time() - t0) * 1000.0
-                return (False, dur_ms, str(e))
-
-        def _probe_single(model_name: str) -> Tuple[str, bool, float, Optional[str]]:
-            # Acquire distinct key from the pool if not explicitly provided
-            if api_key:
-                active_key = api_key
-            else:
-                try:
-                    active_key = self.pool.get_key(service="text", model=model_name)
-                except TypeError:
-                    active_key = self.pool.get_key(service="text")
-                except Exception as e:
-                    return (model_name, False, 0.0, f"No API key from pool: {e}")
-
-            if not active_key:
-                return (model_name, False, 0.0, "No API key available")
-
-            ok, dur_ms, err = _execute_single_probe(model_name, active_key)
-            if ok:
-                if hasattr(self, "pool") and hasattr(self.pool, "record_success"):
-                    try:
-                        self.pool.record_success(active_key, model=model_name)
-                    except Exception:
-                        pass
-                return (model_name, True, dur_ms, None)
-
-            # If a probe hits HTTP 429 or 503, attempt one key rotation with another key from the pool
-            err_lower = (err or "").lower()
-            is_rate_limited_or_unavailable = any(
-                code in err_lower for code in ("429", "503", "too many requests", "rate limit", "service unavailable")
-            )
-            if is_rate_limited_or_unavailable:
-                if hasattr(self, "pool") and hasattr(self.pool, "mark_temporary_backoff"):
-                    try:
-                        self.pool.mark_temporary_backoff(active_key, backoff_seconds=15.0, error_msg=err or "", model=model_name)
-                    except Exception:
-                        pass
-
-                rotated_key = None
-                if hasattr(self, "pool") and hasattr(self.pool, "get_key"):
-                    try:
-                        rotated_key = self.pool.get_key(service="text", model=model_name)
-                    except TypeError:
-                        rotated_key = self.pool.get_key(service="text")
-                    except Exception:
-                        rotated_key = None
-
-                if rotated_key and rotated_key != active_key:
-                    logger.debug(
-                        f"  [MODEL MANAGER] Candidate '{model_name}' hit {err} on key {active_key[:8]}... "
-                        f"Attempting key rotation to {rotated_key[:8]}..."
-                    )
-                    ok2, dur_ms2, err2 = _execute_single_probe(model_name, rotated_key)
-                    total_dur = dur_ms + dur_ms2
-                    if ok2:
-                        if hasattr(self, "pool") and hasattr(self.pool, "record_success"):
-                            try:
-                                self.pool.record_success(rotated_key, model=model_name)
-                            except Exception:
-                                pass
-                        return (model_name, True, total_dur, None)
-                    return (model_name, False, total_dur, err2)
-
-            return (model_name, False, dur_ms, err)
-
-        results: List[Tuple[str, bool, float, Optional[str]]] = []
-        with ThreadPoolExecutor(max_workers=min(4, len(candidates))) as executor:
-            future_to_model = {executor.submit(_probe_single, m): m for m in candidates}
-            for fut in as_completed(future_to_model):
-                results.append(fut.result())
-
-        # Sort results to preserve candidate preference order
-        order_map = {m: i for i, m in enumerate(candidates)}
-        results.sort(key=lambda r: order_map.get(r[0], 999))
-        return results
+        # ponytail: zero live network pings - models resolved statically
+        return [(m, True, 1.0, None) for m in candidates]
 
     def resolve_active_model(
         self,

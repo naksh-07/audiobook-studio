@@ -11,6 +11,10 @@
 > **Pure Vocals-Only Architectural Invariant**:
 > Background music (BGM), sound effects (SFX), 5-track stem mixdowns, and Archive.org sound scraping are **permanently decoupled and archived** in [`archive/cinematic_audio/`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/archive/cinematic_audio/). Production compute is 100% focused on vocal clarity, multi-character acting nuance, conversational breathability, and Audible/EBU R128 compliance.
 
+> [!NOTE]
+> **Strict TTS-Only API Invariant (Ponytail Standard v6.1)**:
+> All external LLM/text API calls across every subsystem (Pre-Production research, glossary extraction, translation collective, screenplay attribution, casting, model health pings) are **permanently deadbolted** at the `ModelGateway`, adapter, and lease levels. All creative intelligence and reasoning tasks are executed directly within **Antigravity via subagent invocations**. The keypool is 100% reserved for Google Gemini Flash TTS audio generation (`gemini-3.8-flash-tts`), eliminating token waste and API rate limit exhaustion.
+
 ---
 
 ## 🏗️ High-Level Option C Architecture

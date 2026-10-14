@@ -182,11 +182,9 @@ class GeminiProviderAdapter(BaseProviderAdapter):
         timeout: float = 180.0,
         **kwargs,
     ) -> GenerationResult:
-        """Generates text using Google Gemini API."""
-        clean_model = model.strip()
-        url = f"{self.BASE_URL}/{clean_model}:generateContent"
-        headers = get_stealth_sdk_headers(api_key, provider="gemini")
-        eff_timeout = float(kwargs.get("timeout") or timeout)
+        """[DISABLED BY SYSTEM POLICY] Generates text using Google Gemini API."""
+        # ponytail: root deadbolt - adapter-level guard
+        raise RuntimeError("External text generation API calls are disabled. Only Gemini Flash TTS is permitted.")
 
         payload = self.format_payload(
             model=clean_model,

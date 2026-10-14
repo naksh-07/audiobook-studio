@@ -86,10 +86,9 @@ class OpenAICompatibleAdapter(BaseProviderAdapter):
         timeout: float = 180.0,
         **kwargs,
     ) -> GenerationResult:
-        """Executes chat completion via OpenAI-compatible API."""
-        clean_model = model.strip()
-        headers = get_stealth_sdk_headers(api_key, provider=self.provider)
-        eff_timeout = float(kwargs.get("timeout") or timeout)
+        """[DISABLED BY SYSTEM POLICY] Executes chat completion via OpenAI-compatible API."""
+        # ponytail: root deadbolt - adapter-level guard
+        raise RuntimeError("External text API calls are disabled. Only Gemini Flash TTS is permitted.")
 
         payload = self.format_payload(
             model=clean_model,

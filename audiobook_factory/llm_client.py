@@ -77,6 +77,17 @@ def call_gemini(
     8. High Headroom: Screenplay 64k, Translation 32k tokens, preventing truncation.
     9. json_mode backward compatibility: Automatically maps json_mode to response_mime_type.
     """
+    # ponytail: root deadbolt - direct LLM calls disabled
+    raise AntigravitySessionFallbackRequired(
+        "Direct LLM API calls are disabled by system policy. "
+        "All intelligence tasks (translation, screenplay, casting, research) "
+        "must be executed inside Antigravity via subagent invocations. "
+        "Only TTS API calls are permitted.",
+        task_type=task_type,
+        prompt=prompt,
+        system_instruction=system_instruction,
+    )
+
     if json_mode is not None:
         response_mime_type = "application/json" if json_mode else "text/plain"
     # --- Task-Adaptive Temperature (Phase 2 Fix) ---

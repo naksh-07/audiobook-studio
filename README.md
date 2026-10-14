@@ -49,6 +49,7 @@ Production compute is 100% focused on vocal clarity, multi-character acting nuan
 - **Domain-Scoped Metadata Architecture**: Anti-monolithic JSON invariant with dedicated SSOT artifacts (`cast_lock.json`, `book_bible.json`, `translation/glossary.json`, `mastered/*_mastering_ledger.json`) and dynamic, backward-compatible auto-projections (`character_roster.json`, `voice_registry.json`).
 - **Zero-Token Pre-Flight Metadata Doctor**: Millisecond-fast ($<50\text{ms}$) forensic sanity audit validating metadata across all 6 production rooms before consuming a single LLM API token.
 - **Mastering V2 Ledgers & Fast-Path Quality Gates**: Immutable chapter mastering ledgers, Gate 6A voice authority precedence (`cast_lock` $\rightarrow$ `book_bible` $\rightarrow$ `voice_registry`), and Gate 6B fast-path audit.
+- **Strict TTS-Only API Architecture & Antigravity Native Execution (v6.1)**: All non-TTS API calls (research, translation, screenplay, casting, network discovery pings) are permanently blocked via root deadbolts in `ModelGateway`, adapters, and lease managers. All creative tasks are performed directly within Antigravity via subagent invocations, reserving 100% of keypool capacity for `gemini-3.8-flash-tts` speech synthesis.
 
 ---
 

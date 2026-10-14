@@ -102,16 +102,16 @@ class ModelGateway:
         **kwargs,
     ) -> GenerationResult:
         """
-        Executes text generation request through the control plane:
-        1. Resolves execution plan & leases key.
-        2. Applies Anti-Ban Gate (pacing, rate limit, anti-correlation).
-        3. Dispatches request via adapter.
-        4. Handles failover on 429 quota exhaustion or server error.
-        5. Records metrics and safely releases lease.
+        [DISABLED BY SYSTEM POLICY - TTS ONLY ARCHITECTURE]
+        All text tasks must be handled inside Antigravity via subagent invocations.
         """
-        identity = CallerIdentity(user_id=user_id, session_id=session_id or "session_default", workload_type="text")
-        retries = 0
-        last_error = None
+        # ponytail: root deadbolt - external text generation disabled
+        raise RuntimeError(
+            "External API calls for text generation are permanently disabled. "
+            "All intelligence tasks (novel research, glossary, translation, screenplay, casting) "
+            "must be executed directly inside Antigravity via subagent invocations. "
+            "Only Gemini Flash TTS speech synthesis is permitted."
+        )
 
         while retries <= max_retries:
             preferred_key = self.anti_ban_guard.affinity.get_affinity_key(session_id) if session_id else None

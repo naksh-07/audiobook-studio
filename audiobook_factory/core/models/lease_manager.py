@@ -122,7 +122,7 @@ class CallerIdentity:
     process_id: int = field(default_factory=os.getpid)
     worker_id: str = field(default_factory=lambda: f"thr_{threading.get_ident()}")
     session_id: str = field(default_factory=lambda: os.environ.get("CURRENT_SESSION_ID") or os.environ.get("CURRENT_AUDIOBOOK_RUN_ID") or "session_default")
-    workload_type: str = "text"  # "text" or "tts"
+    workload_type: str = "tts"  # Strictly "tts" only
 
 
 @dataclass
@@ -339,7 +339,7 @@ class KeyLeaseManager:
 
     def acquire_lease(
         self,
-        workload_type: str = "text",
+        workload_type: str = "tts",
         provider: str = "gemini",
         identity: Optional[CallerIdentity] = None,
         ttl_seconds: float = 180.0,
@@ -355,6 +355,14 @@ class KeyLeaseManager:
         - User quota enforcement.
         - Quota rollover and model isolation.
         """
+        if workload_type != "tts" or (model and "-tts" not in model.lower() and "tts" not in model.lower() and "audio" not in model.lower()):
+            # ponytail: root enforcement - all Studio keys are restricted strictly to TTS models
+            raise ValueError(
+                f"Workload '{workload_type}' / Model '{model}' is forbidden. "
+                "All Google AI Studio keys are restricted strictly to TTS models. "
+                "All text/creative tasks must be executed inside Antigravity via subagents."
+            )
+
         eff_identity = identity or CallerIdentity(workload_type=workload_type)
         now_dt = datetime.now()
         now_ts = now_dt.isoformat()

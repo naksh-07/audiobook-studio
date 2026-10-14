@@ -58,7 +58,7 @@ def init_db(db_path: Optional[Path] = None) -> None:
                 encrypted_key TEXT NOT NULL,
                 provider TEXT NOT NULL DEFAULT 'gemini',
                 tier TEXT NOT NULL DEFAULT 'free',
-                allowed_services TEXT NOT NULL DEFAULT '["text", "tts"]',
+                allowed_services TEXT NOT NULL DEFAULT '["tts"]',
                 status TEXT NOT NULL DEFAULT 'ACTIVE',
                 exhausted_date TEXT,
                 backoff_until TIMESTAMP,

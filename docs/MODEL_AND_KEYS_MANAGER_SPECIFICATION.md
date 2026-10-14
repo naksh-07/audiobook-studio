@@ -155,6 +155,14 @@ If 5 keys fail consecutively with HTTP 429 or 503 within a 60-second window:
 - **Behavior**: All key rotation is halted. No new requests are dispatched for **45 seconds**.
 - **Reason**: This prevents an edge network blip or API update from wiping out all 100 keys in a 10-second retry death spiral.
 
+### Shield 8: Strict TTS-Only Workload Isolation & Antigravity Subagent Execution (Ponytail Standard v6.1)
+To eliminate 429 daily quota exhaustion, RPM thrashing, and IP clustering caused by heavy text reasoning over free API keys:
+- **Zero Outbound Text API Calls**: All text generation tasks (Room 1 Pre-Production research, Room 1.5 Glossary, Room 2 Translation Collective, Room 3 Screenplay Dramaturgy, Casting, Gate Audits) are permanently deadbolted in `ModelGateway.generate_text()`, `GeminiProviderAdapter.generate_text()`, `OpenAICompatibleAdapter.generate_text()`, and `llm_client.call_gemini()`.
+- **Antigravity Native Reasoning**: All intelligence, novel research, literary translation, and screenplay construction are performed natively inside Antigravity via subagent invocations.
+- **Dedicated TTS Key Pool**: Every active Google AI Studio key is strictly scoped to `allowed_services = '["tts"]'`, reserving 100% of API capacity for `gemini-3.8-flash-tts` vocal speech synthesis.
+- **Permanent Quarantine Archival**: Banned, revoked, or disabled keys are physically quarantined in `key_quarantine` with `is_permanent = 1` and never leased or called.
+- **Zero Network Pings**: Model discovery and health checks are performed via static offline catalog caching with 0 network pings.
+
 ---
 
 ## 4. Google Cloud & Gemini API Technical Knowledge Base
