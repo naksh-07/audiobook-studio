@@ -116,7 +116,7 @@ class NetSilenceProcessor:
         Injected = max(min_injected, Target_Pause - (Tail_Decay_A + Head_Margin_B))
     """
 
-    SILENCE_FLOOR_AMPLITUDE: int = 350  # ~ -39.4 dBFS (covers Gemini vocoder dither / room-tone floor)
+    SILENCE_FLOOR_AMPLITUDE: int = 120  # ~ -48.7 dBFS (covers room tone/vocoder dither, protects soft speech/consonant decays)
 
     @classmethod
     def measure_tail_decay_ms(cls, pcm_bytes: bytes, sample_rate: int = 24000) -> int:
@@ -255,12 +255,12 @@ class EditorialDSPEngine:
                 inherent_silence_ms = tail_decay + head_margin
                 if inherent_silence_ms > target_pause:
                     # Excess silence already present from vocoder/punctuation: trim trailing dead air
-                    # Preserve at least 40ms of tail decay for smooth Hann fade-out
+                    # Preserve at least 75ms of tail decay for natural vocal decay & smooth Hann fade-out
                     excess_ms = inherent_silence_ms - target_pause
-                    trim_ms = min(excess_ms, max(0, tail_decay - 40))
+                    trim_ms = min(excess_ms, max(0, tail_decay - 75))
                     if trim_ms > 0:
                         raw_pcm = NetSilenceProcessor.trim_excess_tail_pcm(raw_pcm, trim_ms, sample_rate=effective_sample_rate)
-                        tail_decay = max(40, tail_decay - trim_ms)
+                        tail_decay = max(75, tail_decay - trim_ms)
 
                 net_pause_ms = NetSilenceProcessor.calculate_net_silence_ms(
                     target_pause_ms=target_pause,

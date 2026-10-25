@@ -1595,3 +1595,35 @@
 - **Verification:**
   - 101/101 audio and mastering tests passed 100% green in 20.59s.
   - Rendered [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (132.92s, -19.0 LUFS, -1.50 dBTP, LRA **6.8 LU**, ACX/Audible certified pass).
+
+## ADR-037: Natural Dialogue Cadence, Punctuation-Aware Latencies & Tail Preservation
+- **Status:** APPROVED & IMPLEMENTED
+- **Date:** 2026-10-25
+- **Context:**
+  1. Listening audit identified subtle artificiality in dialogue pacing and turn-taking:
+     - **Em-Dash Narrator Interruption Bug**: In `_stitch_screenplay`, lines ending with an em-dash (`—`, `--`, `-`) were universally classified as breathless mid-speech cut-offs (`110ms`). In audiobook prose, narrator dialogue lead-ins (e.g. `कसाई बोला—`, `उसने कहा—`) end with an em-dash, clamping the transition to an unnatural 0.11s pause where characters spoke on top of narrator vocal decay.
+     - **Missing Devanagari Full Stop (`।`) & Period (`.`):** Neither `।` nor `.` was handled, causing full sentences to fall through to arbitrary default fallbacks (290ms character turns, 220ms narrator paragraph breaks), rushing the narrator (Aoede) and preventing reflective acting cadence.
+     - **Aggressive Silence Trimming**: `NetSilenceProcessor` used `SILENCE_FLOOR_AMPLITUDE = 350` (-39.4 dBFS) and trimmed tails down to 40ms, prematurely clipping delicate trailing consonants ('s', 'h', breath decay).
+     - **Artificial Growl Artifact**: `[growls]` reflex on human characters caused Gemini Flash TTS to emit animalistic canine snarls rather than authentic human cold menace.
+- **Decision:**
+  1. **Audible Flow Punctuation & Cadence Matrix (`multi_cast_client.py`)**:
+     - Narrator prose dialogue lead-in ending with em-dash/hyphen/colon (`—`, `--`, `-`, `:`): Set to **340ms** natural conversational cue.
+     - True character mid-speech cut-off ending with em-dash: Retained at **110ms** breathless interruption.
+     - Devanagari full stop `।` / Western `.`:
+       - Narrator -> Narrator paragraph breath: **400ms** (gives Aoede relaxed, sweet phrasing and scene visualization time).
+       - Character -> Character dramatic turn switch: **400ms** (natural standoff/dialogue reaction latency).
+       - Narrator <-> Character transition: **360ms**.
+       - Same character multi-sentence breath: **280ms**.
+     - Question mark (`?`, `؟`): **440ms** expectant latency between speakers.
+     - Exclamation mark (`!`): **340ms** impact reaction beat between speakers.
+     - Trailing ellipsis (`...`, `…`): **580ms** lingering thought.
+     - Mid-sentence clause / comma (`,`, `،`): **180ms**.
+  2. **Soft Decay Tail Preservation (`editorial.py`)**:
+     - Lowered `SILENCE_FLOOR_AMPLITUDE` to `120` (~ -48.7 dBFS), safely above shaped comfort room tone (-62 dBFS) while fully capturing soft consonants and syllable decays.
+     - Increased minimum preserved tail decay from 40ms to **75ms**, ensuring the 18ms Hann fade-out operates entirely within room decay and never clips speech phonemes.
+  3. **Human Anti-Growl Protection (`gemini_adapter.py`)**:
+     - Strips `[growls]` from spoken text for human speakers (only permitting it for explicit beasts/monsters), routing it into `speechMetadata.style` (`menacing guttural undertone, controlled lethal threat`) for authentic human threat acting.
+- **Verification:**
+  - 143/143 audio and TTS tests passed 100% green.
+  - Added `test_multicast_pause_cadence_matrix` in `tests/tts/test_multicast_client_deep.py`.
+  - Fresh end-to-end production run delivered [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (128.20s, -19.0 LUFS, -1.50 dBTP, LRA 6.2 LU, 100% certified pass).

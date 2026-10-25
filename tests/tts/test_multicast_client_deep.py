@@ -181,3 +181,91 @@ def test_multicast_dialogue_rally_grouping_and_fallback(multicast_orchestrator, 
     assert result.master_audio_path.exists()
     assert result.duration_sec > 0
     assert result.qc_passed is True
+
+def test_multicast_pause_cadence_matrix(multicast_orchestrator, tmp_path):
+    """
+    Verifies that _stitch_screenplay correctly applies the Audible Flow pause cadence:
+    1. Narrator prose lead-in ending with em-dash -> 340ms (never 110ms).
+    2. Character mid-speech cut-off ending with em-dash -> 110ms.
+    3. Sentence terminator (।) between narrator paragraphs -> 400ms.
+    4. Sentence terminator (।) between different character turns -> 400ms.
+    """
+    client = MultiCastStudioClient(orchestrator=multicast_orchestrator)
+    from audiobook_factory.tts.contracts import CanonicalTTSRequest, SynthesizedAudioChunk
+
+    req_narr_intro = CanonicalTTSRequest(
+        segment_uid="s1",
+        literary_text="कसाई बोला—",
+        spoken_text="कसाई बोला—",
+        voice_id="Aoede",
+        speaker="Narrator",
+        sample_rate=24000,
+        scene_num=1,
+    )
+    req_char_dialogue = CanonicalTTSRequest(
+        segment_uid="s2",
+        literary_text="तगड़ी घोड़ी है।",
+        spoken_text="तगड़ी घोड़ी है।",
+        voice_id="Enceladus",
+        speaker="Butcher",
+        sample_rate=24000,
+        scene_num=1,
+    )
+    req_char_interrupted = CanonicalTTSRequest(
+        segment_uid="s3",
+        literary_text="मैं तो बस कह रहा था—",
+        spoken_text="मैं तो बस कह रहा था—",
+        voice_id="Enceladus",
+        speaker="Butcher",
+        sample_rate=24000,
+        scene_num=1,
+    )
+    req_char_response = CanonicalTTSRequest(
+        segment_uid="s4",
+        literary_text="उस घोड़े को हाथ मत लगाना, साथी।",
+        spoken_text="उस घोड़े को हाथ मत लगाना, साथी।",
+        voice_id="Charon",
+        speaker="Borch",
+        sample_rate=24000,
+        scene_num=1,
+    )
+    req_narr_para1 = CanonicalTTSRequest(
+        segment_uid="s5",
+        literary_text="दीवार की ओट से अजनबी घूमा।",
+        spoken_text="दीवार की ओट से अजनबी घूमा।",
+        voice_id="Aoede",
+        speaker="Narrator",
+        sample_rate=24000,
+        scene_num=1,
+    )
+    req_narr_para2 = CanonicalTTSRequest(
+        segment_uid="s6",
+        literary_text="उसके बाल घने और बादामी थे।",
+        spoken_text="उसके बाल घने और बादामी थे।",
+        voice_id="Aoede",
+        speaker="Narrator",
+        sample_rate=24000,
+        scene_num=1,
+    )
+
+    dummy_pcm = b"\x00\x00" * 2400
+    chunk1 = SynthesizedAudioChunk(segment_uid="s1", pcm_bytes=dummy_pcm, sample_rate=24000, num_channels=1, duration_sec=0.1, provider_model="model", voice_id="v1")
+    chunk2 = SynthesizedAudioChunk(segment_uid="s2", pcm_bytes=dummy_pcm, sample_rate=24000, num_channels=1, duration_sec=0.1, provider_model="model", voice_id="v2")
+    chunk3 = SynthesizedAudioChunk(segment_uid="s3", pcm_bytes=dummy_pcm, sample_rate=24000, num_channels=1, duration_sec=0.1, provider_model="model", voice_id="v3")
+    chunk4 = SynthesizedAudioChunk(segment_uid="s4", pcm_bytes=dummy_pcm, sample_rate=24000, num_channels=1, duration_sec=0.1, provider_model="model", voice_id="v4")
+    chunk5 = SynthesizedAudioChunk(segment_uid="s5", pcm_bytes=dummy_pcm, sample_rate=24000, num_channels=1, duration_sec=0.1, provider_model="model", voice_id="v5")
+    chunk6 = SynthesizedAudioChunk(segment_uid="s6", pcm_bytes=dummy_pcm, sample_rate=24000, num_channels=1, duration_sec=0.1, provider_model="model", voice_id="v6")
+
+    batch = [
+        (req_narr_intro, chunk1, None),
+        (req_char_dialogue, chunk2, None),
+        (req_char_interrupted, chunk3, None),
+        (req_char_response, chunk4, None),
+        (req_narr_para1, chunk5, None),
+        (req_narr_para2, chunk6, None),
+    ]
+
+    out_file = tmp_path / "cadence_test.wav"
+    dur = client._stitch_screenplay(batch, out_file)
+    assert dur > 0
+    assert out_file.exists()

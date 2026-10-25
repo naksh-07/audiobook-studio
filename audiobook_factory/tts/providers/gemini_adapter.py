@@ -97,7 +97,7 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
 
         session_id = f"scene_{request.segment_uid[:8]}" if request.segment_uid else "tts_session"
 
-        # Check if literary_text contains certified acoustic reflexes (e.g. [growls], [laughs], [chuckles], [whispers])
+        # Check if literary_text contains certified acoustic reflexes (e.g. [laughs], [chuckles], [whispers], [sighs])
         spoken_text = request.spoken_text
         if request.literary_text and request.speaker != "Narrator":
             from audiobook_factory.tts.providers.gemini import (
@@ -119,6 +119,15 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
                         tag_clean = tag.lower().strip()
                         if tag_clean in CERTIFIED_ACOUSTIC_REFLEX_TAGS and f"[{tag_clean}]" not in spoken_text:
                             spoken_text = f"[{tag_clean}] {spoken_text}"
+
+            # Anti-animal growl protection: Strip [growls] from human speech to prevent cartoon snarls
+            is_creature = any(k in (request.speaker or "").lower() for k in ("beast", "monster", "demon", "creature", "राक्षस", "दैत्य"))
+            if not is_creature and ("[growls]" in spoken_text.lower() or "[growl]" in spoken_text.lower()):
+                spoken_text = re.sub(r"\[growls?\]\s*", "", spoken_text, flags=re.IGNORECASE).strip()
+                if style_desc:
+                    style_desc = f"{style_desc}, menacing guttural undertone"
+                else:
+                    style_desc = "menacing guttural undertone"
 
         intent_emotion = request.delivery_intent.emotion if request.delivery_intent else "neutral"
         intent_intensity = request.delivery_intent.intensity if request.delivery_intent else "medium"

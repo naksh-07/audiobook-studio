@@ -540,24 +540,59 @@ class MultiCastStudioClient:
                 next_req = batch_results[idx + 1][0]
                 cur_text = (getattr(cur_req, "spoken_text", getattr(cur_req, "literary_text", "")) or "").strip()
 
+                # 1. Scene shift / Chapter beat
                 if cur_req.scene_num != next_req.scene_num:
                     pause_ms = 650  # Scene shift / chapter beat
-                elif cur_text.endswith("—") or cur_text.endswith("--") or cur_text.endswith("-"):
-                    pause_ms = 110  # Breathless interruption / cut-off
+
+                # 2. Lingering hesitation or trailing thought
                 elif cur_text.endswith("...") or cur_text.endswith("…"):
-                    pause_ms = 620  # Trailing hesitation / lingering thought
-                elif cur_text.endswith("?") or cur_text.endswith("؟!"):
-                    pause_ms = 400  # Expectant question pause
+                    pause_ms = 580  # Trailing hesitation / lingering thought
+
+                # 3. Em-dash / Hyphen / Colon: Prose Dialogue Lead-in vs Breathless Interruption
+                elif cur_text.endswith(("—", "--", "-", ":")):
+                    if cur_req.speaker == "Narrator":
+                        # Narrator introducing spoken dialogue: natural prose breathing space
+                        pause_ms = 340
+                    else:
+                        # Character cut off mid-speech: breathless interruption
+                        pause_ms = 110
+
+                # 4. Question pause
+                elif cur_text.endswith(("?", "؟!", "?!")):
+                    if cur_req.speaker != next_req.speaker:
+                        pause_ms = 440  # Expectant question pause between speakers
+                    else:
+                        pause_ms = 350  # Rhetorical question before speaker continues
+
+                # 5. Exclamation beat
                 elif cur_text.endswith("!"):
-                    pause_ms = 260  # Sharp exclamation beat
-                elif cur_text.endswith(","):
-                    pause_ms = 150  # Mid-sentence breath clause
+                    if cur_req.speaker != next_req.speaker:
+                        pause_ms = 340  # Impact reaction beat before next speaker
+                    else:
+                        pause_ms = 260  # Punctuation emphasis within same speaker
+
+                # 6. Sentence terminator: Devanagari Purna Viram (।) or Western period (.)
+                elif cur_text.endswith(("।", ".")):
+                    if cur_req.speaker == "Narrator" and next_req.speaker == "Narrator":
+                        pause_ms = 400  # Natural narrative paragraph/cadence breath (Aoede sweet phrasing)
+                    elif cur_req.speaker == "Narrator" or next_req.speaker == "Narrator":
+                        pause_ms = 360  # Transition between narrator and dialogue
+                    elif cur_req.speaker == next_req.speaker:
+                        pause_ms = 280  # Same character multi-sentence breath
+                    else:
+                        pause_ms = 400  # Organic conversational turn switch between characters
+
+                # 7. Mid-sentence clause / comma
+                elif cur_text.endswith((",", "،")):
+                    pause_ms = 180  # Mid-sentence breath clause
+
+                # 8. Default speaker relationship fallbacks
                 elif cur_req.speaker == next_req.speaker:
-                    pause_ms = 220  # Same speaker continuation
+                    pause_ms = 240  # Same speaker continuation
                 elif cur_req.speaker == "Narrator" or next_req.speaker == "Narrator":
-                    pause_ms = 350  # Narrator intro / transition
+                    pause_ms = 360  # Narrator intro / transition
                 else:
-                    pause_ms = 290  # Organic conversational turn switch
+                    pause_ms = 380  # Organic conversational turn switch
 
                 target_pauses_ms.append(pause_ms)
             else:
