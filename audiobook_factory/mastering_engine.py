@@ -80,7 +80,8 @@ class MasteringEngineV2:
         reference_matcher: Optional[ReferenceSpectrumMatcher] = None,
         ffmpeg_bin: Optional[str] = None,
     ):
-        self.ffmpeg = ffmpeg_bin or shutil.which("ffmpeg") or "ffmpeg"
+        from audiobook_factory.tts.constants import get_ffmpeg
+        self.ffmpeg = ffmpeg_bin or get_ffmpeg()
         self.analyzer = analyzer or MasteringAnalyzer(ffmpeg_bin=self.ffmpeg)
         self.qc_agent = qc_agent or MasteringQCAgent()
         self.judge = judge or MasteringJudge()

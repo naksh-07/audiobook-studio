@@ -73,7 +73,7 @@ class TestAudioDSPProcessor(unittest.TestCase):
         self.assertTrue(cfg.enable_pedalboard)
         self.assertEqual(cfg.subsonic_hz, 75.0)
         self.assertEqual(cfg.boxiness_cut_hz, 320.0)
-        self.assertEqual(cfg.boxiness_cut_db, -1.5)
+        self.assertEqual(cfg.boxiness_cut_db, -1.0)
         self.assertEqual(cfg.presence_lift_hz, 3200.0)
         self.assertEqual(cfg.presence_lift_db, 0.8)
         self.assertEqual(cfg.target_lufs, -19.0)

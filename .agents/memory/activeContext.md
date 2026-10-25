@@ -6,15 +6,14 @@
 
 ## System Freeze & Touch Guard Active
 - **FROZEN (TOUCH BAN)**: Rooms 1 to 4 (Extraction, Translation, Screenplay/Attribution, TTS & Directing). 100% stable & green. Certified untouched.
-- **ROOM 5 PRO MASTERING (COMPLETED)**: Studio 10/10 Vocal Mastering Engine featuring:
+- **ROOM 5 PRO MASTERING & TTS PURITY (COMPLETED)**:
   - Vectorized C-level split-band lookahead dynamic de-esser (5.5kHz crossover, -24 dBFS threshold).
-  - 3-band resonance mud notch (300Hz, -3.5dB) and +1.8dB silky air restoration high-shelf (>10.5kHz).
-  - Two-stage vocal dynamics (Fast Peak Tamer -14dB + Smooth Opto RMS Leveler -22dB).
-  - Downward noise expander (-55dB threshold) and ACX room tone framing (0.75s lead-in, 3.0s tail).
-  - 48kHz 24-bit stereo output via C++ JUCE libsndfile and 4x oversampled True-Peak BrickwallLimiter.
+  - Gentle warmth curve: 320Hz notch relaxed to -1.0dB, preserving female chest resonance ($F_0$ 220-350Hz) and souz.
+  - Stage 1 compressor attack relaxed from 4.0ms to 25.0ms (preserving consonant transient articulation & melodic breath).
+  - MultiCastStudioClient: Purged analytical `character_objective` from `speechMetadata.style` to prevent robotic reading; restricted to pure physical vocal traits & theatrical styles.
+  - Premaster Headroom Scaling: Automatic -1.0 dBFS scaling in `_stitch_screenplay` to prevent inter-sample digital clipping.
+  - 48kHz 24-bit stereo output via C++ JUCE libsndfile, True-Peak Brickwall Limiter, and ACX room tone framing.
 
-## Audition Deliverables On Disk
-- **Studio 10/10 Deliverable**: [`COMPARISON_04_STUDIO_10_OUT_OF_10_MASTER.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/COMPARISON_04_STUDIO_10_OUT_OF_10_MASTER.wav) (93.77s, -19.01 LUFS, peak -1.53 dBTP, ACX pass)
-- **Primary Chapter Master**: [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (Synchronized to 10/10 master)
-- **Previous Master (6.5/10)**: [`COMPARISON_03_NEW_PEDALBOARD_MASTER.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/COMPARISON_03_NEW_PEDALBOARD_MASTER.wav) (90.02s)
-- **Raw Premaster**: [`COMPARISON_01_RAW_PREMASTER.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/COMPARISON_01_RAW_PREMASTER.wav)
+## Fresh End-to-End Master Deliverable
+- **Fresh Master Deliverable**: [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (137.11s, -19.0 LUFS, peak -1.90 dBTP, LRA 4.8 LU, 48kHz 24-bit PCM stereo, ACX/Audible certified pass).
+- **Mastering Ledger**: [`chapter_001_mastering_ledger.json`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_mastering_ledger.json) (100% Certified, 0 warnings, 0 review items).

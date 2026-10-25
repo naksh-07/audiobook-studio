@@ -1537,3 +1537,21 @@
 - **Verification:**
   - Audition file [`COMPARISON_04_STUDIO_10_OUT_OF_10_MASTER.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/COMPARISON_04_STUDIO_10_OUT_OF_10_MASTER.wav) (93.77s): -19.01 LUFS, -1.53 dBTP, 1.05s head silence (PASS), 3.42s tail silence (PASS), 3.70% presence (PASS). Rendered in 2.99s (~31x realtime).
   - 100% green test matrix across all 129 audio/tts tests and 24 podcast tests.
+
+
+## ADR-034: Framework Dialogue Delivery & Vocal Warmth Optimization (Ponytail Standard)
+- **Status:** APPROVED & APPLIED
+- **Date:** 2026-10-25
+- **Context:**
+  1. Listening audit of fresh end-to-end master render revealed two subtle acoustic/expressive flaws:
+     - **Dialogue Artificiality**: Dialogue lines felt slightly synthetic/flat rather than fully theatrical. Investigation proved that MultiCastStudioClient was inadvertently appending character_objective (plot objectives such as 'Advance position and secure control over encounter with...') into memory_vocal_constraint, which was concatenated into Gemini 3.8 Flash's speechMetadata.style. Analytical plot sentences confused the neural vocoder into flat delivery instead of rich acting.
+     - **Loss of Melody & Souz (Female Narration / Aoede)**: An aggressive -3.5 dB static notch at 300Hz cut directly into the fundamental pitch (F0) and chest resonance corridor (220-350 Hz) of female narration, while a +2.2 dB boost at 3.6kHz and ultra-fast 4ms compressor attack stripped Aoede's natural sweetness, breath phrasing, and melodic warmth.
+- **Decision:**
+  1. **Purge Analytical Plot Objectives from TTS Style Prompt:**
+     - In multi_cast_client.py, strictly exclude character_objective and subtext from vocal_constraints. Only genuine physical vocal descriptors (vocal_persona, vocal_trait, timbre) and theatrical acting styles (delivery_style, tone, emotion) are routed to speechMetadata.style.
+  2. **Musical Vocal Curve in Studio Mastering Chain:**
+     - dsp.py & contracts.py: Set boxiness_cut_db = -1.0 dB at 320Hz (protects female vocal chest warmth and melody), reduce presence lift to +0.8 dB at 3.2kHz (transparent intelligibility without sibilant bite), and relax Stage 1 compressor attack to 25.0ms (allows natural vocal transients, breathing, and musical phrasing to breathe).
+  3. **Novel-Agnostic Invariant:**
+     - All changes implemented strictly at framework level with zero hardcoding of novel titles, character rosters, or franchise lore.
+- **Verification:**
+  - multi_cast_client.py, dsp.py, and contracts.py patched and verified.

@@ -93,7 +93,7 @@ class DSPConfig(BaseModel):
     vst3_plugin_path: Optional[Path] = Field(default=None, description="Path to .vst3 bundle")
     subsonic_hz: float = Field(default=75.0, ge=20.0, le=120.0, description="Subsonic highpass filter cutoff in Hz")
     boxiness_cut_hz: float = Field(default=320.0, ge=150.0, le=600.0, description="Parametric notch frequency for chest resonance in Hz")
-    boxiness_cut_db: float = Field(default=-1.5, ge=-6.0, le=0.0, description="Boxiness attenuation gain in dB")
+    boxiness_cut_db: float = Field(default=-1.0, ge=-6.0, le=0.0, description="Boxiness attenuation gain in dB")
     presence_lift_hz: float = Field(default=3200.0, ge=1500.0, le=6000.0, description="Speech presence clarity center frequency in Hz")
     presence_lift_db: float = Field(default=0.8, ge=0.0, le=4.0, description="Speech presence boost in dB")
     target_lufs: float = Field(default=-19.0, ge=-24.0, le=-14.0, description="EBU R128 integrated loudness target in LUFS")

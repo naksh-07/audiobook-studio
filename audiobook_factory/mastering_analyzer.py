@@ -39,8 +39,9 @@ class MasteringAnalyzer:
         ffmpeg_bin: Optional[str] = None,
         ffprobe_bin: Optional[str] = None,
     ):
-        self.ffmpeg = ffmpeg_bin or shutil.which("ffmpeg") or "ffmpeg"
-        self.ffprobe = ffprobe_bin or shutil.which("ffprobe") or "ffprobe"
+        from audiobook_factory.tts.constants import get_ffmpeg, get_ffprobe
+        self.ffmpeg = ffmpeg_bin or get_ffmpeg()
+        self.ffprobe = ffprobe_bin or get_ffprobe()
         self.base_analyzer = base_analyzer or DeterministicAudioAnalyzer(
             ffprobe_bin=self.ffprobe,
             ffmpeg_bin=self.ffmpeg,

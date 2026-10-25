@@ -163,16 +163,16 @@ class MultiCastStudioClient:
             if any(k in str(emotion).lower() for k in ("whisper", "intimate", "subdued")):
                 proximity = "intimate"
 
-            char_obj = seg.get("character_objective") or seg.get("subtext") or None
-
-            # Build memory vocal constraint combining character base persona with scene objective
+            # Build memory vocal constraint combining character physical vocal traits
             vocal_constraints = []
             if speaker != "Narrator":
                 vocal_persona = resolved_personas.get(speaker, "")
                 if vocal_persona:
                     vocal_constraints.append(vocal_persona)
-            if char_obj and char_obj not in vocal_constraints:
-                vocal_constraints.append(char_obj)
+                # Physical vocal traits from acting directives (strictly exclude analytical plot objectives)
+                vocal_trait = acting.get("vocal_trait") or acting.get("timbre") or seg.get("vocal_trait")
+                if vocal_trait and str(vocal_trait).lower() not in ("none", "neutral", "standard"):
+                    vocal_constraints.append(str(vocal_trait).strip())
 
             combined_constraint = ", ".join(vocal_constraints) if vocal_constraints else None
 
@@ -512,6 +512,17 @@ class MultiCastStudioClient:
             target_pauses_ms=target_pauses_ms,
             sample_rate=sample_rate,
         )
+
+        # Scale stitched PCM to -1.0 dBFS peak headroom to prevent inter-sample clipping on premaster
+        if stitched_pcm:
+            import numpy as np
+            audio_arr = np.frombuffer(stitched_pcm, dtype=np.int16).astype(np.float32)
+            max_val = float(np.max(np.abs(audio_arr)))
+            target_peak = 32767.0 * (10.0 ** (-1.0 / 20.0))  # ~29204 (-1.0 dBFS)
+            if max_val > target_peak:
+                scaling = target_peak / max_val
+                audio_arr = np.clip(audio_arr * scaling, -32768.0, 32767.0)
+                stitched_pcm = audio_arr.astype(np.int16).tobytes()
 
         with wave.open(str(output_file), "wb") as out_wf:
             out_wf.setnchannels(1)

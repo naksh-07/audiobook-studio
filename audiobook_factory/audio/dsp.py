@@ -189,23 +189,23 @@ class VocalDSPProcessor:
         sub_hz = float(getattr(cfg, "subsonic_hz", 65.0) or 65.0)
         effects.append(HighpassFilter(cutoff_frequency_hz=sub_hz))
 
-        # 2. Parametric Mud & Boxiness Notch (300Hz, -3.5dB): Eliminates cardboard box boominess
-        box_hz = float(getattr(cfg, "boxiness_cut_hz", 300.0) or 300.0)
-        box_db = float(getattr(cfg, "boxiness_cut_db", -3.5) or -3.5)
+        # 2. Parametric Mud & Boxiness Notch (320Hz, gentle -1.0dB): Preserves female fundamental chest warmth & souz
+        box_hz = float(getattr(cfg, "boxiness_cut_hz", 320.0) or 320.0)
+        box_db = float(getattr(cfg, "boxiness_cut_db", -1.0) or -1.0)
         effects.append(PeakFilter(cutoff_frequency_hz=box_hz, gain_db=box_db, q=1.1))
 
-        # 3. Nasal Honk Notch (500Hz, -1.2dB): Removes plastic/hollow resonance
-        effects.append(PeakFilter(cutoff_frequency_hz=500.0, gain_db=-1.2, q=1.8))
+        # 3. Nasal Honk Notch (500Hz, -0.8dB): Transparent cleanup of hollow plastic resonance
+        effects.append(PeakFilter(cutoff_frequency_hz=500.0, gain_db=-0.8, q=1.8))
 
-        # 4. Speech Presence Clarity Lift (3.6kHz, +2.2dB): Lifts speech intelligibility corridor
-        pres_hz = float(getattr(cfg, "presence_lift_hz", 3600.0) or 3600.0)
-        pres_db = float(getattr(cfg, "presence_lift_db", 2.2) or 2.2)
+        # 4. Speech Presence Clarity Lift (3.2kHz, +0.8dB): Natural vocal clarity without sibilant bite
+        pres_hz = float(getattr(cfg, "presence_lift_hz", 3200.0) or 3200.0)
+        pres_db = float(getattr(cfg, "presence_lift_db", 0.8) or 0.8)
         effects.append(PeakFilter(cutoff_frequency_hz=pres_hz, gain_db=pres_db, q=1.1))
 
-        # 5. Silky Air Restoration (>9.5kHz, +1.8dB High-Shelf): Restores expensive studio mic sheen
+        # 5. Silky Air Restoration (>10.5kHz, +1.5dB High-Shelf): Velvet microphone sheen without harshness
         if getattr(cfg, "enable_air_boost", True):
             air_hz = float(getattr(cfg, "air_boost_hz", 10500.0) or 10500.0)
-            air_db = float(getattr(cfg, "air_boost_db", 1.8) or 1.8)
+            air_db = float(getattr(cfg, "air_boost_db", 1.5) or 1.5)
             effects.append(HighShelfFilter(cutoff_frequency_hz=air_hz, gain_db=air_db))
 
         # 6. Downward Noise Expander: Smoothly pushes breath pauses and noise floor below -65 dBFS
@@ -214,10 +214,10 @@ class VocalDSPProcessor:
 
         # 7. Two-Stage Vocal Dynamics
         if getattr(cfg, "enable_two_stage_compression", True):
-            # Stage 1: Fast Peak Tamer (plosive & transient control)
-            effects.append(Compressor(threshold_db=-14.0, ratio=2.2, attack_ms=4.0, release_ms=45.0))
+            # Stage 1: Musical Peak Tamer (25ms attack preserves consonant articulation and melodic phrasing)
+            effects.append(Compressor(threshold_db=-14.0, ratio=2.0, attack_ms=25.0, release_ms=60.0))
             # Stage 2: Smooth Opto RMS Leveler (tightens crest factor to 14.5 dB broadcast intimacy)
-            effects.append(Compressor(threshold_db=-22.0, ratio=1.8, attack_ms=30.0, release_ms=220.0))
+            effects.append(Compressor(threshold_db=-22.0, ratio=1.8, attack_ms=35.0, release_ms=220.0))
         else:
             effects.append(
                 Compressor(
