@@ -24,7 +24,13 @@ from typing import Dict, Any, List, Optional, Tuple, Union
 import numpy as np
 
 from audiobook_factory.logger import logger
-from audiobook_factory.audio.contracts import DSPConfig, DSPMasteringResult
+from audiobook_factory.audio.contracts import (
+    DSPConfig,
+    DSPMasteringResult,
+    VocalRegister,
+    DeliveryIntensity,
+    DialogueAcousticContext,
+)
 from audiobook_factory.mastering_contracts import MasteringProfile
 
 # Dynamic capability probe
@@ -66,6 +72,304 @@ def has_pedalboard_engine() -> bool:
 def has_pyloudnorm_engine() -> bool:
     """Returns True if Pyloudnorm (BS.1770-4) is available in current environment."""
     return _HAS_PYLOUDNORM
+
+
+class AcousticContextResolver:
+    """
+    Novel-agnostic resolver mapping casting metadata, physical vocal traits,
+    and dramatic acting directives into rich DialogueAcousticContext.
+    """
+
+    @classmethod
+    def resolve(
+        cls,
+        voice_id: str = "Aoede",
+        speaker: str = "Narrator",
+        gender: Optional[str] = None,
+        vocal_traits: Optional[Union[str, List[str]]] = None,
+        intensity: Optional[str] = None,
+        emotion: Optional[str] = None,
+        character_archetype: Optional[str] = None,
+        age_group: Optional[str] = None,
+        is_narrator: bool = False,
+        sample_rate: int = 24000,
+    ) -> DialogueAcousticContext:
+        """Dynamically maps multi-source metadata into calibrated acoustic context."""
+        # 1. Resolve Delivery Intensity
+        eff_intensity = DeliveryIntensity.CONVERSATIONAL
+        intensity_str = str(intensity or "").lower()
+        emotion_str = str(emotion or "").lower()
+        traits_str = " ".join(vocal_traits) if isinstance(vocal_traits, list) else str(vocal_traits or "").lower()
+
+        if (
+            intensity_str in ("explosive", "screaming", "shouting", "furious")
+            or any(k in emotion_str for k in ("rage", "screaming", "shouting", "fury", "combat", "battle"))
+        ):
+            eff_intensity = DeliveryIntensity.EXPLOSIVE_RAGE
+        elif (
+            intensity_str in ("whisper", "intimate")
+            or any(k in emotion_str for k in ("whisper", "फुसफुसा", "intimate", "secret"))
+            or any(k in traits_str for k in ("whisper", "intimate"))
+        ):
+            eff_intensity = DeliveryIntensity.WHISPER_INTIMATE
+        elif (
+            any(k in emotion_str for k in ("weep", "crying", "fragile", "subdued", "रोते", "कराहते", "vulnerable", "grief"))
+            or intensity_str in ("fragile", "subdued")
+        ):
+            eff_intensity = DeliveryIntensity.SUBDUED_VULNERABLE
+        elif (
+            any(k in emotion_str for k in ("panic", "gasp", "terror", "हाँफते", "breathless", "frightened"))
+            or intensity_str in ("panic", "gasping")
+        ):
+            eff_intensity = DeliveryIntensity.PANIC_GASP
+        elif (
+            intensity_str in ("theatrical", "projected", "commanding", "loud", "authoritative")
+            or any(k in emotion_str for k in ("commanding", "authoritative", "theatrical"))
+        ):
+            eff_intensity = DeliveryIntensity.PROJECTED_THEATRICAL
+
+        # 2. Resolve Vocal Register
+        eff_register = VocalRegister.NEUTRAL_SPEECH
+        gender_str = str(gender or "").lower()
+        archetype_str = str(character_archetype or "").lower()
+        age_str = str(age_group or "").lower()
+        combined_desc = f"{traits_str} {archetype_str} {age_str}".lower()
+
+        # Check narrator status
+        if is_narrator or speaker.lower() == "narrator":
+            if gender_str in ("female", "woman") or voice_id.lower() in ("aoede", "kore", "calliope", "thalia"):
+                eff_register = VocalRegister.SOPRANO_LYRICAL
+            elif voice_id.lower() in ("puck", "fenrir_tenor"):
+                eff_register = VocalRegister.TENOR_BRIGHT
+            else:
+                eff_register = VocalRegister.NEUTRAL_SPEECH
+        elif any(k in combined_desc for k in ("beast", "monster", "demon", "creature", "guttural", "growl", "दहाड़", "राक्षस")):
+            eff_register = VocalRegister.CREATURE_GUTTURAL
+        elif any(k in combined_desc for k in ("child", "kid", "boy", "girl", "juvenile", "बच्चा", "लड़का", "लड़की")):
+            eff_register = VocalRegister.CHILD_JUVENILE
+        elif any(k in combined_desc for k in ("elderly", "old", "aged", "ancient", "weathered", "बूढ़ा", "वृद्ध", "sage", "mentor", "grandfather")):
+            eff_register = VocalRegister.ELDERLY_TEXTURED
+        elif gender_str in ("female", "woman"):
+            if any(k in combined_desc for k in ("deep", "smoky", "contralto", "dark", "husky")):
+                eff_register = VocalRegister.CONTRALTO_DEEP
+            elif any(k in combined_desc for k in ("mature", "grounded", "mezzo", "firm")):
+                eff_register = VocalRegister.MEZZO_ALTO
+            else:
+                eff_register = VocalRegister.SOPRANO_LYRICAL
+        elif gender_str in ("male", "man"):
+            if any(k in combined_desc for k in ("bass", "gravel", "rumble", "sub-bass", "booming bass", "भारी बास")):
+                eff_register = VocalRegister.BASS_GRAVEL
+            elif any(k in combined_desc for k in ("tenor", "young", "bright", "cutting", "energetic", "high", "चंचल")) or voice_id.lower() in ("puck", "fenrir_tenor"):
+                eff_register = VocalRegister.TENOR_BRIGHT
+            else:
+                eff_register = VocalRegister.BARITONE_RESONANT
+        else:
+            if voice_id.lower() in ("aoede", "kore", "calliope", "thalia"):
+                eff_register = VocalRegister.SOPRANO_LYRICAL
+            elif voice_id.lower() in ("puck",):
+                eff_register = VocalRegister.TENOR_BRIGHT
+            elif voice_id.lower() in ("fenrir", "charon", "enceladus"):
+                eff_register = VocalRegister.BARITONE_RESONANT
+
+        return DialogueAcousticContext(
+            vocal_register=eff_register,
+            intensity=eff_intensity,
+            speaker=speaker,
+            voice_id=voice_id,
+            gender=gender_str or "neutral",
+            is_narrator=is_narrator or (speaker.lower() == "narrator"),
+            sample_rate=sample_rate,
+        )
+
+
+class DialogueAcousticSculptor:
+    """
+    Stem-level acoustic sculptor executing high-speed in-memory C++ JUCE DSP
+    calibrated per vocal register and dramatic delivery intensity.
+    """
+
+    @classmethod
+    def build_pedalboard_for_context(cls, context: DialogueAcousticContext) -> Optional[Any]:
+        if not _HAS_PEDALBOARD:
+            return None
+
+        reg = context.vocal_register
+        effects = []
+
+        if reg == VocalRegister.SOPRANO_LYRICAL:
+            # Aoede / Lyrical Female: Zero 300Hz cut! Preserves full chest fundamental (220-350Hz) and melody
+            effects.append(HighpassFilter(cutoff_frequency_hz=95.0))
+            effects.append(HighShelfFilter(cutoff_frequency_hz=11000.0, gain_db=1.5))
+            effects.append(Compressor(threshold_db=-18.0, ratio=1.5, attack_ms=35.0, release_ms=160.0))
+
+        elif reg == VocalRegister.MEZZO_ALTO:
+            effects.append(HighpassFilter(cutoff_frequency_hz=90.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=420.0, gain_db=-1.0, q=1.2))
+            effects.append(HighShelfFilter(cutoff_frequency_hz=10500.0, gain_db=1.2))
+            effects.append(Compressor(threshold_db=-18.0, ratio=1.8, attack_ms=30.0, release_ms=150.0))
+
+        elif reg == VocalRegister.CONTRALTO_DEEP:
+            effects.append(HighpassFilter(cutoff_frequency_hz=85.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=350.0, gain_db=-1.2, q=1.2))
+            effects.append(PeakFilter(cutoff_frequency_hz=650.0, gain_db=1.0, q=1.5))
+            effects.append(Compressor(threshold_db=-19.0, ratio=2.0, attack_ms=25.0, release_ms=140.0))
+
+        elif reg == VocalRegister.TENOR_BRIGHT:
+            effects.append(HighpassFilter(cutoff_frequency_hz=85.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=220.0, gain_db=-1.5, q=1.2))
+            effects.append(PeakFilter(cutoff_frequency_hz=3500.0, gain_db=1.2, q=1.1))
+            effects.append(Compressor(threshold_db=-17.0, ratio=2.0, attack_ms=20.0, release_ms=120.0))
+
+        elif reg == VocalRegister.BARITONE_RESONANT:
+            effects.append(HighpassFilter(cutoff_frequency_hz=75.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=300.0, gain_db=-2.5, q=1.2))
+            effects.append(PeakFilter(cutoff_frequency_hz=3200.0, gain_db=0.8, q=1.1))
+            effects.append(Compressor(threshold_db=-14.0, ratio=2.0, attack_ms=20.0, release_ms=60.0))
+            effects.append(Compressor(threshold_db=-22.0, ratio=1.8, attack_ms=30.0, release_ms=200.0))
+
+        elif reg == VocalRegister.BASS_GRAVEL:
+            effects.append(HighpassFilter(cutoff_frequency_hz=65.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=100.0, gain_db=1.5, q=1.2))
+            effects.append(PeakFilter(cutoff_frequency_hz=250.0, gain_db=-3.0, q=1.3))
+            effects.append(Compressor(threshold_db=-20.0, ratio=2.5, attack_ms=15.0, release_ms=150.0))
+
+        elif reg == VocalRegister.ELDERLY_TEXTURED:
+            effects.append(HighpassFilter(cutoff_frequency_hz=80.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=750.0, gain_db=1.8, q=1.5))
+            effects.append(HighShelfFilter(cutoff_frequency_hz=6500.0, gain_db=-2.0))
+            effects.append(Compressor(threshold_db=-18.0, ratio=2.0, attack_ms=25.0, release_ms=140.0))
+
+        elif reg == VocalRegister.CHILD_JUVENILE:
+            effects.append(HighpassFilter(cutoff_frequency_hz=110.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=260.0, gain_db=-2.0, q=1.2))
+            effects.append(PeakFilter(cutoff_frequency_hz=4000.0, gain_db=1.5, q=1.2))
+            effects.append(HighShelfFilter(cutoff_frequency_hz=10000.0, gain_db=1.0))
+            effects.append(Compressor(threshold_db=-17.0, ratio=1.8, attack_ms=25.0, release_ms=120.0))
+
+        elif reg == VocalRegister.CREATURE_GUTTURAL:
+            effects.append(HighpassFilter(cutoff_frequency_hz=55.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=85.0, gain_db=2.5, q=1.2))
+            effects.append(PeakFilter(cutoff_frequency_hz=3000.0, gain_db=-2.5, q=1.8))
+            effects.append(Compressor(threshold_db=-15.0, ratio=3.5, attack_ms=5.0, release_ms=80.0))
+
+        else:  # NEUTRAL_SPEECH
+            effects.append(HighpassFilter(cutoff_frequency_hz=80.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=320.0, gain_db=-1.0, q=1.1))
+            effects.append(PeakFilter(cutoff_frequency_hz=3200.0, gain_db=0.8, q=1.1))
+            effects.append(HighShelfFilter(cutoff_frequency_hz=10500.0, gain_db=1.5))
+            effects.append(Compressor(threshold_db=-18.0, ratio=2.0, attack_ms=25.0, release_ms=120.0))
+
+        # Dynamic Intensity Modulations
+        if context.intensity == DeliveryIntensity.EXPLOSIVE_RAGE:
+            # Suppress painful 2.8-3.5kHz screeching distortion
+            effects.append(PeakFilter(cutoff_frequency_hz=3000.0, gain_db=-2.5, q=2.0))
+        elif context.intensity == DeliveryIntensity.WHISPER_INTIMATE:
+            # Bring out close-mic saliva, mouth, and breath intimacy
+            effects.append(HighShelfFilter(cutoff_frequency_hz=10500.0, gain_db=2.0))
+
+        return Pedalboard(effects)
+
+    @classmethod
+    def sculpt_chunk(
+        cls,
+        pcm_bytes: bytes,
+        context: DialogueAcousticContext,
+        sample_rate: int = 24000,
+    ) -> bytes:
+        if not pcm_bytes or not _HAS_PEDALBOARD:
+            return pcm_bytes
+
+        try:
+            arr = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+            if arr.ndim == 1:
+                arr = arr.reshape(1, -1)
+
+            # 1. Apply Register Pedalboard Chain
+            board = cls.build_pedalboard_for_context(context)
+            if board is not None:
+                arr = board(arr, sample_rate)
+
+            # 2. Apply Register Targeted Lookahead De-Esser
+            arr = cls.apply_register_deesser(arr, context, sample_rate)
+
+            # 3. Clip & convert back to 16-bit PCM bytes
+            clean = np.clip(arr[0], -1.0, 1.0)
+            return (clean * 32767.0).astype(np.int16).tobytes()
+        except Exception as e:
+            logger.warning(f"Stem acoustic sculpting fallback ({e}); using raw pcm.")
+            return pcm_bytes
+
+    @classmethod
+    def apply_register_deesser(
+        cls,
+        audio: np.ndarray,
+        context: DialogueAcousticContext,
+        sr: int = 24000,
+    ) -> np.ndarray:
+        reg = context.vocal_register
+        # Crossover & threshold tuning per register
+        if reg == VocalRegister.SOPRANO_LYRICAL:
+            crossover_hz = 8200.0
+            threshold_db = -16.0
+            ratio = 2.0
+            max_att = -4.0
+        elif reg == VocalRegister.MEZZO_ALTO:
+            crossover_hz = 7200.0
+            threshold_db = -18.0
+            ratio = 2.2
+            max_att = -5.0
+        elif reg == VocalRegister.CONTRALTO_DEEP:
+            crossover_hz = 6800.0
+            threshold_db = -20.0
+            ratio = 2.2
+            max_att = -5.5
+        elif reg == VocalRegister.TENOR_BRIGHT:
+            crossover_hz = 6200.0
+            threshold_db = -20.0
+            ratio = 2.4
+            max_att = -6.0
+        elif reg == VocalRegister.BARITONE_RESONANT:
+            crossover_hz = 5500.0
+            threshold_db = -22.0
+            ratio = 2.8
+            max_att = -6.5
+        elif reg == VocalRegister.BASS_GRAVEL:
+            crossover_hz = 5000.0
+            threshold_db = -22.0
+            ratio = 3.0
+            max_att = -7.0
+        elif reg == VocalRegister.ELDERLY_TEXTURED:
+            crossover_hz = 6500.0
+            threshold_db = -20.0
+            ratio = 2.5
+            max_att = -6.0
+        elif reg == VocalRegister.CHILD_JUVENILE:
+            crossover_hz = 7500.0
+            threshold_db = -18.0
+            ratio = 2.0
+            max_att = -4.5
+        elif reg == VocalRegister.CREATURE_GUTTURAL:
+            crossover_hz = 4800.0
+            threshold_db = -24.0
+            ratio = 3.0
+            max_att = -7.0
+        else:
+            crossover_hz = 6500.0
+            threshold_db = -20.0
+            ratio = 2.5
+            max_att = -6.0
+
+        if sr <= crossover_hz * 2.1:
+            return audio
+
+        return VocalDSPProcessor.apply_split_band_deesser(
+            audio,
+            sr=sr,
+            crossover_hz=crossover_hz,
+            threshold_db=threshold_db,
+            ratio=ratio,
+            max_attenuation_db=max_att,
+        )
 
 
 class VocalDSPProcessor:
@@ -239,6 +543,21 @@ class VocalDSPProcessor:
 
         return Pedalboard(effects)
 
+    def build_master_bus_chain(self, config: Optional[DSPConfig] = None) -> Optional[Any]:
+        """
+        Master bus broadcast glue chain.
+        Applies transparent glue compression to the summed mix without altering character timbres.
+        """
+        if not self._has_pedalboard:
+            return None
+        effects = [
+            # 1. Subsonic protection
+            HighpassFilter(cutoff_frequency_hz=65.0),
+            # 2. Transparent mastering bus glue compressor
+            Compressor(threshold_db=-16.0, ratio=1.3, attack_ms=45.0, release_ms=200.0),
+        ]
+        return Pedalboard(effects)
+
     def process_samples(
         self,
         audio_np: np.ndarray,
@@ -368,8 +687,9 @@ class VocalDSPProcessor:
 
             audio = np.concatenate((head_bed, audio, tail_bed), axis=1)
 
-        # Step 3: Dynamic Split-Band Lookahead De-Esser
-        if getattr(cfg, "enable_dynamic_deesser", True) and audio.shape[1] > 0:
+        # Step 3: Dynamic Split-Band Lookahead De-Esser (Bypassed if stem conditioning already handled per register)
+        is_stem_aware = getattr(cfg, "enable_voice_aware_mastering", True)
+        if getattr(cfg, "enable_dynamic_deesser", True) and not is_stem_aware and audio.shape[1] > 0:
             deesser_co = float(getattr(cfg, "deesser_crossover_hz", 5500.0) or 5500.0)
             deesser_th = float(getattr(cfg, "deesser_threshold_db", -24.0) or -24.0)
             deesser_rt = float(getattr(cfg, "deesser_ratio", 3.0) or 3.0)
@@ -383,8 +703,12 @@ class VocalDSPProcessor:
                 max_attenuation_db=deesser_ma,
             )
 
-        # Step 4: Apply C++ Pedalboard Studio Vocal Chain (EQ, Air Boost, Expander, 2-Stage Compression)
-        vocal_board = self.build_pedalboard_chain(cfg)
+        # Step 4: Apply C++ Pedalboard Studio Vocal Chain
+        if is_stem_aware:
+            vocal_board = self.build_master_bus_chain(cfg)
+        else:
+            vocal_board = self.build_pedalboard_chain(cfg)
+
         if vocal_board is not None:
             processed = vocal_board(audio, target_sr)
         else:

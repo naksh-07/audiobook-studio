@@ -353,30 +353,87 @@ class MultiCastStudioClient:
             except TypeError:
                 progress_callback(1.0)
 
-        # 5. Apply 4D Acoustic Formant Sculpting
+        # 5. Apply 4D Acoustic Formant Sculpting & Voice-Aware Stem Conditioning
+        from audiobook_factory.audio.dsp import AcousticContextResolver, DialogueAcousticSculptor
+
         formant_map = character_formants or {}
         processed_chunks: List[Tuple[CanonicalTTSRequest, SynthesizedAudioChunk, Any]] = []
+        seg_lookup = {r.segment_uid: s for s, r in requests}
 
         for req, chunk, validation in synthesized_takes:
+            curr_pcm = chunk.pcm_bytes
+
+            # 5a. Formant Sculpting (if character formants specified)
             speaker_formant = formant_map.get(req.speaker)
             if speaker_formant:
-                sculpted_pcm = FormantSculptor.apply_formant_eq(
-                    pcm_bytes=chunk.pcm_bytes,
+                curr_pcm = FormantSculptor.apply_formant_eq(
+                    pcm_bytes=curr_pcm,
                     profile=speaker_formant,
                     sample_rate=chunk.sample_rate,
                 )
-                new_chunk = SynthesizedAudioChunk(
-                    segment_uid=chunk.segment_uid,
-                    pcm_bytes=sculpted_pcm,
-                    sample_rate=chunk.sample_rate,
-                    num_channels=chunk.num_channels,
-                    duration_sec=chunk.duration_sec,
-                    provider_model=chunk.provider_model,
-                    voice_id=chunk.voice_id,
-                )
-                processed_chunks.append((req, new_chunk, validation))
-            else:
-                processed_chunks.append((req, chunk, validation))
+
+            # 5b. Voice-Aware Stem Conditioning (Universal Acoustic Profiling)
+            seg_dict = seg_lookup.get(req.segment_uid, {})
+            acting_dir = seg_dict.get("acting", {}) if isinstance(seg_dict.get("acting"), dict) else {}
+
+            intensity = (
+                acting_dir.get("intensity")
+                or seg_dict.get("intensity")
+                or (getattr(req, "metadata", {}) or {}).get("intensity")
+                or "conversational"
+            )
+            emotion = (
+                acting_dir.get("emotion")
+                or seg_dict.get("emotion")
+                or (getattr(req, "metadata", {}) or {}).get("emotion")
+                or "neutral"
+            )
+            vocal_trait = (
+                acting_dir.get("vocal_trait")
+                or acting_dir.get("timbre")
+                or seg_dict.get("vocal_trait")
+                or resolved_personas.get(req.speaker, "")
+            )
+            archetype = (
+                acting_dir.get("character_archetype")
+                or seg_dict.get("character_archetype")
+                or None
+            )
+            age_group = (
+                acting_dir.get("age_group")
+                or seg_dict.get("age_group")
+                or None
+            )
+
+            acoustic_ctx = AcousticContextResolver.resolve(
+                voice_id=req.voice_id,
+                speaker=req.speaker,
+                gender=resolved_genders.get(req.speaker, "neutral"),
+                vocal_traits=vocal_trait,
+                intensity=intensity,
+                emotion=emotion,
+                character_archetype=archetype,
+                age_group=age_group,
+                is_narrator=(req.speaker == "Narrator"),
+                sample_rate=chunk.sample_rate,
+            )
+
+            curr_pcm = DialogueAcousticSculptor.sculpt_chunk(
+                pcm_bytes=curr_pcm,
+                context=acoustic_ctx,
+                sample_rate=chunk.sample_rate,
+            )
+
+            new_chunk = SynthesizedAudioChunk(
+                segment_uid=chunk.segment_uid,
+                pcm_bytes=curr_pcm,
+                sample_rate=chunk.sample_rate,
+                num_channels=chunk.num_channels,
+                duration_sec=chunk.duration_sec,
+                provider_model=chunk.provider_model,
+                voice_id=chunk.voice_id,
+            )
+            processed_chunks.append((req, new_chunk, validation))
 
         # 6. Dialogue Editorial Stitching with Contextual Turn Latency & Net Silence
         premaster_path = master_path.with_name(f"{master_path.stem}_premaster.wav")

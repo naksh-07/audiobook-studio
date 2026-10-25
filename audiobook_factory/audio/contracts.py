@@ -7,9 +7,47 @@ segment contracts, chapter masters, and container packaging.
 
 from __future__ import annotations
 import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
+
+
+class VocalRegister(str, Enum):
+    """Acoustic vocal register and physiological archetype."""
+    SOPRANO_LYRICAL = "soprano_lyrical"       # Higher female, light, sweet, airy (Aoede, young women)
+    MEZZO_ALTO = "mezzo_alto"                 # Mid-register female, grounded, warm
+    CONTRALTO_DEEP = "contralto_deep"         # Low female, smoky, resonant
+    TENOR_BRIGHT = "tenor_bright"             # Higher male, energetic, cutting (Dandelion, youthful)
+    BARITONE_RESONANT = "baritone_resonant"   # Mid male, warm, heroic (standard male baritone)
+    BASS_GRAVEL = "bass_gravel"               # Deep male, heavy rumble, sub-bass
+    CHILD_JUVENILE = "child_juvenile"         # Children, high pitch, light body
+    ELDERLY_TEXTURED = "elderly_textured"     # Aged, weathered, throat resonance (Alderman, sages)
+    CREATURE_GUTTURAL = "creature_guttural"   # Monsters, beasts, raspy distortion
+    NEUTRAL_SPEECH = "neutral_speech"         # Generic standard narration
+
+
+class DeliveryIntensity(str, Enum):
+    """Dramatic emotional delivery and projection state."""
+    WHISPER_INTIMATE = "whisper_intimate"     # Close proximity, high mouth detail, breathy
+    SUBDUED_VULNERABLE = "subdued_vulnerable" # Quiet, fragile, weeping
+    CONVERSATIONAL = "conversational"         # Standard dialogue / narration
+    PROJECTED_THEATRICAL = "projected_theatrical" # Dramatic, commanding
+    EXPLOSIVE_RAGE = "explosive_rage"         # Screaming, shouting, combat
+    PANIC_GASP = "panic_gasp"                 # Fast breathing, sudden bursts
+
+
+class DialogueAcousticContext(BaseModel):
+    """Rich acoustic metadata resolved for an individual dialogue segment."""
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    vocal_register: VocalRegister = Field(default=VocalRegister.NEUTRAL_SPEECH)
+    intensity: DeliveryIntensity = Field(default=DeliveryIntensity.CONVERSATIONAL)
+    speaker: str = Field(default="Narrator")
+    voice_id: str = Field(default="Aoede")
+    gender: str = Field(default="neutral")
+    is_narrator: bool = Field(default=False)
+    sample_rate: int = Field(default=24000)
 
 
 class IngestionConfig(BaseModel):
@@ -116,6 +154,7 @@ class DSPConfig(BaseModel):
     air_boost_hz: float = Field(default=10500.0, ge=8000.0, le=16000.0, description="High-shelf air restoration frequency in Hz")
     air_boost_db: float = Field(default=1.8, ge=0.0, le=4.0, description="High-shelf air boost in dB")
     enable_downward_expander: bool = Field(default=True, description="Enable gentle downward noise expander")
+    enable_voice_aware_mastering: bool = Field(default=True, description="Enable per-character stem acoustic sculpting")
 
 
 class DSPMasteringResult(BaseModel):

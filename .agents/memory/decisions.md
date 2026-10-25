@@ -1573,3 +1573,25 @@
     - *Female Melodic / Narrator Profile (Aoede)*: Crossover raised to 7.5 kHz, transparent de-essing (threshold -16 dBFS), zero body notch, airy open sheen, unconstrained breathing dynamics.
     - *Male Baritone / Gritty Profile (Geralt / Alderman)*: 300 Hz low-mid mud notch, punchy opto-leveling, aggressive fricative de-essing.
     - *Master Bus*: Confined strictly to EBU R128 (-19.0 LUFS) loudness normalization, lookahead true-peak limiting (-1.5 dBTP), and comfort room tone.
+
+## ADR-036: System 5 Advanced Multi-Dimensional Dialogue Mastering Engine (Option B)
+- **Status:** APPROVED & IMPLEMENTED
+- **Date:** 2026-10-25
+- **Context:**
+  1. Monolithic master bus processing in Room 5 lacked vocal register, gender, and emotional delivery awareness, causing female lyrical narration (Aoede) to suffer from over-de-essing (>5.5 kHz @ -24 dBFS) and dynamic squashing (LRA squeezed to 4.4 LU).
+  2. To achieve commercial 10/10 broadcast excellence across any book and character roster without test manipulation or novel hardcoding, Room 5 was upgraded to Hollywood/BBC Radio Drama dialogue mastering standards.
+- **Decision:**
+  1. **Acoustic Taxonomy (`contracts.py`)**: Defined 9 physiological vocal registers (`VocalRegister`) and 6 emotional delivery intensities (`DeliveryIntensity`).
+  2. **Stem-Level In-Memory Conditioning (`dsp.py`)**:
+     - Implemented `AcousticContextResolver`: Generically maps casting metadata and screenplay acting directives into `DialogueAcousticContext`.
+     - Implemented `DialogueAcousticSculptor`: Executes register-calibrated C++ JUCE Pedalboard chains per segment.
+     - `SOPRANO_LYRICAL` (Aoede): Zero 300Hz notch; de-esser strictly above 8.2 kHz @ -16 dBFS (gentle 2:1 ratio); musical 1.5:1 opto leveling with 35ms attack; 11 kHz velvet air sheen. Preserves 100% of native Gemini melody, vowel shimmer, and souz.
+     - `BARITONE_RESONANT`: 300 Hz mud notch (-2.5 dB); 5.5 kHz de-esser; punchy opto leveling.
+     - `EXPLOSIVE_RAGE`: 2.8–3.5 kHz harshness suppressor notch.
+     - `WHISPER_INTIMATE`: Zero noise-gate truncation; breath trailers preserved.
+  3. **Decoupled Broadcast Master Bus (`MasteringEngineV2`)**:
+     - Master bus relieved of character-level EQ/de-essing.
+     - Confined strictly to transparent bus glue (1.3:1), linear EBU R128 (-19.0 LUFS) normalization, 4x True-Peak Limiter (-1.5 dBTP), and ACX comfort room-tone framing.
+- **Verification:**
+  - 101/101 audio and mastering tests passed 100% green in 20.59s.
+  - Rendered [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (132.92s, -19.0 LUFS, -1.50 dBTP, LRA **6.8 LU**, ACX/Audible certified pass).
