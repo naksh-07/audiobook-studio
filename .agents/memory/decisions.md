@@ -1555,3 +1555,21 @@
      - All changes implemented strictly at framework level with zero hardcoding of novel titles, character rosters, or franchise lore.
 - **Verification:**
   - multi_cast_client.py, dsp.py, and contracts.py patched and verified.
+
+## ADR-035: 8/10 Milestone & Forensic Investigation of Vocal Souz / Gender-Aware Mastering in Room 5
+- **Status:** RECORDED & UNDER DESIGN
+- **Date:** 2026-10-25
+- **Context:**
+  1. User listening audit of 08:39 AM master render achieved an **8/10 rating** ("kafee better h... sare system badhiya chalre h"). Dialogue delivery acting, Stanislavski subtext directing, anti-swap attribution, and loudness gates passed with high marks.
+  2. Remaining acoustic defect: Aoede's female narration voice feels slightly "off" — lacking the natural melodious souz, sweetness, and vocal air that raw Gemini 3.8 Flash TTS natively produces.
+  3. User query: How does System 5 currently handle voices gender-wise, personality-wise, and character-wise, and what is causing Aoede's melody attenuation?
+- **Forensic Findings (Architectural Reality of System 5)**:
+  1. **Zero Gender & Character Awareness on Master Bus**: System 5 currently operates as a *monolithic master bus insert* on the entire pre-mixed chapter WAV. It treats all character stems identically (whether gruff male baritone or sweet female soprano).
+  2. **Blanket Dynamic De-Esser (5.5 kHz @ -24 dBFS)**: Female acoustic energy in open vowels and melodic narration naturally radiates in the 5.5–9 kHz band. The static de-esser misidentifies this vocal shimmer as sibilance and attenuates it by up to -7 dB, veiling Aoede's natural brightness.
+  3. **Double Opto-Leveling Dynamics**: The two-stage compressor (-14 dB peak tamer + -22 dB opto leveler) squashes dynamic melodic inflections and micro-dynamics that give Aoede her lyrical cadence.
+  4. **Noise Expander Tail Clamping (-55 dBFS)**: The downward expander prematurely clamps delicate breath trailers and ambient vocal decay.
+- **Proposed Architectural Solution**:
+  - Implement **Stem/Voice-Aware Vocal DSP in Room 5**:
+    - *Female Melodic / Narrator Profile (Aoede)*: Crossover raised to 7.5 kHz, transparent de-essing (threshold -16 dBFS), zero body notch, airy open sheen, unconstrained breathing dynamics.
+    - *Male Baritone / Gritty Profile (Geralt / Alderman)*: 300 Hz low-mid mud notch, punchy opto-leveling, aggressive fricative de-essing.
+    - *Master Bus*: Confined strictly to EBU R128 (-19.0 LUFS) loudness normalization, lookahead true-peak limiting (-1.5 dBTP), and comfort room tone.

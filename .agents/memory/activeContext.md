@@ -4,17 +4,13 @@
 <!-- LINE_BUDGET_HARD_CAP: 50 LINES -->
 # Active Context: Audiobook Studio Antigravity Plugin & Studio Engine (v6.0)
 
-## System Freeze & Touch Guard Active
-- **FROZEN (TOUCH BAN)**: Rooms 1 to 4 (Extraction, Translation, Screenplay/Attribution, TTS & Directing). 100% stable & green. Certified untouched.
-- **ROOM 5 PRO MASTERING & TTS PURITY (COMPLETED)**:
-  - Vectorized C-level split-band lookahead dynamic de-esser (5.5kHz crossover, -24 dBFS threshold).
-  - Gentle warmth curve: 320Hz notch relaxed to -1.0dB, preserving female chest resonance ($F_0$ 220-350Hz) and souz.
-  - Stage 1 compressor attack relaxed from 4.0ms to 25.0ms (preserving consonant transient articulation & melodic breath).
-  - MultiCastStudioClient: Purged analytical `character_objective` from `speechMetadata.style` to prevent robotic reading; restricted to pure physical vocal traits & theatrical styles.
-  - Premaster Headroom Scaling: Automatic -1.0 dBFS scaling in `_stitch_screenplay` to prevent inter-sample digital clipping.
-  - 48kHz 24-bit stereo output via C++ JUCE libsndfile, True-Peak Brickwall Limiter, and ACX room tone framing.
+## Current Status: 8/10 Milestone Achieved
+- **Certified Stable (Touch Ban)**: Rooms 1 to 4. Dialogue delivery, anti-swap attribution & acting are solid.
+- **Master Deliverables**:
+  - WAV: [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (129.31s, -19.0 LUFS, -1.50 dBTP, 48kHz 24-bit).
+  - M4B: [`chapter_001_master.m4b`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.m4b) (3.15 MB, 192kbps AAC).
+  - Ledger: [`chapter_001_mastering_ledger.json`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_mastering_ledger.json).
 
-## Fresh End-to-End Master Deliverables (Rendered 08:39 AM)
-- **Fresh Master WAV**: [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (129.31s, -19.0 LUFS, peak -1.50 dBTP, LRA 4.4 LU, 48kHz 24-bit PCM stereo, ACX/Audible certified pass).
-- **Fresh Packaged M4B**: [`chapter_001_master.m4b`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.m4b) (3.15 MB, 192kbps AAC container).
-- **Mastering Ledger**: [`chapter_001_mastering_ledger.json`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_mastering_ledger.json) (100% Certified, 0 warnings, 0 review items).
+## Active Investigation: Room 5 Gender/Voice-Aware Dynamic Profiling (ADR-035)
+- **Problem**: Monolithic master bus chain treats all voices identically. Blanket De-Esser (5.5kHz @ -24dB) & Opto compression clamp Aoede's upper-harmonic melody, shimmer, and souz compared to raw Gemini TTS.
+- **Next Step**: Design stem-level/voice-aware DSP profiles in Room 5 (calibrated for female melodic vs. male baritones) before final EBU R128 mastering.
