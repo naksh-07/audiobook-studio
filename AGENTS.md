@@ -24,7 +24,7 @@
   3. Room 3 Anti-Swap `DialogueAttributionAuditor` ensuring 0% speaker turn inversion ($A \leftrightarrow B$).
   4. Room 2 Translation Collective with Dual-Rule Invariant (`CLASSIC_REVERENT` dignity vs `RAW_UNRATED` visceral combat gore & intimacy).
   5. Dialogue Editorial Layer with Hann micro-fades (12ms/18ms), dynamic punctuation-aware latencies, and -62 dBFS shaped comfort room tone.
-  6. Broadcast EBU R128 (-19.0 LUFS, -1.5 dBTP) vocal loudness mastering and chaptered `.m4b` container with embedded cover art.
+  6. Room 5 Multi-Dimensional Dialogue Mastering Engine (ADR-036): Dynamic stem conditioning across 9 vocal registers and 6 delivery intensities, preserving female narration (Aoede) melody, vowel shimmer, and souz while delivering punchy baritone presence; decoupled EBU R128 (-19.0 LUFS, -1.5 dBTP) broadcast master bus and chaptered `.m4b` container with embedded cover art.
 - **Universal Novel-Agnostic Invariant**: The factory core (`audiobook_factory`, CLI, quality gates, translation engines) MUST NEVER contain hardcoded novel titles, franchise lore, character rosters, file hashes, or era biases.
 - **Environment**: High-performance Windows 11 workstation with CUDA acceleration.
 - **Active Memory**: Project memory bank in `.agents/memory/` (`activeContext.md` $\le$ 50 lines).
