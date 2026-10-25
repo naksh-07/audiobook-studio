@@ -66,7 +66,16 @@ def test_build_style_descriptor_directing_nlp():
     assert "intimate whisper proximity" in style
     assert "hoarse voice" in style
     assert "heavy breathing" in style
-    assert "understated natural dialogue (never theatrical)" in style
+    assert "authentic dramatic delivery with genuine emotional conviction" in style
+
+    # 3. Conversational character delivery
+    conversational_intent = DeliveryIntent(
+        emotion="neutral",
+        delivery_style="grounded_dialogue",
+        intensity="medium",
+    )
+    conv_style = GeminiTTSAdapter.build_style_descriptor(conversational_intent, speaker="Innkeeper")
+    assert "understated natural dialogue (never theatrical)" in conv_style
 
 
 @patch("urllib.request.urlopen")

@@ -13,6 +13,7 @@ import math
 import struct
 import random
 from typing import List, Tuple, Optional, Dict, Any
+import numpy as np
 
 
 class ZeroCrossingAligner:
@@ -171,6 +172,91 @@ class NetSilenceProcessor:
         return pcm_bytes[: new_sample_count * 2]
 
     @classmethod
+    def trim_excess_head_pcm(
+        cls,
+        pcm_bytes: bytes,
+        trim_ms: int,
+        sample_rate: int = 24000,
+    ) -> bytes:
+        """Trims excessive leading pre-speech silence from PCM bytes."""
+        if trim_ms <= 0 or sample_rate <= 0:
+            return pcm_bytes
+        sample_count = len(pcm_bytes) // 2
+        trim_samples = int(sample_rate * (trim_ms / 1000.0))
+        if trim_samples >= sample_count - 100:
+            return pcm_bytes
+        return pcm_bytes[trim_samples * 2 :]
+
+    @classmethod
+    def compress_intra_chunk_silences(
+        cls,
+        pcm_bytes: bytes,
+        sample_rate: int = 24000,
+        max_silence_ms: int = 480,
+        target_silence_ms: int = 320,
+        silence_threshold_db: float = -42.0,
+    ) -> bytes:
+        """
+        Finds and compresses excessive internal pauses (> max_silence_ms) down to target_silence_ms
+        using clean boundary splicing, preserving organic speech cadence while eliminating
+        vocoder runaway dead-air loops on internal Devanagari '।' or '?'.
+        """
+        if not pcm_bytes or len(pcm_bytes) < sample_rate * 2 * 0.8:
+            return pcm_bytes
+
+        samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32)
+        hop_ms = 10
+        hop_size = int(sample_rate * (hop_ms / 1000.0))
+        window_size = hop_size * 2
+        num_hops = (len(samples) - window_size) // hop_size
+
+        if num_hops <= 0:
+            return pcm_bytes
+
+        # Compute short-time energy
+        threshold_amp = 32768.0 * (10.0 ** (silence_threshold_db / 20.0))
+        is_silent = np.zeros(num_hops, dtype=bool)
+        for i in range(num_hops):
+            w = samples[i * hop_size : i * hop_size + window_size]
+            rms = np.sqrt(np.mean(w ** 2) + 1e-12)
+            if rms < threshold_amp:
+                is_silent[i] = True
+
+        max_hops = int(max_silence_ms / hop_ms)
+        target_hops = int(target_silence_ms / hop_ms)
+        trim_regions = []
+
+        in_silence = False
+        start_hop = 0
+        for i in range(num_hops):
+            if is_silent[i] and not in_silence:
+                in_silence = True
+                start_hop = i
+            elif not is_silent[i] and in_silence:
+                in_silence = False
+                region_hops = i - start_hop
+                # Skip leading (first 80ms) and trailing (last 80ms) margins (handled by boundary stitching)
+                if start_hop > 8 and i < num_hops - 8:
+                    if region_hops > max_hops:
+                        excess_hops = region_hops - target_hops
+                        cut_start_sample = (start_hop + target_hops) * hop_size
+                        cut_len_samples = excess_hops * hop_size
+                        trim_regions.append((cut_start_sample, cut_len_samples))
+
+        if not trim_regions:
+            return pcm_bytes
+
+        out_parts = []
+        last_idx = 0
+        for cut_start, cut_len in trim_regions:
+            out_parts.append(samples[last_idx:cut_start])
+            last_idx = cut_start + cut_len
+
+        out_parts.append(samples[last_idx:])
+        res = np.concatenate(out_parts)
+        return res.astype(np.int16).tobytes()
+
+    @classmethod
     def calculate_net_silence_ms(
         cls,
         target_pause_ms: int,
@@ -242,6 +328,12 @@ class EditorialDSPEngine:
         output_buffers: List[bytes] = []
         total_samples = 0
 
+        # Step 0: Compress excessive internal pauses inside each chunk (>480ms -> 320ms)
+        chunks_pcm = [
+            NetSilenceProcessor.compress_intra_chunk_silences(c, sample_rate=effective_sample_rate)
+            for c in chunks_pcm
+        ]
+
         for idx in range(len(chunks_pcm)):
             raw_pcm = chunks_pcm[idx]
 
@@ -251,6 +343,13 @@ class EditorialDSPEngine:
                 tail_decay = NetSilenceProcessor.measure_tail_decay_ms(raw_pcm, sample_rate=effective_sample_rate)
                 next_raw = chunks_pcm[idx + 1]
                 head_margin = NetSilenceProcessor.measure_head_margin_ms(next_raw, sample_rate=effective_sample_rate)
+
+                # Trim excessive leading head margin (> 60ms) on the following chunk
+                if head_margin > 60:
+                    trim_head = head_margin - 40
+                    next_raw = NetSilenceProcessor.trim_excess_head_pcm(next_raw, trim_head, sample_rate=effective_sample_rate)
+                    chunks_pcm[idx + 1] = next_raw
+                    head_margin = 40
 
                 inherent_silence_ms = tail_decay + head_margin
                 if inherent_silence_ms > target_pause:

@@ -1651,3 +1651,28 @@
   - Added bit-for-bit identity test in `tests/audio/test_acoustic_sculptor.py` (`assert sculpted == pcm_16k`).
   - 101/101 audio mastering tests pass 100% green.
   - Rendered fresh master [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (132.86s, -19.0 LUFS, -2.60 dBTP, LRA **7.7 LU**, ACX/Audible certified pass) and [`chapter_001_master.m4b`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.m4b).
+
+
+## ADR-039: Dialogue Emotion, Expressiveness & Intra-Turn Cadence Compaction
+- **Status:** APPROVED & IMPLEMENTED
+- **Date:** 2026-10-25
+- **Context:**
+  1. Deep forensic audit identified four interdependent contradictions across Rooms 3, 4, and 5:
+     - **Intra-Chunk Silence Blindspot**: Gemini Flash TTS inserted 880ms to 1200ms of dead air after internal punctuation (`।` and `?`) within multi-sentence turns (e.g. 5 pauses totaling over 5 seconds of dead air in Segment 16 alone). Because `EditorialDSPEngine` only measured chunk outer edges, this dead air leaked into the master.
+     - **Blanket Anti-Theatrical Restraint Anchor**: `GeminiTTSAdapter.build_style_descriptor` unconditionally appended `"understated natural dialogue (never theatrical)"` to all character lines, flattening emotional intensity (rage, cold menace, fear) into deadpan reading.
+     - **Directing Fallback Clobbering**: `StanislavskiSubtextDirector` overwrote pre-existing screenplay dramatic intent with generic `grounded_dialogue` or `sharp_inquiry` when external text LLM calls failed.
+     - **Stem-Level Double Compression & 300Hz Mud Notch**: `DialogueAcousticSculptor` notched 300Hz (-2.5 dB) and applied aggressive compressors on character stems, which were then compressed a second time on the Master Bus, resulting in hollow, telephonic voices.
+- **Decision:**
+  1. **Intra-Turn Silence Compactor (`editorial.py`)**:
+     - Implemented `NetSilenceProcessor.compress_intra_chunk_silences` scanning for internal dead-air regions $> 480\text{ms}$ and slicing them to natural conversational breaths (320ms) using smooth raised-cosine Hann crossfades.
+     - Trimmed excessive leading head margin ($> 60\text{ms}$) on consecutive chunks to 40ms.
+  2. **Authentic Dramatic Acting Framing (`gemini_adapter.py`)**:
+     - Purged the blanket `"never theatrical"` constraint for dramatic speech. High/explosive intensity lines and dramatic emotions (`rage`, `menace`, `fury`, `terror`, `threat`, `fear`, `trembling`) receive `"authentic dramatic delivery with genuine emotional conviction"`.
+  3. **Screenplay Dramatic Intent Preservation (`stanislavski_director.py`)**:
+     - Pre-existing screenplay dramatic cues (`cold_menace`, `trembling_voice`, etc.) are immutably preserved and enriched rather than overwritten with generic regex defaults.
+  4. **Decoupled Transparent Stem EQ (`dsp.py`)**:
+     - Eliminated all stem-level dynamic compression in `DialogueAcousticSculptor`. Dynamic compression belongs exclusively on the Master Bus (`MasteringEngineV2`).
+     - Removed the destructive 300Hz mud notch on `BARITONE_RESONANT`, restoring rich chest body and masculine gravitas to character dialogue.
+- **Verification:**
+  - 145/145 audio and TTS unit tests pass 100% green.
+  - End-to-end Chapter 1 render delivers broadcast-mastered WAV and M4B with zero dead-air gaps (>550ms) and authentic dramatic character acting.

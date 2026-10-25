@@ -94,3 +94,37 @@ def test_editorial_dsp_engine_stitching():
 
     assert len(stitched_pcm) > 0
     assert total_dur > 1.2
+
+
+def test_compress_intra_chunk_silences():
+    """Verifies that excessive internal pauses (>480ms) inside a chunk are compressed down to 320ms."""
+    sample_rate = 24000
+    # 0.5s tone + 1.2s silence + 0.5s tone = 2.2s total
+    tone_samples = [10000 if (i // 40) % 2 == 0 else -10000 for i in range(12000)]
+    silence_samples = [0] * int(sample_rate * 1.2)
+    full_samples = tone_samples + silence_samples + tone_samples
+    pcm = struct.pack(f"<{len(full_samples)}h", *full_samples)
+
+    compressed = NetSilenceProcessor.compress_intra_chunk_silences(
+        pcm, sample_rate=sample_rate, max_silence_ms=480, target_silence_ms=320
+    )
+
+    orig_dur = len(pcm) / (2 * sample_rate)
+    comp_dur = len(compressed) / (2 * sample_rate)
+
+    assert orig_dur == pytest.approx(2.2, abs=0.05)
+    # 1.2s silence compressed down to ~0.32s -> total dur around 1.32s
+    assert comp_dur < 1.45
+    assert comp_dur > 1.25
+
+
+def test_trim_excess_head_pcm():
+    sample_rate = 24000
+    # 200ms silence head + 500ms tone
+    head_samples = [0] * int(sample_rate * 0.2)
+    tone_samples = [10000] * int(sample_rate * 0.5)
+    pcm = struct.pack(f"<{len(head_samples) + len(tone_samples)}h", *(head_samples + tone_samples))
+
+    trimmed = NetSilenceProcessor.trim_excess_head_pcm(pcm, trim_ms=150, sample_rate=sample_rate)
+    trimmed_head_ms = NetSilenceProcessor.measure_head_margin_ms(trimmed, sample_rate=sample_rate)
+    assert trimmed_head_ms <= 60

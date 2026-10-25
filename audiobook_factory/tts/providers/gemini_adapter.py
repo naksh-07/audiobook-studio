@@ -223,7 +223,18 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
                 if cue_clean and cue_clean not in descriptors:
                     descriptors.append(cue_clean)
 
-        descriptors.append("understated natural dialogue (never theatrical)")
+        # Context-aware delivery anchor:
+        # High/explosive or dramatic emotions receive authentic dramatic performance framing.
+        # Neutral conversational speech retains understated natural dialogue.
+        is_dramatic = (
+            intent.intensity in ("explosive", "high")
+            or any(k in str(intent.emotion).lower() for k in ("rage", "anger", "menace", "fury", "terror", "threat", "fear", "trembling"))
+            or any(k in str(intent.delivery_style).lower() for k in ("menace", "rage", "urgency", "strain", "fear"))
+        )
+        if is_dramatic:
+            descriptors.append("authentic dramatic delivery with genuine emotional conviction")
+        else:
+            descriptors.append("understated natural dialogue (never theatrical)")
 
         return ", ".join(descriptors) if descriptors else None
 

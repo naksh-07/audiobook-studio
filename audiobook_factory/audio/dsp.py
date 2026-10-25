@@ -190,6 +190,12 @@ class DialogueAcousticSculptor:
 
     @classmethod
     def build_pedalboard_for_context(cls, context: DialogueAcousticContext) -> Optional[Any]:
+        """
+        Builds transparent, organic stem-level tonal shaping curves.
+        Invariant (ADR-039): Dynamic range compression is strictly handled by the Master Bus
+        (MasteringEngineV2) to permanently prevent double-compression, telephonic boxiness,
+        and loss of natural vocal body. Stem conditioning is 100% non-destructive tonal tinting.
+        """
         if not _HAS_PEDALBOARD:
             return None
 
@@ -197,74 +203,54 @@ class DialogueAcousticSculptor:
         effects = []
 
         if reg == VocalRegister.SOPRANO_LYRICAL:
-            # Lyrical Female: Subsonic safety only, preserving full chest resonance (150-350Hz) and natural melody
-            effects.append(HighpassFilter(cutoff_frequency_hz=65.0))
-            effects.append(Compressor(threshold_db=-15.0, ratio=1.2, attack_ms=40.0, release_ms=180.0))
+            # Lyrical Female: Subsonic rumble safety, preserving full 150-350Hz chest body and melody
+            effects.append(HighpassFilter(cutoff_frequency_hz=60.0))
 
         elif reg == VocalRegister.MEZZO_ALTO:
-            effects.append(HighpassFilter(cutoff_frequency_hz=90.0))
-            effects.append(PeakFilter(cutoff_frequency_hz=420.0, gain_db=-1.0, q=1.2))
-            effects.append(HighShelfFilter(cutoff_frequency_hz=10500.0, gain_db=1.2))
-            effects.append(Compressor(threshold_db=-18.0, ratio=1.8, attack_ms=30.0, release_ms=150.0))
+            effects.append(HighpassFilter(cutoff_frequency_hz=70.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=420.0, gain_db=-0.8, q=1.1))
+            effects.append(HighShelfFilter(cutoff_frequency_hz=10500.0, gain_db=1.0))
 
         elif reg == VocalRegister.CONTRALTO_DEEP:
-            effects.append(HighpassFilter(cutoff_frequency_hz=85.0))
-            effects.append(PeakFilter(cutoff_frequency_hz=350.0, gain_db=-1.2, q=1.2))
-            effects.append(PeakFilter(cutoff_frequency_hz=650.0, gain_db=1.0, q=1.5))
-            effects.append(Compressor(threshold_db=-19.0, ratio=2.0, attack_ms=25.0, release_ms=140.0))
+            effects.append(HighpassFilter(cutoff_frequency_hz=65.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=650.0, gain_db=0.8, q=1.2))
 
         elif reg == VocalRegister.TENOR_BRIGHT:
-            effects.append(HighpassFilter(cutoff_frequency_hz=85.0))
-            effects.append(PeakFilter(cutoff_frequency_hz=220.0, gain_db=-1.5, q=1.2))
-            effects.append(PeakFilter(cutoff_frequency_hz=3500.0, gain_db=1.2, q=1.1))
-            effects.append(Compressor(threshold_db=-17.0, ratio=2.0, attack_ms=20.0, release_ms=120.0))
+            effects.append(HighpassFilter(cutoff_frequency_hz=70.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=3500.0, gain_db=0.8, q=1.1))
 
         elif reg == VocalRegister.BARITONE_RESONANT:
-            effects.append(HighpassFilter(cutoff_frequency_hz=75.0))
-            effects.append(PeakFilter(cutoff_frequency_hz=300.0, gain_db=-2.5, q=1.2))
+            # Baritone: Subsonic rumble safety; zero 300Hz cut to preserve warm chest authority & gravitas
+            effects.append(HighpassFilter(cutoff_frequency_hz=65.0))
             effects.append(PeakFilter(cutoff_frequency_hz=3200.0, gain_db=0.8, q=1.1))
-            effects.append(Compressor(threshold_db=-14.0, ratio=2.0, attack_ms=20.0, release_ms=60.0))
-            effects.append(Compressor(threshold_db=-22.0, ratio=1.8, attack_ms=30.0, release_ms=200.0))
 
         elif reg == VocalRegister.BASS_GRAVEL:
-            effects.append(HighpassFilter(cutoff_frequency_hz=65.0))
-            effects.append(PeakFilter(cutoff_frequency_hz=100.0, gain_db=1.5, q=1.2))
-            effects.append(PeakFilter(cutoff_frequency_hz=250.0, gain_db=-3.0, q=1.3))
-            effects.append(Compressor(threshold_db=-20.0, ratio=2.5, attack_ms=15.0, release_ms=150.0))
+            effects.append(HighpassFilter(cutoff_frequency_hz=55.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=100.0, gain_db=1.2, q=1.2))
 
         elif reg == VocalRegister.ELDERLY_TEXTURED:
-            effects.append(HighpassFilter(cutoff_frequency_hz=80.0))
-            effects.append(PeakFilter(cutoff_frequency_hz=750.0, gain_db=1.8, q=1.5))
-            effects.append(HighShelfFilter(cutoff_frequency_hz=6500.0, gain_db=-2.0))
-            effects.append(Compressor(threshold_db=-18.0, ratio=2.0, attack_ms=25.0, release_ms=140.0))
+            effects.append(HighpassFilter(cutoff_frequency_hz=70.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=750.0, gain_db=1.2, q=1.3))
 
         elif reg == VocalRegister.CHILD_JUVENILE:
-            effects.append(HighpassFilter(cutoff_frequency_hz=110.0))
-            effects.append(PeakFilter(cutoff_frequency_hz=260.0, gain_db=-2.0, q=1.2))
-            effects.append(PeakFilter(cutoff_frequency_hz=4000.0, gain_db=1.5, q=1.2))
-            effects.append(HighShelfFilter(cutoff_frequency_hz=10000.0, gain_db=1.0))
-            effects.append(Compressor(threshold_db=-17.0, ratio=1.8, attack_ms=25.0, release_ms=120.0))
+            effects.append(HighpassFilter(cutoff_frequency_hz=95.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=3800.0, gain_db=1.0, q=1.1))
 
         elif reg == VocalRegister.CREATURE_GUTTURAL:
-            effects.append(HighpassFilter(cutoff_frequency_hz=55.0))
-            effects.append(PeakFilter(cutoff_frequency_hz=85.0, gain_db=2.5, q=1.2))
-            effects.append(PeakFilter(cutoff_frequency_hz=3000.0, gain_db=-2.5, q=1.8))
-            effects.append(Compressor(threshold_db=-15.0, ratio=3.5, attack_ms=5.0, release_ms=80.0))
+            effects.append(HighpassFilter(cutoff_frequency_hz=50.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=85.0, gain_db=2.0, q=1.2))
 
         else:  # NEUTRAL_SPEECH
-            effects.append(HighpassFilter(cutoff_frequency_hz=80.0))
-            effects.append(PeakFilter(cutoff_frequency_hz=320.0, gain_db=-1.0, q=1.1))
-            effects.append(PeakFilter(cutoff_frequency_hz=3200.0, gain_db=0.8, q=1.1))
-            effects.append(HighShelfFilter(cutoff_frequency_hz=10500.0, gain_db=1.5))
-            effects.append(Compressor(threshold_db=-18.0, ratio=2.0, attack_ms=25.0, release_ms=120.0))
+            effects.append(HighpassFilter(cutoff_frequency_hz=70.0))
+            effects.append(PeakFilter(cutoff_frequency_hz=3200.0, gain_db=0.6, q=1.1))
 
         # Dynamic Intensity Modulations
         if context.intensity == DeliveryIntensity.EXPLOSIVE_RAGE:
-            # Suppress painful 2.8-3.5kHz screeching distortion
-            effects.append(PeakFilter(cutoff_frequency_hz=3000.0, gain_db=-2.5, q=2.0))
+            # Suppress painful 2.8-3.5kHz screeching distortion on extreme yells
+            effects.append(PeakFilter(cutoff_frequency_hz=3000.0, gain_db=-2.0, q=2.0))
         elif context.intensity == DeliveryIntensity.WHISPER_INTIMATE:
             # Bring out close-mic saliva, mouth, and breath intimacy
-            effects.append(HighShelfFilter(cutoff_frequency_hz=10500.0, gain_db=2.0))
+            effects.append(HighShelfFilter(cutoff_frequency_hz=10500.0, gain_db=1.5))
 
         return Pedalboard(effects)
 

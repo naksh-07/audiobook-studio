@@ -189,6 +189,23 @@ class StanislavskiSubtextDirector:
             pacing = 1.0
             reflex_prefix = ""
 
+            # Invariant: Respect pre-existing screenplay dramatic intent
+            pre_emotion = str(seg.get("emotion") or seg.get("underlying_emotion") or "").strip()
+            pre_acting = seg.get("acting") if isinstance(seg.get("acting"), dict) else {}
+            pre_delivery = pre_acting.get("delivery_style") or pre_acting.get("tone")
+            pre_intensity = str(seg.get("intensity") or seg.get("intensity_level") or "").strip()
+
+            if pre_delivery and str(pre_delivery).lower() not in ("neutral", "standard", "none"):
+                delivery_style = str(pre_delivery)
+            if pre_emotion and pre_emotion.lower() not in ("neutral", "standard", "none"):
+                emotion = pre_emotion
+                if "trembl" in pre_emotion.lower():
+                    delivery_style = "whispering_fear"
+                elif "cold" in pre_emotion.lower() or "menace" in pre_emotion.lower():
+                    delivery_style = "cold_menace"
+            if pre_intensity and pre_intensity.lower() not in ("medium", "standard", "none"):
+                intensity = pre_intensity
+
             # 1. Preceding narrative tag heuristics
             if any(w in prev_narr for w in ("गुर्राया", "गुर्राते", "दहाड़ा", "धमकाया", "growled", "snarled", "threatened")):
                 actioning = "threaten"
@@ -302,7 +319,7 @@ class StanislavskiSubtextDirector:
                 delivery_style = "grounded_dialogue"
                 tone = "affable, relaxed and resonant"
                 pacing = 1.0
-            elif "?" in raw_text:
+            elif "?" in raw_text and delivery_style == "grounded_dialogue" and emotion == "neutral":
                 actioning = "probe"
                 subtext = "Extract the hidden truth."
                 emotion = "sharp suspicion"
@@ -357,6 +374,9 @@ class StanislavskiSubtextDirector:
                 "speaker": str(s.get("speaker") or "Narrator"),
                 "type": s.get("type", "narration"),
                 "text": str(s.get("text") or ""),
+                "emotion": s.get("emotion") or s.get("surface_emotion") or (s.get("acting", {}) if isinstance(s.get("acting"), dict) else {}).get("emotion"),
+                "acting": s.get("acting", {}) if isinstance(s.get("acting"), dict) else {},
+                "intensity": s.get("intensity") or s.get("intensity_level"),
             }
             for s in segments
         ]
