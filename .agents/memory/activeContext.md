@@ -4,14 +4,10 @@
 <!-- LINE_BUDGET_HARD_CAP: 50 LINES -->
 # Active Context: Audiobook Studio Antigravity Plugin & Studio Engine (v6.0)
 
-## System Freeze & Touch Guard Active
-- **FROZEN (TOUCH BAN)**: Rooms 1 to 4 certified stable.
-- **ROOM 5 ADVANCED MULTI-DIMENSIONAL MASTERING ENGINE (COMPLETED)**:
-  - **ADR-036**: 9 Vocal Registers & 6 Delivery Intensities with stem-level `DialogueAcousticSculptor` conditioning.
-  - **ADR-037**: Dialogue Cadence, Punctuation-Aware Latencies & Soft Tail Preservation (340ms narrator em-dash cue, 400ms Devanagari full stop `।`, 75ms decay margin).
-  - **ADR-038**: Narrator Acoustic Transparency Invariant (Aoede bypasses stem filtering, preserving 100% native souz, sweet melody, and vowel warmth; female character profile relaxed).
-
-## Fresh Studio 10/10 Master Deliverables (Rendered 10:40 AM)
-- **Fresh Master WAV**: [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (132.86s, -19.0 LUFS, -2.60 dBTP, LRA 7.7 LU, 48kHz 24-bit PCM stereo, ACX/Audible certified pass).
-- **Fresh Packaged M4B**: [`chapter_001_master.m4b`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.m4b) (192kbps chaptered AAC container).
-- **Mastering Ledger**: [`chapter_001_mastering_ledger.json`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_mastering_ledger.json) (100% Certified, 0 warnings, 0 review items).
+## Active Sprint: Pipeline Flaw Audit & Cadence/Emotion Architecture Overhaul
+- **Forensic Audit Completed**: Documented 4 structural pipeline contradictions in artifact [comprehensive_pipeline_flaw_audit_and_fix_plan.md](file:///C:/Users/Suraj/.gemini/antigravity/brain/9fdba0d3-b651-4b7e-a930-ef9527d21ba2/comprehensive_pipeline_flaw_audit_and_fix_plan.md).
+  1. Internal vocoder silence blindspot (>1000ms dead air inside single Gemini chunks).
+  2. "understated natural dialogue (never theatrical)" emotion suppressor.
+  3. Stanislavski directing fallback clobbering emotional intent into flat regex styles.
+  4. Stem-level 300Hz mud notch & double-compression in Room 5.
+- **Architectural Fix Plan Created**: 4-phase surgical implementation planned. Awaiting user review/approval.
