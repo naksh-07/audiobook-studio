@@ -14,6 +14,7 @@
   - Premaster Headroom Scaling: Automatic -1.0 dBFS scaling in `_stitch_screenplay` to prevent inter-sample digital clipping.
   - 48kHz 24-bit stereo output via C++ JUCE libsndfile, True-Peak Brickwall Limiter, and ACX room tone framing.
 
-## Fresh End-to-End Master Deliverable
-- **Fresh Master Deliverable**: [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (137.11s, -19.0 LUFS, peak -1.90 dBTP, LRA 4.8 LU, 48kHz 24-bit PCM stereo, ACX/Audible certified pass).
+## Fresh End-to-End Master Deliverables (Rendered 08:39 AM)
+- **Fresh Master WAV**: [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (129.31s, -19.0 LUFS, peak -1.50 dBTP, LRA 4.4 LU, 48kHz 24-bit PCM stereo, ACX/Audible certified pass).
+- **Fresh Packaged M4B**: [`chapter_001_master.m4b`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.m4b) (3.15 MB, 192kbps AAC container).
 - **Mastering Ledger**: [`chapter_001_mastering_ledger.json`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_mastering_ledger.json) (100% Certified, 0 warnings, 0 review items).
