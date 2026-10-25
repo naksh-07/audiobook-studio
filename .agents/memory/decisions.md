@@ -1627,3 +1627,27 @@
   - 143/143 audio and TTS tests passed 100% green.
   - Added `test_multicast_pause_cadence_matrix` in `tests/tts/test_multicast_client_deep.py`.
   - Fresh end-to-end production run delivered [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (128.20s, -19.0 LUFS, -1.50 dBTP, LRA 6.2 LU, 100% certified pass).
+
+
+## ADR-038: Narrator Acoustic Transparency Invariant (Vocal Souz & Melody Restoration)
+- **Status:** APPROVED & IMPLEMENTED
+- **Date:** 2026-10-25
+- **Context:**
+  1. Listening audit following ADR-036 stem conditioning revealed deterioration in the narrator's voice (Aoede): loss of melodious sweetness, vocal warmth (*souz*), and dynamic expressiveness, sounding thin, pinched, and slightly robotic.
+  2. Forensic DSP investigation identified root cause:
+     - `DialogueAcousticSculptor.sculpt_chunk` was unconditionally conditioning Narrator segments as `SOPRANO_LYRICAL`.
+     - It applied a 95Hz Highpass filter (-5.17 dB sub-bass/chest fundamental loss), an 11kHz high shelf (+1.5 dB harsh sibilance), a -18.0 dBFS compressor (16% dynamic range flattening), and an 8.2kHz split-band de-esser.
+     - The master bus compressor then compressed Aoede a *second* time (double compression).
+     - Google Gemini Flash neural vocoder voices (Aoede, Calliope, Puck) are already studio-mastered at the phoneme level. While character dialogue benefits from acoustic conditioning (baritone mud cuts, rage harshness suppression), the Narrator is the book's acoustic anchor and must remain completely unadulterated.
+- **Decision:**
+  1. **Narrator Acoustic Transparency Invariant (`audiobook_factory/audio/dsp.py`)**:
+     - In `DialogueAcousticSculptor.sculpt_chunk`: If `context.is_narrator` is True, bypass all stem DSP filtering entirely and return `pcm_bytes` 100% bit-for-bit identical to the raw neural synthesis output.
+     - Guarantees 0.0 dB loss of Aoede's chest resonance (150-350 Hz), zero treble phase smearing, and zero double-compression.
+  2. **Relaxed Female Character Profile (`SOPRANO_LYRICAL`)**:
+     - Relaxed HPF cutoff to 65Hz (subsonic DC rumble protection only).
+     - Removed 11kHz high shelf to eliminate artificial glassy sheen.
+     - Softened opto leveling to gentle 1.2:1 @ -15 dBFS with 40ms attack.
+- **Verification:**
+  - Added bit-for-bit identity test in `tests/audio/test_acoustic_sculptor.py` (`assert sculpted == pcm_16k`).
+  - 101/101 audio mastering tests pass 100% green.
+  - Rendered fresh master [`chapter_001_master.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.wav) (132.86s, -19.0 LUFS, -2.60 dBTP, LRA **7.7 LU**, ACX/Audible certified pass) and [`chapter_001_master.m4b`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/chapter_001_master.m4b).

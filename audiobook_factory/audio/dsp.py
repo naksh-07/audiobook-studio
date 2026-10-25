@@ -197,10 +197,9 @@ class DialogueAcousticSculptor:
         effects = []
 
         if reg == VocalRegister.SOPRANO_LYRICAL:
-            # Aoede / Lyrical Female: Zero 300Hz cut! Preserves full chest fundamental (220-350Hz) and melody
-            effects.append(HighpassFilter(cutoff_frequency_hz=95.0))
-            effects.append(HighShelfFilter(cutoff_frequency_hz=11000.0, gain_db=1.5))
-            effects.append(Compressor(threshold_db=-18.0, ratio=1.5, attack_ms=35.0, release_ms=160.0))
+            # Lyrical Female: Subsonic safety only, preserving full chest resonance (150-350Hz) and natural melody
+            effects.append(HighpassFilter(cutoff_frequency_hz=65.0))
+            effects.append(Compressor(threshold_db=-15.0, ratio=1.2, attack_ms=40.0, release_ms=180.0))
 
         elif reg == VocalRegister.MEZZO_ALTO:
             effects.append(HighpassFilter(cutoff_frequency_hz=90.0))
@@ -277,6 +276,14 @@ class DialogueAcousticSculptor:
         sample_rate: int = 24000,
     ) -> bytes:
         if not pcm_bytes or not _HAS_PEDALBOARD:
+            return pcm_bytes
+
+        # Narrator Transparency Invariant:
+        # In professional audio drama, the Narrator (Aoede / primary narrator) is the acoustic anchor
+        # and already possesses pristine studio acoustics from the neural model. Applying destructive
+        # stem highpass filtering, compression, or de-essing strips her natural souz, sweetness,
+        # and vocal melody. The narrator voice must flow through bit-for-bit transparently.
+        if context.is_narrator:
             return pcm_bytes
 
         try:

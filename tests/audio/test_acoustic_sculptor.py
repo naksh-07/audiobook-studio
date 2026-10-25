@@ -125,7 +125,8 @@ class TestDialogueAcousticSculptor(unittest.TestCase):
         self.test_pcm = (tone * 32767.0).astype(np.int16).tobytes()
 
     def test_sculpt_chunk_soprano_lyrical(self):
-        ctx = DialogueAcousticContext(
+        # Narrator Transparency Invariant: Narrator Aoede must be 100% bit-for-bit unaltered
+        ctx_narrator = DialogueAcousticContext(
             vocal_register=VocalRegister.SOPRANO_LYRICAL,
             intensity=DeliveryIntensity.CONVERSATIONAL,
             voice_id="Aoede",
@@ -134,13 +135,25 @@ class TestDialogueAcousticSculptor(unittest.TestCase):
             is_narrator=True,
             sample_rate=self.sr,
         )
-        sculpted = DialogueAcousticSculptor.sculpt_chunk(self.test_pcm, ctx, sample_rate=self.sr)
-        self.assertIsInstance(sculpted, bytes)
-        self.assertEqual(len(sculpted), len(self.test_pcm))
+        sculpted_narrator = DialogueAcousticSculptor.sculpt_chunk(self.test_pcm, ctx_narrator, sample_rate=self.sr)
+        self.assertEqual(sculpted_narrator, self.test_pcm)
+
+        # Non-narrator female character receives gentle conditioning
+        ctx_char = DialogueAcousticContext(
+            vocal_register=VocalRegister.SOPRANO_LYRICAL,
+            intensity=DeliveryIntensity.CONVERSATIONAL,
+            voice_id="Aoede",
+            speaker="Princess",
+            gender="female",
+            is_narrator=False,
+            sample_rate=self.sr,
+        )
+        sculpted_char = DialogueAcousticSculptor.sculpt_chunk(self.test_pcm, ctx_char, sample_rate=self.sr)
+        self.assertIsInstance(sculpted_char, bytes)
+        self.assertEqual(len(sculpted_char), len(self.test_pcm))
 
         if has_pedalboard_engine():
-            arr_out = np.frombuffer(sculpted, dtype=np.int16).astype(np.float32) / 32768.0
-            # Ensure audio is not silenced or clipped
+            arr_out = np.frombuffer(sculpted_char, dtype=np.int16).astype(np.float32) / 32768.0
             self.assertGreater(np.max(np.abs(arr_out)), 0.05)
             self.assertLessEqual(np.max(np.abs(arr_out)), 1.0)
 
