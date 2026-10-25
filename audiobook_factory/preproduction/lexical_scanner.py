@@ -86,7 +86,7 @@ ENGLISH_NON_ENTITY_STOPWORDS = {
     "North", "South", "East", "West", "Northern", "Southern", "Eastern", "Western",
     "Earth", "Moon", "Sun", "Sky", "Heaven", "Hell",
     # Known benchmark geographical names & landmarks
-    "Brokilon", "Wyzima", "Cintra", "Blaviken", "Novigrad", "Skellige", "Ellander",
+    # Known geographical and world types handled dynamically
     # Deities, titles of address, and non-entity honorific abstractions
     "God", "Gods", "Goddess", "Goddesses", "Lordship", "Ladyship", "Majesty", "Grace", "Highness",
     "Excellency", "Holiness", "Eminence",

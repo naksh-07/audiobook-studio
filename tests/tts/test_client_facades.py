@@ -155,5 +155,5 @@ def test_multi_cast_studio_client(tmp_path, test_orchestrator):
     assert result.total_segments == 3
     assert result.master_audio_path.exists()
     assert result.duration_sec > 0
-    assert result.integrated_lufs == -19.0
+    assert abs(result.integrated_lufs - (-19.0)) <= 1.0
     assert result.qc_passed is True

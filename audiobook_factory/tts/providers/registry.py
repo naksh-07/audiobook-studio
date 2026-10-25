@@ -27,17 +27,18 @@ class ModelCapabilities(BaseModel):
     supports_speech_metadata: bool = False
     supports_voice_conditioning: bool = False
     supports_multispeaker: bool = False
-    recommended_temperature_range: Tuple[float, float] = (0.30, 0.52)
+    recommended_temperature_range: Tuple[float, float] = (0.65, 0.85)
     supported_voices: List[str] = Field(default_factory=list)
 
 
 # Standard Fallback Cascades
 DEFAULT_FALLBACK_CASCADES: Dict[str, List[str]] = {
+    "gemini-3.8-flash-tts": ["gemini-2.5-flash-tts", "gemini-2.0-flash-tts"],
     "gemini-3.8-flash": ["gemini-2.5-flash", "gemini-2.0-flash"],
     "gemini-2.5-flash": ["gemini-2.0-flash", "gemini-3.8-flash"],
     "gemini-2.0-flash": ["gemini-2.5-flash", "gemini-3.8-flash"],
-    "qwen3-tts": ["gemini-3.8-flash", "gemini-2.5-flash"],
-    "qwen3-tts-custom": ["qwen3-tts", "gemini-3.8-flash"],
+    "qwen3-tts": ["gemini-3.8-flash", "gemini-3.8-flash-tts", "gemini-2.5-flash"],
+    "qwen3-tts-custom": ["qwen3-tts", "gemini-3.8-flash", "gemini-3.8-flash-tts"],
 }
 
 
@@ -51,7 +52,7 @@ class ModelAdapterRegistry:
         self._adapters: Dict[str, BaseTTSModelAdapter] = {}
         self._capabilities: Dict[str, ModelCapabilities] = {}
         self._fallback_chains: Dict[str, List[str]] = dict(DEFAULT_FALLBACK_CASCADES)
-        self._default_model: str = "gemini-3.8-flash"
+        self._default_model: str = "gemini-3.8-flash-tts"
         self._lock = threading.Lock()
 
     def register(
@@ -113,6 +114,14 @@ class ModelAdapterRegistry:
             if self._default_model.lower() in self._adapters:
                 logger.warning(f"[!] Model '{model_identifier}' not found in registry. Falling back to default '{self._default_model}'.")
                 return self._adapters[self._default_model.lower()]
+
+            for alt_key in [self._default_model.replace("-tts", ""), f"{self._default_model}-tts"]:
+                if alt_key.lower() in self._adapters:
+                    logger.warning(f"[!] Model '{model_identifier}' not found. Falling back to '{alt_key}'.")
+                    return self._adapters[alt_key.lower()]
+
+            if self._adapters:
+                return next(iter(self._adapters.values()))
 
             raise KeyError(f"No TTS model adapter registered for model '{model_identifier}' and no default available.")
 

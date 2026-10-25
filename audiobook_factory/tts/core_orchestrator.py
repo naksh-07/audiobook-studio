@@ -42,7 +42,7 @@ class TTSCoreOrchestrator:
         self,
         request_or_text: Union[CanonicalTTSRequest, str],
         voice_id: str = "Puck",
-        model: str = "gemini-3.8-flash",
+        model: str = "gemini-3.8-flash-tts",
         speaker: str = "Narrator",
         pipeline_mode: TTSPipelineMode = TTSPipelineMode.GENERIC,
         validate_audio: bool = True,
@@ -104,7 +104,7 @@ class TTSCoreOrchestrator:
     async def synthesize_async(
         self,
         request: CanonicalTTSRequest,
-        model: str = "gemini-3.8-flash",
+        model: str = "gemini-3.8-flash-tts",
         validate_audio: bool = True,
     ) -> Tuple[SynthesizedAudioChunk, Optional[AudioValidationResult]]:
         """Async variant of single-chunk synthesis."""
@@ -118,7 +118,7 @@ class TTSCoreOrchestrator:
     def synthesize_batch(
         self,
         requests: List[CanonicalTTSRequest],
-        model: str = "gemini-3.8-flash",
+        model: str = "gemini-3.8-flash-tts",
         validate_audio: bool = True,
     ) -> List[Tuple[CanonicalTTSRequest, SynthesizedAudioChunk, Optional[AudioValidationResult]]]:
         """

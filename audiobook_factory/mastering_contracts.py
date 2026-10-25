@@ -40,6 +40,9 @@ class MasteringProfile(BaseModel):
     output_channels: int = Field(default=2, description="Output channel count (2 = stereo)")
     max_retries: int = Field(default=2, ge=0, le=3, description="Hard bound on mastering remediation attempts")
     min_dialogue_to_mix_ratio_db: float = Field(default=0.0, description="Minimum dialogue to mix loudness ratio in dB")
+    enable_acx_framing: bool = Field(default=False, description="Apply 0.75s head and 3.0s tail ACX room tone framing")
+    acx_head_silence_sec: float = Field(default=0.75, ge=0.5, le=1.0, description="Audible ACX head lead-in room tone duration")
+    acx_tail_silence_sec: float = Field(default=3.0, ge=1.0, le=5.0, description="Audible ACX tail trailing room tone duration")
 
 
 class MasteringAnalysisFacts(BaseModel):
@@ -72,6 +75,10 @@ class MasteringAnalysisFacts(BaseModel):
     transient_count: Optional[int] = Field(default=None, description="Detected transient peak count")
     clipping_detected: bool = Field(default=False, description="Flag indicating true-peak overshoots > 0.0 dBTP")
     is_valid_audio: bool = Field(default=True, description="File integrity check (non-empty, non-corrupt)")
+
+    @property
+    def loudness_range_lu(self) -> Optional[float]:
+        return self.loudness_range_lra
 
 
 class MasteringQCResult(BaseModel):
@@ -413,9 +420,9 @@ class MasteringRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     chapter_id: str = Field(..., description="Unique chapter identifier")
-    premaster_path: str = Field(..., description="Path to Stage 11 premaster WAV file")
-    output_master_path: Optional[str] = Field(default=None, description="Target path for mastered WAV file")
-    dialogue_stem_path: Optional[str] = Field(default=None, description="Optional dialogue stem path for vocal protection")
+    premaster_path: Union[str, Path] = Field(..., description="Path to Stage 11 premaster WAV file")
+    output_master_path: Optional[Union[str, Path]] = Field(default=None, description="Target path for mastered WAV file")
+    dialogue_stem_path: Optional[Union[str, Path]] = Field(default=None, description="Optional dialogue stem path for vocal protection")
     profile: MasteringProfile = Field(default_factory=MasteringProfile, description="Mastering configuration profile")
     book_profile: Optional[BookMasterProfile] = Field(default=None, description="Optional book master profile")
     reference_profile: Optional[ReferenceProfile] = Field(default=None, description="Optional reference profile")

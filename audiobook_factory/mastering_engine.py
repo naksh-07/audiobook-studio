@@ -165,10 +165,28 @@ class MasteringEngineV2:
         pass1_stats: Dict[str, str],
     ) -> Path:
         """
-        Executes Pass 2 deterministic linear rendering:
-        Subsonic Highpass -> Measured Linear Loudnorm -> Lookahead Limiter -> Kaiser Sinc Resample + TPDF.
+        Executes Option B Studio Vocal Mastering:
+        Primary: Spotify Pedalboard (C++ JUCE) vocal EQ + opto-compression + 4x oversampled true-peak brickwall.
+        Fallback: Deterministic FFmpeg dual-pass linear loudnorm + Kaiser sinc resampling.
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Option B: High-Performance C++ JUCE DSP Path
+        if self.dsp and self.dsp.is_hardware_accelerated:
+            try:
+                dsp_res = self.dsp.master_chapter(
+                    input_wav=premaster_path,
+                    output_wav=output_path,
+                    profile=profile,
+                )
+                if output_path.exists() and output_path.stat().st_size > 1000:
+                    logger.info(
+                        f"[+] Stage 12 Rendered master deliverable via {dsp_res.backend_used} "
+                        f"in {dsp_res.execution_duration_sec:.2f}s ({dsp_res.integrated_lufs:.1f} LUFS, {dsp_res.true_peak_dbtp:.2f} dBTP)"
+                    )
+                    return output_path
+            except Exception as e:
+                logger.warning(f"Hardware-accelerated C++ DSP failed ({e}); falling back to FFmpeg pipeline.")
         # Convert limiter ceiling from dBFS to linear factor (e.g. -1.6 dBFS -> ~0.8318)
         lim_linear = min(1.0, max(0.0625, 10.0 ** (limiter_ceiling_db / 20.0)))
 

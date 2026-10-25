@@ -102,6 +102,20 @@ class DSPConfig(BaseModel):
     compressor_ratio: float = Field(default=2.5, ge=1.2, le=6.0, description="Optical compressor compression ratio")
     compressor_attack_ms: float = Field(default=25.0, ge=5.0, le=100.0, description="Compressor attack time in ms")
     compressor_release_ms: float = Field(default=120.0, ge=20.0, le=500.0, description="Compressor release time in ms")
+    # Pro Studio 10/10 Broadcast Mastering Parameters
+    enable_acx_framing: bool = Field(default=False, description="Apply 0.75s head and 3.0s tail ACX room tone framing")
+    acx_head_silence_sec: float = Field(default=0.75, ge=0.5, le=1.0, description="Lead-in room tone duration in seconds")
+    acx_tail_silence_sec: float = Field(default=3.0, ge=1.0, le=5.0, description="Trailing room tone duration in seconds")
+    enable_dynamic_deesser: bool = Field(default=True, description="Enable split-band dynamic lookahead de-esser")
+    deesser_crossover_hz: float = Field(default=5500.0, ge=4000.0, le=8000.0, description="De-esser crossover frequency in Hz")
+    deesser_threshold_db: float = Field(default=-24.0, ge=-36.0, le=-12.0, description="De-esser activation threshold in dBFS")
+    deesser_ratio: float = Field(default=3.0, ge=1.5, le=8.0, description="De-esser attenuation ratio")
+    deesser_max_att_db: float = Field(default=-7.0, ge=-12.0, le=-2.0, description="Maximum sibilant attenuation in dB")
+    enable_two_stage_compression: bool = Field(default=True, description="Enable two-stage Peak Tamer + Opto RMS leveler")
+    enable_air_boost: bool = Field(default=True, description="Enable high-shelf silky air restoration")
+    air_boost_hz: float = Field(default=10500.0, ge=8000.0, le=16000.0, description="High-shelf air restoration frequency in Hz")
+    air_boost_db: float = Field(default=1.8, ge=0.0, le=4.0, description="High-shelf air boost in dB")
+    enable_downward_expander: bool = Field(default=True, description="Enable gentle downward noise expander")
 
 
 class DSPMasteringResult(BaseModel):

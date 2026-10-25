@@ -113,10 +113,10 @@ class NetSilenceProcessor:
     Calculates net injected silence at chunk boundaries to permanently eliminate
     double-pause stutter gaps and preserve organic pacing.
     Formula:
-        Injected = max(20ms, Target_Pause - (Tail_Decay_A + Head_Margin_B))
+        Injected = max(min_injected, Target_Pause - (Tail_Decay_A + Head_Margin_B))
     """
 
-    SILENCE_FLOOR_AMPLITUDE: int = 150  # ~ -46 dBFS
+    SILENCE_FLOOR_AMPLITUDE: int = 350  # ~ -39.4 dBFS (covers Gemini vocoder dither / room-tone floor)
 
     @classmethod
     def measure_tail_decay_ms(cls, pcm_bytes: bytes, sample_rate: int = 24000) -> int:
@@ -154,6 +154,23 @@ class NetSilenceProcessor:
         return int((head_samples / float(sample_rate)) * 1000.0)
 
     @classmethod
+    def trim_excess_tail_pcm(
+        cls,
+        pcm_bytes: bytes,
+        trim_ms: int,
+        sample_rate: int = 24000,
+    ) -> bytes:
+        """Trims excessive trailing vocoder silence from PCM bytes."""
+        if trim_ms <= 0 or sample_rate <= 0:
+            return pcm_bytes
+        sample_count = len(pcm_bytes) // 2
+        trim_samples = int(sample_rate * (trim_ms / 1000.0))
+        if trim_samples >= sample_count - 100:
+            return pcm_bytes
+        new_sample_count = sample_count - trim_samples
+        return pcm_bytes[: new_sample_count * 2]
+
+    @classmethod
     def calculate_net_silence_ms(
         cls,
         target_pause_ms: int,
@@ -169,12 +186,34 @@ class NetSilenceProcessor:
         return max(min_injected_ms, net_ms)
 
     @classmethod
-    def generate_silence_pcm(cls, duration_ms: int, sample_rate: int = 24000) -> bytes:
-        """Generates zero-amplitude 16-bit mono silence PCM bytes."""
+    def generate_silence_pcm(
+        cls,
+        duration_ms: int,
+        sample_rate: int = 24000,
+        comfort_noise: bool = True,
+    ) -> bytes:
+        """
+        Generates 16-bit mono silence PCM bytes.
+        When comfort_noise=True, injects an ultra-low (-62 dBFS) shaped acoustic room-tone floor
+        to eliminate harsh digital zero dropouts and DAC click/pumping artifacts.
+        """
         if sample_rate <= 0 or duration_ms <= 0:
             return b""
         num_samples = int(sample_rate * (duration_ms / 1000.0))
-        return b"\x00\x00" * num_samples
+        if not comfort_noise:
+            return b"\x00\x00" * num_samples
+
+        # -62 dBFS shaped comfort noise (peak amplitude ~26 in 16-bit PCM)
+        # Gentle pseudo-random dither with 1st-order low-pass smoothing (room tone)
+        samples = []
+        prev = 0.0
+        for _ in range(num_samples):
+            white = (random.random() - random.random()) * 24.0
+            val = 0.7 * prev + 0.3 * white
+            prev = val
+            samples.append(int(max(-40, min(40, round(val)))))
+
+        return struct.pack(f"<{num_samples}h", *samples)
 
 
 class EditorialDSPEngine:
@@ -203,8 +242,36 @@ class EditorialDSPEngine:
         output_buffers: List[bytes] = []
         total_samples = 0
 
-        for idx, raw_pcm in enumerate(chunks_pcm):
-            # 1. Snap boundary endpoints to nearest zero-crossing if buffer is sufficiently long
+        for idx in range(len(chunks_pcm)):
+            raw_pcm = chunks_pcm[idx]
+
+            # 1. If not the last chunk, check boundary silence and trim excessive trailing dead air
+            if idx < len(chunks_pcm) - 1:
+                target_pause = target_pauses_ms[idx] if idx < len(target_pauses_ms) else 350
+                tail_decay = NetSilenceProcessor.measure_tail_decay_ms(raw_pcm, sample_rate=effective_sample_rate)
+                next_raw = chunks_pcm[idx + 1]
+                head_margin = NetSilenceProcessor.measure_head_margin_ms(next_raw, sample_rate=effective_sample_rate)
+
+                inherent_silence_ms = tail_decay + head_margin
+                if inherent_silence_ms > target_pause:
+                    # Excess silence already present from vocoder/punctuation: trim trailing dead air
+                    # Preserve at least 40ms of tail decay for smooth Hann fade-out
+                    excess_ms = inherent_silence_ms - target_pause
+                    trim_ms = min(excess_ms, max(0, tail_decay - 40))
+                    if trim_ms > 0:
+                        raw_pcm = NetSilenceProcessor.trim_excess_tail_pcm(raw_pcm, trim_ms, sample_rate=effective_sample_rate)
+                        tail_decay = max(40, tail_decay - trim_ms)
+
+                net_pause_ms = NetSilenceProcessor.calculate_net_silence_ms(
+                    target_pause_ms=target_pause,
+                    tail_decay_ms=tail_decay,
+                    head_margin_ms=head_margin,
+                    min_injected_ms=0,
+                )
+            else:
+                net_pause_ms = 0
+
+            # 2. Snap boundary endpoints to nearest zero-crossing if buffer is sufficiently long
             chunk_sample_count = len(raw_pcm) // 2
             if chunk_sample_count > 100:
                 s_list = list(struct.unpack(f"<{chunk_sample_count}h", raw_pcm))
@@ -217,26 +284,15 @@ class EditorialDSPEngine:
                 if 0 <= start_z < end_z < chunk_sample_count:
                     raw_pcm = struct.pack(f"<{end_z - start_z + 1}h", *s_list[start_z : end_z + 1])
 
-            # 2. Apply Hann micro-fades
+            # 3. Apply Hann micro-fades
             faded_pcm = HannFadeProcessor.apply_hann_micro_fades(
                 raw_pcm, sample_rate=effective_sample_rate, apply_tpdf_dither=True
             )
             output_buffers.append(faded_pcm)
             total_samples += len(faded_pcm) // 2
 
-            # 2. If not the last chunk, calculate and insert net silence
-            if idx < len(chunks_pcm) - 1:
-                target_pause = target_pauses_ms[idx] if idx < len(target_pauses_ms) else 350
-                tail_decay = NetSilenceProcessor.measure_tail_decay_ms(raw_pcm, sample_rate=effective_sample_rate)
-                next_raw = chunks_pcm[idx + 1]
-                head_margin = NetSilenceProcessor.measure_head_margin_ms(next_raw, sample_rate=effective_sample_rate)
-
-                net_pause_ms = NetSilenceProcessor.calculate_net_silence_ms(
-                    target_pause_ms=target_pause,
-                    tail_decay_ms=tail_decay,
-                    head_margin_ms=head_margin,
-                )
-
+            # 4. If not the last chunk and net pause is needed, append net silence
+            if idx < len(chunks_pcm) - 1 and net_pause_ms > 0:
                 silence_pcm = NetSilenceProcessor.generate_silence_pcm(net_pause_ms, sample_rate=effective_sample_rate)
                 output_buffers.append(silence_pcm)
                 total_samples += len(silence_pcm) // 2

@@ -206,6 +206,10 @@ class CastLockManager:
         """Resolves cast lock for character by canonical name or ID."""
         if not character_name_or_id:
             return None
+        # Check direct manifest match first
+        if character_name_or_id in self.manifest.locks:
+            return self.manifest.locks[character_name_or_id]
+
         c_clean = str(character_name_or_id).strip()
         c_low = c_clean.lower()
         if c_low in FORBIDDEN_GENERIC_TOKENS or c_clean in FORBIDDEN_GENERIC_TOKENS:

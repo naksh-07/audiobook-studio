@@ -215,10 +215,33 @@ def cmd_synthesize(args):
     else:
         script_files = [scripts_by_ch[k] for k in sorted(scripts_by_ch.keys())]
 
-    for sf in script_files:
-        m = re.search(r"chapter_(\d+)", sf.stem)
-        ch_num = int(m.group(1)) if m else 1
-        dispatcher.synthesize_chapter_script(sf, ch_num)
+    use_multicast = getattr(args, "multicast", True) and os.environ.get("USE_LEGACY_TTS_DISPATCHER", "false").lower() not in ("true", "1", "yes") and getattr(args, "backend", "gemini") == "gemini"
+    if use_multicast:
+        from audiobook_factory.tts.facades.multi_cast_client import MultiCastStudioClient
+        client = MultiCastStudioClient()
+        mastered_dir = project_dir / "mastered"
+        mastered_dir.mkdir(parents=True, exist_ok=True)
+        cast_lock = project_dir / "casting" / "cast_lock.json"
+        if not cast_lock.exists():
+            cast_lock = project_dir / "book_bible.json"
+        for sf in script_files:
+            m = re.search(r"chapter_(\d+)", sf.stem)
+            ch_num = int(m.group(1)) if m else 1
+            with open(sf, "r", encoding="utf-8") as f:
+                s_data = json.load(f)
+            client.produce_screenplay(
+                segments=s_data,
+                chapter_num=ch_num,
+                output_dir=mastered_dir,
+                default_narrator_voice=getattr(args, "voice", "Puck") or "Puck",
+                cast_lock_file=cast_lock if cast_lock.exists() else None,
+                enable_dialogue_rallies=True,
+            )
+    else:
+        for sf in script_files:
+            m = re.search(r"chapter_(\d+)", sf.stem)
+            ch_num = int(m.group(1)) if m else 1
+            dispatcher.synthesize_chapter_script(sf, ch_num)
 
     print(f"\n[OK] Synthesis complete for {len(script_files)} chapters!")
 

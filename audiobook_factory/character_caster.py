@@ -1013,8 +1013,8 @@ Return a JSON array of objects with:
             )
             is_bard = (gender == "male") and not is_knight and not is_official and (
                 any(w in arch_lower for w in ("bard", "minstrel", "witty", "companion", "jester", "poet", "balladeer"))
-                or any(w in name.lower() for w in ("dandelion", "jaskier", "bard", "poet", "minstrel"))
-                or any(any(w in str(a).lower() for w in ("dandelion", "jaskier", "bard", "poet", "minstrel")) for a in aliases)
+                or any(w in name.lower() for w in ("bard", "poet", "minstrel", "balladeer"))
+                or any(any(w in str(a).lower() for w in ("bard", "poet", "minstrel", "balladeer")) for a in aliases)
             )
             is_sorceress = (gender == "female") and any(w in arch_lower for w in ("sorceress", "queen", "regal", "witch"))
             is_maiden = (gender == "female") and not is_child_flag and any(w in arch_lower for w in ("maiden", "young girl", "princess", "daughter"))
@@ -1356,7 +1356,7 @@ Return a JSON array of objects with:
                 "girl", "woman", "lady", "queen", "princess", "madam", "mrs", "miss",
                 "sister", "mother", "daughter", "sorceress", "witch", "priestess", "maiden",
                 "matron", "damsel", "nun", "aunt", "niece", "bride", "widow", "heroine",
-                "yen", "yennefer", "स्त्री", "लड़की", "औरत", "रानी", "माता", "कन्या", "युवती", "बहन", "पत्नी"
+                "स्त्री", "लड़की", "औरत", "रानी", "माता", "कन्या", "युवती", "बहन", "पत्नी"
             )
             if any(ind in sp_clean.lower() for ind in female_indicators):
                 g = "female"

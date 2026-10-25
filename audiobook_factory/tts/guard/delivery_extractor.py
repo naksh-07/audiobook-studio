@@ -130,9 +130,13 @@ class DeliveryIntentExtractor:
                 pacing = matched_dict.get("pacing", pacing)
             else:
                 # Custom constraint or physical anchor
-                vocal_constraint = cue_text
+                if vocal_constraint:
+                    if cue_text not in vocal_constraint:
+                        vocal_constraint = f"{vocal_constraint}, {cue_text}"
+                else:
+                    vocal_constraint = cue_text
 
-        # Strip square bracket tags
+        # Strip square bracket tags from universal spoken text
         working = cls.BRACKET_CUE_PATTERN.sub(" ", working)
 
         # 3. Check Parenthetical Cues: (whispering), (गुस्से में)

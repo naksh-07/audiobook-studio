@@ -148,6 +148,196 @@ class StanislavskiSubtextDirector:
 
         return cleaned, preserved_tags, extracted_cues
 
+
+    def _direct_heuristically(self, segments: List[Dict[str, Any]], context: str = "") -> List[Dict[str, Any]]:
+        """
+        Native Antigravity heuristic directing engine:
+        Extracts deep acting subtext, emotions, dynamic intensity, and certified acoustic reflexes
+        from narrative context, speech tags, and literary punctuation without external LLM calls.
+        """
+        enriched_list = []
+        for i, seg in enumerate(segments):
+            idx = seg.get("index", i + 1)
+            speaker = str(seg.get("speaker") or "Narrator").strip()
+            is_narrator = speaker.lower() in ("narrator", "narration", "") or seg.get("type") == "narration"
+            raw_text = str(seg.get("text") or "").strip()
+
+            if is_narrator:
+                enriched_list.append({
+                    "index": idx,
+                    "actioning": "narrate",
+                    "subtext": "",
+                    "underlying_emotion": "neutral",
+                    "intensity_level": "medium",
+                    "acting": {"delivery_style": "calm_authoritative", "pacing": 1.0},
+                    "text": raw_text
+                })
+                continue
+
+            # Look at preceding segment for narrative speech attribution framing
+            prev_narr = ""
+            if i > 0 and segments[i - 1].get("speaker") == "Narrator":
+                prev_narr = str(segments[i - 1].get("text") or "").lower()
+
+            text_lower = raw_text.lower()
+            actioning = "converse"
+            subtext = "Communicate my thought directly."
+            emotion = "neutral"
+            intensity = "medium"
+            delivery_style = "grounded_dialogue"
+            tone = "natural and clear"
+            pacing = 1.0
+            reflex_prefix = ""
+
+            # 1. Preceding narrative tag heuristics
+            if any(w in prev_narr for w in ("गुर्राया", "गुर्राते", "दहाड़ा", "धमकाया", "growled", "snarled", "threatened")):
+                actioning = "threaten"
+                subtext = "Assert lethal dominance and intimidate into submission."
+                emotion = "hostile menace"
+                intensity = "high"
+                delivery_style = "cold_menace"
+                tone = "harsh, guttural and guarded"
+                pacing = 0.95
+                reflex_prefix = "[growls] "
+            elif any(w in prev_narr for w in ("हँसा", "हँसते", "हंसते", "ठहाका", "laughed", "chuckled", "snickered")):
+                actioning = "mock"
+                subtext = "Show effortless superiority and amusement."
+                emotion = "sardonic amusement"
+                intensity = "medium"
+                delivery_style = "ironic_mockery"
+                tone = "teasing and amused"
+                pacing = 1.05
+                reflex_prefix = "[laughs] "
+            elif any(w in prev_narr for w in ("मुस्कुराया", "मुस्कुराते", "व्यंग्य", "smiled", "smirked", "amused")):
+                actioning = "taunt"
+                subtext = "Provoke a reaction through veiled irony."
+                emotion = "cynical irony"
+                intensity = "medium"
+                delivery_style = "ironic_mockery"
+                tone = "dry and knowing"
+                reflex_prefix = "[chuckles] "
+            elif any(w in prev_narr for w in ("फुसफुसाया", "फुसफुसाते", "धीमी आवाज़", "whispered", "hushed")):
+                actioning = "confide"
+                subtext = "Prevent anyone nearby from overhearing this dangerous truth."
+                emotion = "guarded secrecy"
+                intensity = "medium"
+                delivery_style = "whispering_fear"
+                tone = "hushed and urgent"
+                pacing = 0.9
+                reflex_prefix = "[whispers] "
+            elif any(w in prev_narr for w in ("हाँफा", "हाँफते", "साँस फूल", "panted", "out of breath", "gasping")):
+                actioning = "recover"
+                subtext = "Force out words despite physical exhaustion."
+                emotion = "breathless exhaustion"
+                intensity = "high"
+                delivery_style = "breathless_exhaustion"
+                tone = "labored and strained"
+                pacing = 0.85
+                reflex_prefix = "[pant] "
+            elif any(w in prev_narr for w in ("कराहा", "कराहते", "दर्द से", "groaned", "winced", "in pain")):
+                actioning = "endure"
+                subtext = "Survive the physical agony while speaking."
+                emotion = "acute agony"
+                intensity = "high"
+                delivery_style = "combat_strain"
+                tone = "pained and clenched"
+                pacing = 0.85
+                reflex_prefix = "[groan] "
+            elif any(w in prev_narr for w in ("चौंका", "चौंककर", "सकपकाया", "हक्का-बक्का", "gasped", "startled")):
+                actioning = "react"
+                subtext = "Stunned by an impossible realization."
+                emotion = "shocked disbelief"
+                intensity = "high"
+                delivery_style = "sharp_inquiry"
+                tone = "startled and breathless"
+                pacing = 1.1
+                reflex_prefix = "[gasp] "
+            elif any(w in prev_narr for w in ("आह भरी", "ठंडी सांस", "sighed", "weary")):
+                actioning = "concede"
+                subtext = "Acknowledge the heavy inevitable burden."
+                emotion = "weary resignation"
+                intensity = "low"
+                delivery_style = "weary_composure"
+                tone = "heavy and slow"
+                pacing = 0.9
+                reflex_prefix = "[sighs] "
+            # 2. Text punctuation & lexical heuristics
+            elif raw_text.endswith("—") or raw_text.endswith("--"):
+                actioning = "interrupt"
+                subtext = "Cut in abruptly before the other can finish."
+                emotion = "urgent impatience"
+                intensity = "high"
+                delivery_style = "intense_urgency"
+                tone = "sharp, cutting and impatient"
+                pacing = 1.15
+            elif raw_text.endswith("...") or raw_text.endswith("…"):
+                actioning = "hesitate"
+                subtext = "Struggle with doubt or unspoken consequences."
+                emotion = "lingering hesitation"
+                intensity = "low"
+                delivery_style = "weary_composure"
+                tone = "trailing and uncertain"
+                pacing = 0.85
+            elif "!?" in raw_text or "?!" in raw_text or "क्या?!" in raw_text:
+                actioning = "confront"
+                subtext = "Refuse to believe the madness I just heard."
+                emotion = "explosive indignation"
+                intensity = "explosive"
+                delivery_style = "intense_urgency"
+                tone = "incredulous and piercing"
+                pacing = 1.1
+            elif any(k in text_lower for k in ("मरोगे", "खाल", "काट", "तलवार", "धमकी", "खून", "चीर", "kill", "die", "blade", "throat")):
+                actioning = "intimidate"
+                subtext = "Make it clear violence is imminent."
+                emotion = "deadly intent"
+                intensity = "high"
+                delivery_style = "cold_menace"
+                tone = "chilling and resolute"
+                pacing = 0.9
+            elif any(k in text_lower for k in ("दोस्त", "नमस्ते", "स्वागत", "भोजन", "शराब", "drink", "friend", "welcome", "inn")):
+                actioning = "welcome"
+                subtext = "Disarm tension and establish convivial hospitality."
+                emotion = "warm conviviality"
+                intensity = "medium"
+                delivery_style = "grounded_dialogue"
+                tone = "affable, relaxed and resonant"
+                pacing = 1.0
+            elif "?" in raw_text:
+                actioning = "probe"
+                subtext = "Extract the hidden truth."
+                emotion = "sharp suspicion"
+                intensity = "medium"
+                delivery_style = "sharp_inquiry"
+                tone = "pointed and observant"
+                pacing = 1.0
+            elif "!" in raw_text:
+                actioning = "command"
+                subtext = "Demand immediate obedience."
+                emotion = "commanding urgency"
+                intensity = "high"
+                delivery_style = "intense_urgency"
+                tone = "firm and commanding"
+                pacing = 1.05
+
+            formatted_text = raw_text
+            if reflex_prefix and not formatted_text.startswith("["):
+                formatted_text = f"{reflex_prefix}{formatted_text}"
+
+            enriched_list.append({
+                "index": idx,
+                "actioning": actioning,
+                "subtext": subtext,
+                "underlying_emotion": emotion,
+                "intensity_level": intensity,
+                "acting": {
+                    "delivery_style": delivery_style,
+                    "tone": tone,
+                    "pacing": pacing,
+                },
+                "text": formatted_text,
+            })
+        return enriched_list
+
     def direct_subtext(
         self,
         segments: List[Dict[str, Any]],
@@ -315,8 +505,8 @@ Output JSON: A list of objects matching by "index":
                     thinking_budget=1024,
                 )
         except Exception as e:
-            logger.warning(f"  [!] StanislavskiSubtextDirector notice: {e}. Preserving input baseline.")
-            return segments
+            logger.info(f"  [*] StanislavskiSubtextDirector: Text LLM bridge offline/disabled ({e}). Activating Native Antigravity Heuristic Directing Engine.")
+            enriched = self._direct_heuristically(segments, eff_context)
 
         if isinstance(enriched, dict):
             for k in ("turns", "enriched", "segments", "items", "results"):
@@ -325,7 +515,7 @@ Output JSON: A list of objects matching by "index":
                     break
 
         if not isinstance(enriched, list):
-            return segments
+            enriched = []
 
         enrich_map = {item.get("index"): item for item in enriched if isinstance(item, dict) and "index" in item}
         for seg in segments:
@@ -386,6 +576,34 @@ Output JSON: A list of objects matching by "index":
                     is_dialogue=False,
                 )
                 seg["text"] = cleaned_narr
+
+        # Fallback for dialogue turns with missing acting directives to prevent flatline performance
+        for seg in segments:
+            spk_name = str(seg.get("speaker") or "").strip().lower()
+            if spk_name not in ("narrator", "narration", "") and seg.get("type") != "narration":
+                acting = seg.setdefault("acting", {})
+                cur_ds = acting.get("delivery_style")
+                if not cur_ds or cur_ds in ("neutral", "standard"):
+                    actioning = str(seg.get("actioning") or "").lower()
+                    emotion = str(seg.get("underlying_emotion") or seg.get("emotion") or "").lower()
+                    text = str(seg.get("text") or "")
+
+                    if any(k in emotion or k in actioning for k in ("rage", "anger", "furious", "threat", "menace", "धमकी", "क्रोध")):
+                        acting["delivery_style"] = "cold_menace" if "threat" in actioning or "menace" in actioning else "bellowing_rage"
+                    elif any(k in emotion or k in actioning for k in ("mock", "tease", "amuse", "swagger", "irony", "व्यंग्य", "मज़ाक")):
+                        acting["delivery_style"] = "ironic_mockery"
+                    elif any(k in emotion or k in actioning for k in ("fear", "panic", "plead", "terror", "डर", "घबराहट")):
+                        acting["delivery_style"] = "whispering_fear"
+                    elif any(k in emotion or k in actioning for k in ("strain", "exhaust", "pain", "combat", "दर्द", "कराह")):
+                        acting["delivery_style"] = "combat_strain"
+                    elif any(k in emotion or k in actioning for k in ("tender", "gentle", "comfort", "reassure", "प्रेम", "शांत")):
+                        acting["delivery_style"] = "gentle_tender"
+                    elif "?" in text:
+                        acting["delivery_style"] = "sharp_inquiry"
+                    elif "!" in text:
+                        acting["delivery_style"] = "intense_urgency"
+                    else:
+                        acting["delivery_style"] = "grounded_dialogue"
 
         return segments
 

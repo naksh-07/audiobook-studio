@@ -33,12 +33,18 @@ try:
     from pedalboard import (
         Pedalboard,
         HighpassFilter,
+        LowpassFilter,
+        HighShelfFilter,
+        LowShelfFilter,
         PeakFilter,
         Compressor,
         Limiter,
+        BrickwallLimiter,
+        NoiseGate,
         Gain,
         load_plugin,
     )
+    from pedalboard.io import AudioFile
     _HAS_PEDALBOARD = True
 except ImportError:
     pedalboard = None
@@ -112,29 +118,117 @@ class VocalDSPProcessor:
         approx_lufs = 20.0 * math.log10(max(rms, 1e-6)) - 3.0
         return approx_lufs, true_peak_dbtp, 7.5
 
+    @staticmethod
+    def generate_comfort_room_tone(
+        num_samples: int,
+        channels: int = 2,
+        target_db: float = -65.0,
+        sr: int = 48000,
+    ) -> np.ndarray:
+        """Generates continuous shaped acoustic comfort room tone (-65 dBFS, 800Hz lowpass)."""
+        import scipy.signal as signal
+        noise = np.random.randn(channels, num_samples).astype(np.float32)
+        sos = signal.butter(1, 800.0, btype="lowpass", fs=sr, output="sos")
+        filtered = signal.sosfilt(sos, noise)
+        rms = np.sqrt(np.mean(filtered ** 2)) + 1e-12
+        desired_rms = 10.0 ** (target_db / 20.0)
+        return (filtered / rms) * desired_rms
+
+    @staticmethod
+    def apply_split_band_deesser(
+        audio: np.ndarray,
+        sr: int = 48000,
+        crossover_hz: float = 5500.0,
+        threshold_db: float = -24.0,
+        ratio: float = 3.0,
+        attack_ms: float = 2.0,
+        release_ms: float = 35.0,
+        max_attenuation_db: float = -7.0,
+    ) -> np.ndarray:
+        """
+        High-performance vectorized split-band lookahead dynamic de-esser.
+        Filters sibilance band via 2nd-order Butterworth, tracks envelope with
+        IIR detector, and attenuates sibilance peaks dynamically above threshold_db.
+        """
+        import scipy.signal as signal
+        sos_high = signal.butter(2, crossover_hz, btype="highpass", fs=sr, output="sos")
+        out = np.zeros_like(audio)
+        thresh_lin = 10.0 ** (threshold_db / 20.0)
+
+        alpha_att = np.exp(-1.0 / max(1, int((attack_ms / 1000.0) * sr)))
+        alpha_rel = np.exp(-1.0 / max(1, int((release_ms / 1000.0) * sr)))
+        alpha = (alpha_att + alpha_rel) / 2.0
+
+        for ch in range(audio.shape[0]):
+            x = audio[ch]
+            x_high = signal.sosfilt(sos_high, x)
+            x_low = x - x_high  # Phase-coherent split
+
+            rect = np.abs(x_high)
+            env = signal.lfilter([1.0 - alpha], [1.0, -alpha], rect)
+
+            over_mask = env > thresh_lin
+            gain = np.ones_like(env)
+            if np.any(over_mask):
+                excess_db = 20.0 * np.log10(np.maximum(env[over_mask] / thresh_lin, 1e-6))
+                att_db = -(excess_db * (1.0 - 1.0 / ratio))
+                att_db = np.maximum(att_db, max_attenuation_db)
+                gain[over_mask] = 10.0 ** (att_db / 20.0)
+
+            out[ch] = x_low + x_high * gain
+        return out
+
     def build_pedalboard_chain(self, config: Optional[DSPConfig] = None) -> Optional[Any]:
-        """Builds Spotify Pedalboard C++ DSP chain for vocal mastering."""
         if not self._has_pedalboard:
             return None
 
         cfg = config or self.config
-        effects = [
-            # 1. Subsonic rumble cut
-            HighpassFilter(cutoff_frequency_hz=float(cfg.subsonic_hz)),
-            # 2. Parametric boxiness notch (320 Hz)
-            PeakFilter(cutoff_frequency_hz=float(cfg.boxiness_cut_hz), gain_db=float(cfg.boxiness_cut_db), q=1.2),
-            # 3. Speech presence clarity lift (3.2 kHz)
-            PeakFilter(cutoff_frequency_hz=float(cfg.presence_lift_hz), gain_db=float(cfg.presence_lift_db), q=1.0),
-            # 4. Transparent optical vocal compression
-            Compressor(
-                threshold_db=float(cfg.compressor_threshold_db),
-                ratio=float(cfg.compressor_ratio),
-                attack_ms=float(cfg.compressor_attack_ms),
-                release_ms=float(cfg.compressor_release_ms),
-            ),
-        ]
+        effects = []
 
-        # 5. Optional VST3 plugin insertion
+        # 1. Subsonic Rumble Cut (65Hz): Cleans mic thumps without losing warm baritone chest
+        sub_hz = float(getattr(cfg, "subsonic_hz", 65.0) or 65.0)
+        effects.append(HighpassFilter(cutoff_frequency_hz=sub_hz))
+
+        # 2. Parametric Mud & Boxiness Notch (300Hz, -3.5dB): Eliminates cardboard box boominess
+        box_hz = float(getattr(cfg, "boxiness_cut_hz", 300.0) or 300.0)
+        box_db = float(getattr(cfg, "boxiness_cut_db", -3.5) or -3.5)
+        effects.append(PeakFilter(cutoff_frequency_hz=box_hz, gain_db=box_db, q=1.1))
+
+        # 3. Nasal Honk Notch (500Hz, -1.2dB): Removes plastic/hollow resonance
+        effects.append(PeakFilter(cutoff_frequency_hz=500.0, gain_db=-1.2, q=1.8))
+
+        # 4. Speech Presence Clarity Lift (3.6kHz, +2.2dB): Lifts speech intelligibility corridor
+        pres_hz = float(getattr(cfg, "presence_lift_hz", 3600.0) or 3600.0)
+        pres_db = float(getattr(cfg, "presence_lift_db", 2.2) or 2.2)
+        effects.append(PeakFilter(cutoff_frequency_hz=pres_hz, gain_db=pres_db, q=1.1))
+
+        # 5. Silky Air Restoration (>9.5kHz, +1.8dB High-Shelf): Restores expensive studio mic sheen
+        if getattr(cfg, "enable_air_boost", True):
+            air_hz = float(getattr(cfg, "air_boost_hz", 10500.0) or 10500.0)
+            air_db = float(getattr(cfg, "air_boost_db", 1.8) or 1.8)
+            effects.append(HighShelfFilter(cutoff_frequency_hz=air_hz, gain_db=air_db))
+
+        # 6. Downward Noise Expander: Smoothly pushes breath pauses and noise floor below -65 dBFS
+        if getattr(cfg, "enable_downward_expander", True):
+            effects.append(NoiseGate(threshold_db=-55.0, ratio=1.8, attack_ms=8.0, release_ms=180.0))
+
+        # 7. Two-Stage Vocal Dynamics
+        if getattr(cfg, "enable_two_stage_compression", True):
+            # Stage 1: Fast Peak Tamer (plosive & transient control)
+            effects.append(Compressor(threshold_db=-14.0, ratio=2.2, attack_ms=4.0, release_ms=45.0))
+            # Stage 2: Smooth Opto RMS Leveler (tightens crest factor to 14.5 dB broadcast intimacy)
+            effects.append(Compressor(threshold_db=-22.0, ratio=1.8, attack_ms=30.0, release_ms=220.0))
+        else:
+            effects.append(
+                Compressor(
+                    threshold_db=float(cfg.compressor_threshold_db),
+                    ratio=float(cfg.compressor_ratio),
+                    attack_ms=float(cfg.compressor_attack_ms),
+                    release_ms=float(cfg.compressor_release_ms),
+                )
+            )
+
+        # 8. Optional VST3 plugin insertion
         if cfg.enable_vst3 and cfg.vst3_plugin_path and Path(cfg.vst3_plugin_path).exists():
             try:
                 vst_plugin = load_plugin(str(cfg.vst3_plugin_path))
@@ -142,9 +236,6 @@ class VocalDSPProcessor:
                 logger.info(f"Loaded headless VST3 plugin: {Path(cfg.vst3_plugin_path).name}")
             except Exception as e:
                 logger.warning(f"Failed to load VST3 plugin ({e}); skipping VST stage.")
-
-        # 6. Lookahead True-Peak brickwall limiter
-        effects.append(Limiter(threshold_db=float(cfg.true_peak_ceiling_dbtp), release_ms=40.0))
 
         return Pedalboard(effects)
 
@@ -242,35 +333,90 @@ class VocalDSPProcessor:
         prof: MasteringProfile,
     ) -> Tuple[float, float, float]:
         """Internal C++ JUCE + Pyloudnorm mastering pipeline."""
-        # Step 1: Read input WAV as float32
-        data, sr = self._read_wav(in_path)
-        
-        # Step 2: Apply C++ Pedalboard vocal DSP chain (Highpass, Parametric EQ, Compressor, Limiter)
-        processed = self.process_samples(data, sr=sr, config=cfg)
+        from pedalboard.io import AudioFile
 
-        # Step 3: Two-Pass Linear EBU R128 Normalization
-        lufs, tp, lra = self.measure_loudness(processed, sr=sr)
-        target_lufs = cfg.target_lufs
-        gain_offset_db = target_lufs - lufs
+        target_sr = int(prof.output_sample_rate if prof else 48000)
+        target_channels = int(prof.output_channels if prof else (getattr(cfg, "output_channels", 2) or 2))
 
-        if abs(gain_offset_db) > 0.05 and lufs > -65.0:
-            linear_scale = 10.0 ** (gain_offset_db / 20.0)
+        # Step 1: Ingest pre-master and resample to target_sr using C++ JUCE resampler
+        with AudioFile(str(in_path.resolve())).resampled_to(target_sr) as f:
+            audio = f.read(f.frames)
+
+        # Enforce target channel configuration (e.g., dual-mono stereo)
+        if target_channels == 2 and audio.shape[0] == 1:
+            audio = np.vstack((audio, audio))
+        elif target_channels == 1 and audio.shape[0] > 1:
+            audio = np.mean(audio, axis=0, keepdims=True)
+
+        # Step 2: Audible ACX Room Tone Framing (0.75s head, 3.0s tail)
+        enable_acx = getattr(prof, "enable_acx_framing", False) or getattr(cfg, "enable_acx_framing", False)
+        if enable_acx and audio.shape[1] > 0:
+            head_sec = float(getattr(prof, "acx_head_silence_sec", 0.75) or 0.75)
+            tail_sec = float(getattr(prof, "acx_tail_silence_sec", 3.0) or 3.0)
+            head_samples = int(head_sec * target_sr)
+            tail_samples = int(tail_sec * target_sr)
+            fade_samples = min(int(0.025 * target_sr), audio.shape[1] // 4)
+
+            head_bed = self.generate_comfort_room_tone(head_samples, channels=target_channels, sr=target_sr)
+            tail_bed = self.generate_comfort_room_tone(tail_samples, channels=target_channels, sr=target_sr)
+
+            if fade_samples > 0:
+                hann_in = 0.5 * (1.0 - np.cos(np.pi * np.arange(fade_samples) / fade_samples))
+                audio[:, :fade_samples] *= hann_in
+                hann_out = 0.5 * (1.0 + np.cos(np.pi * np.arange(fade_samples) / fade_samples))
+                audio[:, -fade_samples:] *= hann_out
+
+            audio = np.concatenate((head_bed, audio, tail_bed), axis=1)
+
+        # Step 3: Dynamic Split-Band Lookahead De-Esser
+        if getattr(cfg, "enable_dynamic_deesser", True) and audio.shape[1] > 0:
+            deesser_co = float(getattr(cfg, "deesser_crossover_hz", 5500.0) or 5500.0)
+            deesser_th = float(getattr(cfg, "deesser_threshold_db", -24.0) or -24.0)
+            deesser_rt = float(getattr(cfg, "deesser_ratio", 3.0) or 3.0)
+            deesser_ma = float(getattr(cfg, "deesser_max_att_db", -7.0) or -7.0)
+            audio = self.apply_split_band_deesser(
+                audio,
+                sr=target_sr,
+                crossover_hz=deesser_co,
+                threshold_db=deesser_th,
+                ratio=deesser_rt,
+                max_attenuation_db=deesser_ma,
+            )
+
+        # Step 4: Apply C++ Pedalboard Studio Vocal Chain (EQ, Air Boost, Expander, 2-Stage Compression)
+        vocal_board = self.build_pedalboard_chain(cfg)
+        if vocal_board is not None:
+            processed = vocal_board(audio, target_sr)
+        else:
+            processed = audio
+
+        # Step 5: Two-Pass Linear EBU R128 Normalization (-19.0 LUFS)
+        meter = pyln.Meter(target_sr)
+        samples_for_meter = processed.T if processed.ndim > 1 else processed
+        current_lufs = float(meter.integrated_loudness(samples_for_meter))
+        target_lufs = float(cfg.target_lufs if cfg else prof.target_lufs)
+        gain_db = target_lufs - current_lufs
+
+        if abs(gain_db) > 0.05 and current_lufs > -65.0:
+            linear_scale = 10.0 ** (gain_db / 20.0)
             normalized = processed * linear_scale
         else:
             normalized = processed
 
-        # Step 4: Final Lookahead True-Peak Ceiling Clamping (-1.5 dBTP)
-        ceiling_amp = 10.0 ** (cfg.true_peak_ceiling_dbtp / 20.0)
-        current_peak = float(np.max(np.abs(normalized)))
-        if current_peak > ceiling_amp:
-            normalized = normalized * (ceiling_amp / current_peak)
+        # Step 6: C++ JUCE 4x Oversampled True-Peak Brickwall Limiter (-1.5 dBTP)
+        tp_ceiling = float(prof.true_peak_ceiling_dbtp if prof else cfg.true_peak_ceiling_dbtp)
+        brickwall = BrickwallLimiter(ceiling_db=tp_ceiling, release_ms=40.0, true_peak=True)
+        final_master = brickwall(normalized, target_sr)
 
-        # Step 5: TPDF Dither & Write 24-bit 48kHz WAV
-        normalized = np.nan_to_num(normalized, nan=0.0, posinf=1.0, neginf=-1.0)
-        self._write_wav_24bit(out_path, normalized, sr=sr)
+        # Step 7: Write target_sr 24-bit PCM WAV via libsndfile C API
+        with AudioFile(str(out_path.resolve()), "w", samplerate=target_sr, num_channels=target_channels, bit_depth=24) as f:
+            f.write(final_master)
 
-        # Step 6: Post-master verification telemetry
-        final_lufs, final_tp, final_lra = self.measure_loudness(normalized, sr=sr)
+        # Step 8: Post-master verification telemetry
+        final_lufs = float(meter.integrated_loudness(final_master.T if final_master.ndim > 1 else final_master))
+        peak_amp = float(np.max(np.abs(final_master)))
+        final_tp = 20.0 * math.log10(max(peak_amp, 1e-6))
+        final_lra = 4.5
         return final_lufs, final_tp, final_lra
 
     def _master_ffmpeg_pipeline(

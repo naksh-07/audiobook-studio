@@ -80,31 +80,29 @@ def execute_tts_synthesize(
     Executes a Room 4 Speech Synthesis request strictly through ModelGateway.
     Returns SpeechResult containing decoded audio bytes and operational metadata.
     """
-    # Dynamic Temperature Clamping:
-    # - Narrator: Locked strictly to 0.32 (calm, steady, articulate, measured audiobook delivery).
-    # - Character Dialogue: Dynamic temperature based on emotion/intensity, strictly clamped between 0.35 and 0.50 (0.52 max for extreme drama).
-    # - Zero histrionics or screeching (never allow temperature > 0.52).
+    # Dynamic Temperature Clamping (Calibrated for gemini-3.8-flash-tts):
+    # - Low temperatures (<= 0.50) cause vocoder runaway silence loops (> 40s dead air).
+    # - Narrator: Locked strictly to 0.65 (calm, steady, articulate, measured audiobook delivery).
+    # - Character Dialogue: Dynamic temperature based on emotion/intensity, clamped between 0.65 and 0.85.
     is_narrator = str(speaker or "").strip().lower() in ("narrator", "narration")
     if is_narrator:
-        clamped_temp = 0.32
+        clamped_temp = 0.65
     else:
-        target_temp = temperature
+        target_temp = temperature if temperature >= 0.60 else 0.70
         eff_intensity = str(kwargs.get("intensity") or kwargs.get("intensity_level") or "").lower()
         eff_emotion = str(kwargs.get("emotion") or "").lower()
         eff_style = str(style_desc or "").lower()
 
-        # If temperature is at default (0.35), scale dynamically based on dramatic context
-        if target_temp == 0.35:
-            if eff_intensity in ("explosive", "extreme", "maximum") or any(k in eff_emotion or k in eff_style for k in ("rage", "screaming", "bellowing", "fury")):
-                target_temp = 0.50
-            elif eff_intensity in ("high",) or any(k in eff_emotion or k in eff_style for k in ("angry", "terror", "panic", "shout")):
-                target_temp = 0.45
-            elif eff_intensity in ("low",) or any(k in eff_emotion or k in eff_style for k in ("subdued", "whisper", "tender")):
-                target_temp = 0.36
-            elif any(k in eff_emotion or k in eff_style for k in ("excited", "urgent", "intense")):
-                target_temp = 0.42
+        if eff_intensity in ("explosive", "extreme", "maximum") or any(k in eff_emotion or k in eff_style for k in ("rage", "screaming", "bellowing", "fury")):
+            target_temp = 0.85
+        elif eff_intensity in ("high",) or any(k in eff_emotion or k in eff_style for k in ("angry", "terror", "panic", "shout")):
+            target_temp = 0.80
+        elif eff_intensity in ("low",) or any(k in eff_emotion or k in eff_style for k in ("subdued", "whisper", "tender")):
+            target_temp = 0.65
+        elif any(k in eff_emotion or k in eff_style for k in ("excited", "urgent", "intense")):
+            target_temp = 0.75
 
-        clamped_temp = max(0.35, min(target_temp, 0.52))
+        clamped_temp = max(0.65, min(target_temp, 0.85))
 
     # Sanitize spoken text by preserving acoustic reflexes and extracting non-acoustic cues
     from audiobook_factory.tts.providers.gemini import (

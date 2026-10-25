@@ -15,6 +15,7 @@ import base64
 import struct
 import wave
 import asyncio
+import re
 from typing import Dict, Any, List, Tuple, Optional, Set
 
 from audiobook_factory.logger import logger
@@ -50,7 +51,7 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
     Production-grade adapter connecting CanonicalTTSRequest to Google Gemini Flash Speech API.
     """
 
-    def __init__(self, model_name: str = "gemini-3.8-flash", config: Optional[Dict[str, Any]] = None):
+    def __init__(self, model_name: str = "gemini-3.8-flash-tts", config: Optional[Dict[str, Any]] = None):
         super().__init__(model_name=model_name, config=config)
         self.api_endpoint_template = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         self.max_retries = self.config.get("max_retries", 4)
@@ -68,8 +69,8 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
         if len(request.spoken_text) > 3000:
             warnings.append(f"Spoken text length ({len(request.spoken_text)} chars) exceeds recommended Gemini atomic unit limit.")
 
-        if request.temperature < 0.20 or request.temperature > 0.60:
-            warnings.append(f"Temperature {request.temperature:.2f} is outside recommended clamp (0.30 - 0.52).")
+        if request.temperature < 0.20 or request.temperature > 0.95:
+            warnings.append(f"Temperature {request.temperature:.2f} is outside recommended clamp (0.65 - 0.85).")
 
         return is_compat, warnings
 
@@ -81,7 +82,7 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
             "supported_voices": list(GEMINI_SUPPORTED_VOICES),
             "native_sample_rate": 24000,
             "max_recommended_chars": 2000,
-            "temperature_bounds": (0.30, 0.52),
+            "temperature_bounds": (0.65, 0.85),
             "supports_speech_metadata": True,
             "supports_reference_audio": False,
         }
@@ -96,8 +97,34 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
 
         session_id = f"scene_{request.segment_uid[:8]}" if request.segment_uid else "tts_session"
 
+        # Check if literary_text contains certified acoustic reflexes (e.g. [growls], [laughs], [chuckles], [whispers])
+        spoken_text = request.spoken_text
+        if request.literary_text and request.speaker != "Narrator":
+            from audiobook_factory.tts.providers.gemini import (
+                CERTIFIED_ACOUSTIC_REFLEX_TAGS,
+                sanitize_spoken_text_and_extract_stage_directions,
+            )
+            reflex_tags = re.findall(r"\[([^\]]+)\]", request.literary_text)
+            has_reflex = any(
+                tag.lower().strip() in CERTIFIED_ACOUSTIC_REFLEX_TAGS
+                for tag in reflex_tags
+            )
+            if has_reflex:
+                if not request.metadata.get("numeral_expansions"):
+                    clean_with_reflexes, _ = sanitize_spoken_text_and_extract_stage_directions(request.literary_text)
+                    if clean_with_reflexes:
+                        spoken_text = clean_with_reflexes
+                else:
+                    for tag in reflex_tags:
+                        tag_clean = tag.lower().strip()
+                        if tag_clean in CERTIFIED_ACOUSTIC_REFLEX_TAGS and f"[{tag_clean}]" not in spoken_text:
+                            spoken_text = f"[{tag_clean}] {spoken_text}"
+
+        intent_emotion = request.delivery_intent.emotion if request.delivery_intent else "neutral"
+        intent_intensity = request.delivery_intent.intensity if request.delivery_intent else "medium"
+
         speech_result = execute_tts_synthesize(
-            text=request.spoken_text,
+            text=spoken_text,
             voice_name=request.voice_id,
             model=self.model_name,
             speaker=request.speaker,
@@ -106,6 +133,8 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
             max_retries=self.max_retries,
             timeout_sec=self.timeout_sec,
             style_desc=style_desc,
+            emotion=intent_emotion,
+            intensity=intent_intensity,
         )
 
         # Extract PCM and calculate duration
@@ -120,7 +149,7 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
         metadata.setdefault("key_preview", "CONTROL_PLANE")
         metadata["style_descriptor"] = style_desc
         metadata["temperature"] = (
-            0.32 if request.speaker == "Narrator" else max(0.30, min(request.temperature, 0.52))
+            0.65 if request.speaker == "Narrator" else max(0.65, min(request.temperature, 0.85))
         )
 
         return SynthesizedAudioChunk(
@@ -149,11 +178,21 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
         if speaker == "Narrator":
             return "calm, steady, articulate, measured audiobook delivery"
 
+        if intent.memory_vocal_constraint:
+            for item in intent.memory_vocal_constraint.split(","):
+                clean_item = item.strip()
+                if clean_item and clean_item not in descriptors:
+                    descriptors.append(clean_item)
+
         if intent.delivery_style not in ("neutral", "standard"):
-            descriptors.append(intent.delivery_style.replace("_", " "))
+            ds = intent.delivery_style.replace("_", " ").strip()
+            if ds and ds not in descriptors:
+                descriptors.append(ds)
 
         if intent.emotion not in ("neutral", "standard"):
-            descriptors.append(intent.emotion.replace("_", " "))
+            em = intent.emotion.replace("_", " ").strip()
+            if em and em not in descriptors:
+                descriptors.append(em)
 
         if intent.intensity == "explosive":
             descriptors.append("extreme intensity")
@@ -169,15 +208,12 @@ class GeminiTTSAdapter(BaseTTSModelAdapter):
         elif intent.proximity == "distant":
             descriptors.append("projected distant voice")
 
-        if intent.memory_vocal_constraint:
-            descriptors.append(intent.memory_vocal_constraint)
-
         if intent.extracted_stage_cues:
             for cue in intent.extracted_stage_cues:
-                if cue not in descriptors:
-                    descriptors.append(cue)
+                cue_clean = cue.strip()
+                if cue_clean and cue_clean not in descriptors:
+                    descriptors.append(cue_clean)
 
-        # Anti-theatricality restraint anchor
         descriptors.append("understated natural dialogue (never theatrical)")
 
         return ", ".join(descriptors) if descriptors else None

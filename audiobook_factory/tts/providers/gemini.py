@@ -91,8 +91,8 @@ def resolve_speech_metadata_style(
     # measured audiobook delivery with zero theatrical acting or histrionics.
     if is_narrator:
         if narrator_tint and str(narrator_tint).strip():
-            return f"{str(narrator_tint).strip().rstrip('.')}, articulate measured audiobook delivery"
-        return "calm, steady, articulate, measured audiobook delivery"
+            return f"{str(narrator_tint).strip().rstrip('.')}, articulate measured storytelling narration with warm cadence"
+        return "Calm, articulate, measured storytelling narration with warm resonant cadence"
 
     descriptors = []
 
@@ -100,18 +100,37 @@ def resolve_speech_metadata_style(
     if not style_val and isinstance(acting, dict):
         style_val = acting.get("delivery_style")
 
-    if style_val and str(style_val).lower() not in ("neutral", "standard"):
+    # Map delivery styles to vivid, expressive theatrical descriptors for Gemini 3.8 Flash
+    STYLE_PROMPT_MAP = {
+        "cold_menace": "Chilling subdued threat, controlled menace, deliberate low cadence",
+        "bellowing_rage": "Fierce explosive rage, trembling with fury, sharp aggressive cadence",
+        "ironic_mockery": "Sardonic amused smirk, playful ironic cadence, effortless confidence",
+        "whispering_fear": "Hushed trembling whisper, rapid shallow breath, guarded dread",
+        "combat_strain": "Grit teeth, labored breath, strained painful exertion in the voice",
+        "breathless_exhaustion": "Heavy panting breath, words forced out through sheer fatigue",
+        "weary_composure": "Heavy weary sigh, deep melancholy, slow trailing cadence",
+        "sharp_inquiry": "Pointed suspicious inquiry, searching piercing tone, sharp pauses",
+        "intense_urgency": "Fast urgent cadence, commanding authority, breathless drive",
+        "grounded_dialogue": "Warm resonant cadence, natural conversational breath, grounded delivery",
+    }
+
+    style_key = str(style_val or "").lower().strip()
+    if style_key in STYLE_PROMPT_MAP:
+        descriptors.append(STYLE_PROMPT_MAP[style_key])
+    elif style_val and str(style_val).lower() not in ("neutral", "standard"):
         descriptors.append(str(style_val).replace("_", " "))
 
     if emotion and emotion.lower() not in ("neutral", "standard"):
-        descriptors.append(emotion.lower().replace("_", " "))
+        em_lower = emotion.lower().replace("_", " ")
+        if not any(em_lower in d.lower() for d in descriptors):
+            descriptors.append(f"feeling {em_lower}")
 
     if intensity == "explosive":
-        descriptors.append("extreme intensity")
+        descriptors.append("explosive dynamic volume, peak vocal strain")
     elif intensity in ("high", "intense"):
-        descriptors.append("high intensity")
+        descriptors.append("heightened vocal intensity")
     elif intensity == "low":
-        descriptors.append("subdued")
+        descriptors.append("subdued volume, quiet breath")
 
     # Additional acting context if present (tone, vocal_tension, proximity)
     if acting:
@@ -149,8 +168,6 @@ def resolve_speech_metadata_style(
     if not descriptors:
         return ""
 
-    # Universal restraint anchor prevents theatrical histrionics while preserving authentic emotion
-    descriptors.append("understated natural dialogue (never theatrical)")
     return ", ".join(descriptors)
 
 
@@ -163,6 +180,10 @@ CERTIFIED_ACOUSTIC_REFLEX_TAGS = {
     "gasp", "gasps",
     "pant", "panting", "pants",
     "groan", "groans",
+    "grunt", "grunts",
+    "scoff", "scoffs",
+    "snort", "snorts",
+    "clears throat", "clear throat",
 }
 
 HINDI_ACOUSTIC_MAP = {
@@ -172,7 +193,16 @@ HINDI_ACOUSTIC_MAP = {
     "फुसफुसाते हुए": "whispers",
     "हाँफते हुए": "pant",
     "हांफते हुए": "pant",
+    "हाँफते": "pant",
+    "हांफते": "pant",
     "आह भरते हुए": "sighs",
+    "कराहते हुए": "groan",
+    "कराहा": "groan",
+    "चौंकते हुए": "gasp",
+    "चौंककर": "gasp",
+    "गुर्राते हुए": "growls",
+    "दहाड़ते हुए": "growls",
+    "गला साफ़ करते हुए": "clears throat",
     "धीमी आवाज में": "whispering",  # preserved for compatibility with test_voice_catalog_and_casting
 }
 
@@ -308,15 +338,16 @@ def synthesize_gemini_tts(
         ],
     }
 
-    # --- TTS Temperature Calibration (Dynamic Clamping 0.30 - 0.52) ---
-    # Clamped strictly <= 0.52 to eliminate pitch instability, screeching, and histrionics
-    # while ensuring natural conversational human nuance (dialogue 0.35 - 0.42, climactic drama <= 0.50).
+    # --- TTS Temperature Calibration (Dynamic Operating Range 0.65 - 0.85) ---
+    # Calibrated to eliminate dead-air runaway loops (<0.50) while permitting organic
+    # pitch excursions, character dialect variation, and emotional reflexes.
+    # Narrator locked to 0.65, dialogue turns dynamically calibrated 0.70 - 0.85.
     gen_config = payload["generationConfig"]
     if base_temp is not None:
         jitter = random.uniform(-0.01, 0.01)
-        gen_config["temperature"] = round(max(0.30, min(0.52, float(base_temp) + jitter)), 3)
+        gen_config["temperature"] = round(max(0.60, min(0.85, float(base_temp) + jitter)), 3)
     else:
-        gen_config["temperature"] = round(random.uniform(0.35, 0.42), 3)
+        gen_config["temperature"] = round(random.uniform(0.70, 0.75), 3)
 
     data = json.dumps(payload).encode("utf-8")
     cadence = _resolve_cadence_controller()
@@ -693,12 +724,12 @@ def synthesize_gemini_multispeaker_batch(
             part_item["speechMetadata"]["style"] = style_desc
         parts.append(part_item)
 
-    # Dynamic acting temperature for multi-speaker drama (strictly clamped between 0.35 and 0.52)
+    # Dynamic acting temperature for multi-speaker drama (calibrated between 0.65 and 0.85)
     if temperature is not None:
         jitter = random.uniform(-0.01, 0.01)
-        batch_temp = round(max(0.35, min(0.52, float(temperature) + jitter)), 3)
+        batch_temp = round(max(0.65, min(0.85, float(temperature) + jitter)), 3)
     else:
-        batch_temp = round(random.uniform(0.36, 0.42), 3)
+        batch_temp = round(random.uniform(0.72, 0.78), 3)
 
     payload = {
         "contents": [{

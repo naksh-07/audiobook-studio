@@ -15,6 +15,15 @@
 > **Strict TTS-Only API Invariant (Ponytail Standard v6.1)**:
 > All external LLM/text API calls across every subsystem (Pre-Production research, glossary extraction, translation collective, screenplay attribution, casting, model health pings) are **permanently deadbolted** at the `ModelGateway`, adapter, and lease levels. All creative intelligence and reasoning tasks are executed directly within **Antigravity via subagent invocations**. The keypool is 100% reserved for Google Gemini Flash TTS audio generation (`gemini-3.8-flash-tts`), eliminating token waste and API rate limit exhaustion.
 
+> [!TIP]
+> **Dual-Track Invariant & Side-by-Side Coexistence (ADR-030)**:
+> The platform natively supports simultaneous side-by-side coexistence of both the **Audible-Standard Studio Audiobook Engine** (-19.0 LUFS, verbatim prose preservation, anti-swap dialogue attribution, em-dash framing, `.m4b` container) and the **Conversational 2-Host Narrative & Technical Podcast Engine** (-16.0 LUFS, Sameer/Priya & Alex/Maya dynamics, $\le 22$ words breathability, 5-part retention arcs, stereo spatial staging, `.m4a`/`.mp3` containers). Both tracks share the unified dramaturgy core, 2,089-voice registry, and Option C TTS platform core while maintaining zero-leakage isolation between format adapters.
+
+> [!IMPORTANT]
+> **Universal Novel-Agnostic Dynamic Casting Architecture & Benchmark Entity Purge (ADR-030)**:
+> The entire engine codebase contains **zero hardcoded book titles, character rosters, entity names, or franchise lore**. All entity rosters, gender assignments, phonetic transliterations, and dialect traits are 100% dynamically derived at runtime from source text, `book_bible.json`, and dynamic LLM project profiling (`ProjectClassifier` / `BookDNAAgent`). Default benchmark vocabularies and entity leaks in `phonetic_transliteration.py` (`DEV_PHONETIC_VOCAB`), `character_caster.py`, and `lexical_scanner.py` have been purged in favor of pure runtime entity discovery.
+
+
 ---
 
 ## 🏗️ High-Level Option C Architecture
@@ -371,6 +380,7 @@ Room 3.5 implements **Option C: Shared Understanding & Voice Registry Core with 
 2. **Subsystem 1: Studio Casting Director (`StudioCastingDirector`)**:
    - **Hollywood Ensemble Prompting**: Enforces lead narrator transparency (`0.32` temperature), strict gender matching, dramatic vocal contrast across co-speakers, and regional Hindustani dialect matching (Haryanvi warriors/guards, Bhojpuri commoners/butchers, Awadhi healers/aristocracy, Bundeli foresters, Urdu courtly scholars).
    - **Anime Seiyū Child Rule Guard**: Strictly prohibits adult male baritones from voicing pre-pubescent children (age $< 13$). Automatically casts youthful female voices with bright upper harmonics (`hi-in-tutor-7`, `hi-in-tutor-9`, `Leda`).
+   - **100% Novel-Agnostic Dynamic Casting Architecture & Benchmark Entity Purge (ADR-030)**: Purged all legacy benchmark entity fallbacks (Geralt, Yennefer, Dandelion, Brokilon, Wyzima) from `phonetic_transliteration.py` (`DEV_PHONETIC_VOCAB`), `character_caster.py`, `lexical_scanner.py`, and `preproduction_supervisor.py`. Casting decisions, dialect assignments, and phonetic pronunciations are 100% dynamically derived from source book text, `book_bible.json`, and project classification with zero hardcoded franchise lore.
    - **Control Plane Gateway Routing**: Routes requests via [`execute_casting_llm()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/gateway_bridge.py) through [`ModelGateway.generate_text()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/core/models/gateway.py) with AntiBanGuard 11.0 RPM pacing and session affinity across the 123+ API key inventory.
    - **Immutable Project Persistence**: Anchors all decisions in `cast_lock.json` via [`CastLockManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/casting/cast_lock.py), dual-indexing by `character_id` and `character_name` to prevent character voice drift across chapters.
 
@@ -429,7 +439,7 @@ Room 4 implements the **Studio TTS Platform Core (Option C: Layered Shared Core 
 1. **Tier 1: Specialized Client Facades**:
    - **[`GenericTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/generic_client.py)**: Ad-hoc, low-latency ($<800\text{ms}$), single-utterance synthesis for CLI interactions (`audiobook-cli tts`), UI feedback, and voice auditions (`speak()`, `speak_to_bytes()`).
    - **[`LongFormTTSClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/long_form_client.py)**: Continuous full-chapter and novel narrative streaming (`synthesize_prose()`, `synthesize_chapter()`). Integrates a 4-tier semantic chunker (Scene $\to$ Paragraph $\to$ Sentence $\to$ Clause) and checkpoint caching (`checkpoint_manifest.json`) to eliminate autoregressive rate drift and redundant API costs.
-   - **[`MultiCastStudioClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/multi_cast_client.py)**: Full multi-character ensemble audio drama production (`produce_screenplay()`). Manages `cast_lock.json` persistent voice assignments, Anime Seiyū child casting patterns, anti-swap attribution verification, TakeBank multi-take auditioning, and conversational turn latencies.
+   - **[`MultiCastStudioClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/multi_cast_client.py)**: The unified default synthesis and mastering engine wired into `PipelineOrchestrator` (`orchestrator.py`) and `audiobook_cli.py`. Executes autonomous multi-character ensemble audio drama production (`produce_screenplay()`), resolving persistent voice locks from `cast_lock.json`, injecting dynamic character persona styles into `speechMetadata.style`, staging 2-speaker dialogue rallies with Cross-Gender gating, sculpting 4D parametric EQ formants, and directly executing Room 5 EBU R128 linear mastering (`MasteringEngineV2`) to output validated `ChapterMasterResult` with cryptographic ledgers.
 
 2. **Tier 2: Universal Input Guards & Normalization**:
    - **[`UniversalInputGuard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/guard/input_guard.py)**: Enforces Sacred Text vs Spoken Text immutability, NFC Unicode normalization, and C0 control character stripping.
@@ -457,9 +467,10 @@ Room 4 implements the **Studio TTS Platform Core (Option C: Layered Shared Core 
    - **[`FormantSculptor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/formant_sculptor.py)**: Pure Python 2nd-order biquad peaking EQ filters with headroom pre-attenuation ($10^{-G_{\max}/20}$) and soft tanh knee peak limiting ($\le 32,760$) across 7 presets (`WARM_BARITONE`, `CRISP_TENOR`, `BRIGHT_FEMALE`, `DEEP_RESONANT`, `ELDERLY_TEXTURED`, `CHILD_ANIME`, `NEUTRAL`).
    - **[`TakeBankManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/take_bank_manager.py)**: Multi-take candidate auditioning (`standard`, `restraint`, `vulnerable`, `exposed`) for high-stakes dramatic screenplay turns.
 
-6. **Room 4 vs Room 5 Pipeline Boundary**:
-   - **Room 4 Output Scope**: Room 4 strictly terminates with the rendered, edited dialogue stem (`stage="dialogue_stem"`). It guarantees pristine actor performance, 4D formant distinction, and zero double-pause stutters, but **strictly refrains from global EBU R128 loudness compression**.
-   - **Room 5 Hand-off**: Room 5 receives the uncompressed dialogue stem and executes global two-pass linear EBU R128 (-19.0 LUFS / -1.5 dBTP) broadcast mastering, SOXR 48kHz / 24-bit resampling, and chaptered `.m4b` container packaging.
+6. **Room 4 & Room 5 Pipeline Unification (`MultiCastStudioClient` & `MasteringEngineV2`)**:
+   - **Seamless Synthesis-to-Mastering Pipeline**: In the unified architecture (ADR-030), `MultiCastStudioClient.produce_screenplay()` coordinates the entire sequence: screenplay ingestion $\to$ pre-flight attribution audit $\to$ dynamic persona injection $\to$ Gemini Flash TTS synthesis $\to$ 4D formant sculpting $\to$ dialogue editorial stitching into a premaster WAV $\to$ direct invocation of Room 5 [`MasteringEngineV2`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering_engine.py).
+   - **Room 5 Broadcast Standards**: `MasteringEngineV2` executes two-pass linear EBU R128 normalization (-19.0 LUFS integrated loudness, -1.5 dBTP true peak ceiling, Kaiser sinc 48kHz / 24-bit studio pipeline, and triangular dither), generating authoritative `*_mastering_ledger.json` cryptographic ledgers.
+
 
 *For complete specification details, see [`docs/TTS_PLATFORM_CORE_SPECIFICATION.md`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/TTS_PLATFORM_CORE_SPECIFICATION.md).*
 
@@ -476,14 +487,25 @@ Room 5 constitutes the **Pro-Grade AI Vocal Mastering Workstation (Phase 6)**, e
 2. **Immutable Contracts & Schemas** ([`contracts.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py)):
    - Governed by strongly-typed Pydantic v2 schemas: [`IngestionConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L15), [`SegmentAudioContract`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L26), [`ChapterMasterContract`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L68), [`DSPConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L87), [`DSPMasteringResult`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L107), [`AudioQAConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L121), [`SegmentQAEvaluation`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L136), [`ChapterQAReport`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L154), [`EnhancerConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L168), [`ReferenceMatcherConfig`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/contracts.py#L178).
 
-3. **Phase 1: C++ JUCE Vocal DSP Engine** ([`dsp.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py)):
-   - [`VocalDSPProcessor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py#L65): In-memory C++ JUCE mastering via **Spotify Pedalboard** and ITU-R BS.1770-4 loudness compliance via **Pyloudnorm**.
-   - **4-Band Parametric Vocal EQ**:
-     - `HighpassFilter(75 Hz)`: Subsonic rumble cut without sacrificing narrator baritone warmth.
-     - `PeakFilter(320 Hz, -1.5 dB, Q=1.2)`: Attenuates chest resonance and boxiness.
-     - `PeakFilter(3.2 kHz, +0.8 dB, Q=1.0)`: Lifts presence and consonant clarity in the speech intelligibility corridor.
-   - **Optical Vocal Compression**: `Compressor(threshold=-18 dB, ratio=2.5:1, attack=25ms, release=120ms)` for transparent leveling.
-   - **Lookahead True Peak Limiter**: Clamped strictly to $\le -1.5\text{ dBTP}$ with 40ms release window.
+3. **Phase 1: Studio 10/10 C++ JUCE Vocal DSP Engine** ([`dsp.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py)):
+   - [`VocalDSPProcessor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/audio/dsp.py#L65): In-memory C++ JUCE mastering via **Spotify Pedalboard**, ITU-R BS.1770-4 loudness compliance via **Pyloudnorm**, and vectorized SciPy signal processing:
+   - **Audible ACX Standard Room Tone Bed & Framing**:
+     - Pre-rolls exact **0.75s lead-in** and appends **3.0s trailing** continuous shaped comfort room tone (-65 dBFS, 800Hz low-pass) with 25ms raised-cosine Hann cross-dissolve to satisfy Audible ACX ingestion standards.
+   - **Vectorized Dynamic Split-Band Lookahead De-Esser**:
+     - 5.5 kHz 2nd-order Butterworth crossover with complementary phase-coherent split.
+     - Single-pole IIR envelope detector (2ms attack / 35ms release) dynamically attenuates sibilance spikes (-24 dBFS threshold, 3:1 ratio, max -7 dB attenuation) without dulling natural consonants.
+   - **4-Band Parametric Resonance Sculptor & Silky Air Sheen**:
+     - `HighpassFilter(65 Hz)`: Subsonic plosive cut preserving male baritone chest fundamental.
+     - `PeakFilter(300 Hz, -3.5 dB, Q=1.1)`: Eliminates cardboard-box low-mid boominess.
+     - `PeakFilter(500 Hz, -1.2 dB, Q=1.8)`: Eliminates nasal/hollow plastic resonance.
+     - `PeakFilter(3.6 kHz, +2.2 dB, Q=1.1)`: Boosts core speech intelligibility corridor from 1.7% to 3.7%.
+     - `HighShelfFilter(10.5 kHz, +1.8 dB)`: Restores airy silky sheen (>9.5kHz) characteristic of studio condenser microphones.
+   - **Downward Noise Expander & Two-Stage Vocal Dynamics**:
+     - `NoiseGate(threshold=-55 dB, ratio=1.8:1, attack=8ms, release=180ms)`: Downward expander pushing room pauses below -65 dBFS.
+     - **Stage 1 (Fast Peak Tamer)**: `Compressor(threshold=-14 dB, ratio=2.2:1, attack=4ms, release=45ms)` taming dynamic bursts.
+     - **Stage 2 (Smooth Opto RMS Leveler)**: `Compressor(threshold=-22 dB, ratio=1.8:1, attack=30ms, release=220ms)` gluing speech body.
+   - **4x Oversampled True Peak Brickwall Limiter**:
+     - `BrickwallLimiter(ceiling_db=-1.5, release_ms=40ms, true_peak=True)`.
    - **Headless VST3 Plugin Hosting**: Supports optional dynamic 64-bit VST3 plugin bundle insertion (`vst3_plugin_path`).
    - **Deterministic FFmpeg Dual-Pass Fallback**: If Pedalboard is absent, automatically activates dual-pass linear `loudnorm` at `-19.0 LUFS` integrated target.
 

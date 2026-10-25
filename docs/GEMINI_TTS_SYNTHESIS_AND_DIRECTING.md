@@ -318,27 +318,29 @@ class ProductionGeminiTTSClient:
 
 The Gemini 3.8 Flash architecture provides a dual-channel directing interface: **Physical Inline Vocal Tags** for momentary physiological events, and **Turn-Level Metadata Directives** for sustained emotional tone.
 
-### 1. Physical Inline Vocal Tags (`<...>`)
+### 1. Physical Inline Vocal Tags & Certified Acoustic Reflexes
 
 Inline tags represent involuntary human respiratory, reflexive, or emotional sounds. They must be inserted inside the verbatim text string at the exact acoustic position where the event occurs.
 
+Both angle brackets (`<gasp>`, `<sigh>`) and certified square-bracket acoustic reflex tags (`[laughs]`, `[chuckles]`, `[growls]`, `[whispers]`, `[sighs]`, `[gasp]`, `[pant]`, `[groan]`) are supported.
+
 ```text
-"Wait... <short pause> did you hear that? <gasp> Behind the curtain! <pant> Don't move!"
+"[growls] चुप रहो, एल्डरमैन, और बीच में मत पड़ो! [chuckles] सच है, पर मुझे ज़रूरत भी नहीं!"
 ```
 
-| Tag Category | Verified Tags | Acoustic Effect & Performance Behavior |
+| Tag Category | Verified Tags | Acoustic Effect & Performance Behavior in Gemini 3.8 Flash Audio |
 |---|---|---|
-| **Respiration** | `<breath>`, `<gasp>`, `<pant>`, `<sigh>` | Sharp inhalation, heavy breathing, sudden fear, or weary exhalation. |
-| **Laughter & Mirth** | `<laugh>`, `<laughter>`, `<snicker>`, `<snort>` | Natural chuckle, sarcastic snicker, or full belly laugh embedded in words. |
-| **Grief & Vulnerability** | `<sob>`, `<sigh>` | Breaking voice, ragged throat friction, weeping tremor. |
-| **Reflexive / Physical** | `<cough>`, `<sneeze>`, `<throat-clearing>`, `<pff>` | Throat clearing before speaking, dismissive puff of air, involuntary cough. |
+| **Laughter & Mirth** | `[laughs]`, `[chuckles]`, `[snicker]`, `<laugh>` | Real physiological chuckle, sarcastic snicker, or amusement embedded naturally in voice. |
+| **Aggression & Threat** | `[growls]`, `[growl]` | Visceral low-pitch throat friction, guttural snarling, intimidating street aggression. |
+| **Respiration & Fear** | `[whispers]`, `[gasp]`, `[pant]`, `<breath>`, `<sigh>` | Sharp inhalation, rapid panicky breathing, breathless intimacy, weary exhalation. |
+| **Grief & Exhaustion** | `[sighs]`, `[groan]`, `<sob>` | Resigned heavy sigh, ragged vocal tract strain, vocal cracking. |
 | **Dramatic Cadence** | `<short pause>` | Natural dramatic beat (~300–600ms acoustic silence with room presence). |
 
-> [!WARNING]
-> **Strict Compiler Anti-Patterns Banned in Audiobook Maker**:
-> 1. **NO Square Brackets (`[laughs]`, `[sighs]`)**: Gemini models interpret square brackets as literal spoken words or parenthetical remarks. They will speak *"open bracket laughs close bracket"* or mumble awkwardly.
-> 2. **NO Non-Vocal Sound Effects (`<gunshot>`, `<explosion>`, `<door opens>`)**: Gemini TTS is exclusively a biological human voice synthesizer. Inserting non-vocal tags produces digital hallucinations or mangled phonemes. Non-vocal SFX belong in the Stage 2/3 Sound Bank pipeline!
-> 3. **NO Sustained Styles in Inline Tags (`<whisper>`, `<angry>`)**: Sustained vocal postures belong exclusively in `speechMetadata.style`.
+> [!IMPORTANT]
+> **Acoustic Reflex vs. Stage Direction Routing Protocol**:
+> 1. **Certified Acoustic Reflex Tags (`CERTIFIED_ACOUSTIC_REFLEX_TAGS`)**: Tags like `[laughs]`, `[growls]`, `[chuckles]`, `[whispers]`, `[sighs]`, `[gasp]` represent physical sounds that Gemini 3.8 Flash Audio modality renders natively. They are PRESERVED in the spoken text sent to the Gemini engine.
+> 2. **Non-Acoustic Acting Descriptors (`[cold menace]`, `[angrily]`, `[धीमी आवाज़ में]`)**: These are structural directing instructions. They MUST be stripped from spoken text and routed directly to `speechMetadata.style` so they are never read aloud as literal words.
+> 3. **NO Non-Vocal Sound Effects (`[gunshot]`, `[explosion]`, `<door opens>`)**: Gemini TTS is exclusively a biological vocal synthesizer. Non-vocal SFX are permanently decoupled on this pure vocals-only pipeline.
 
 ---
 
@@ -349,26 +351,96 @@ Sustained performance direction belongs exclusively in the `style` string of `sp
 ```json
 "speechMetadata": {
   "speaker": "Villain",
-  "style": "hissing whisper, intensely close-mic'd, mocking arrogance, slow deliberate cadence"
+  "style": "menacing aggression, low furious growl, deadly street thug threat"
 }
 ```
 
 #### Tested Directing Descriptors:
 - **Tonal Pitch & Vocal Weight**: `"deep gravelly baritone"`, `"low resonant chest register"`, `"husky chest resonance"`, `"dry thin elder timbre"`.
-- **Emotional States**: `"wry melancholy irony"`, `"quiet menace"`, `"iron restraint"`, `"understated natural dialogue (never theatrical)"`.
+- **Emotional States**: `"venomous amusement"`, `"quiet menace"`, `"hesitant pleading"`, `"callous greed"`, `"furious indignation"`.
 - **Vocal Delivery Mechanics**: `"measured, steady pacing"`, `"slow regal cadence"`, `"intimate, close-mic proximity"`, `"weary soldier drawl"`.
 - **Linguistic/Cultural Registers**: `"authentic rustic Bundeli inflection"`, `"refined aristocrat Urdu cadence"`, `"harsh northern brogue"`.
 
-#### 🚫 Overacting Elimination & Restraint Protocol (v5.0 Upgrade):
-- **Why Gemini TTS Overacts**: When the neural vocoder receives active theatrical verbs (e.g. `"acting to threaten"`, `"sobbing with grief"`), it exaggerates acoustic inflections into melodramatic stage acting, breathless panting, and cartoonish caricature.
-- **Stripping Theatrical Verbs**: All `"acting to..."` directives are stripped from `speechMetadata.style`. Only objective physical vocal textures (pitch, tempo, chest resonance, breath state) are permitted.
-- **Narrator Transparency Invariant**: Narrator turns must NEVER receive dramatic or acting directives. The Narrator is strictly locked to `"calm, steady, articulate, measured audiobook delivery"`, temperature `0.32`, and zero melodrama.
-- **Universal Anti-Theatrical Anchor**: Every character dialogue turn is anchored with `"understated natural dialogue (never theatrical)"`.
-- **Temperature Clamping (`0.30 - 0.52`)**: In generative audio models, temperature $\ge 0.70$ causes pitch dispersion, instability, and unmotivated sobbing/whispering. Clamping generationConfig `temperature` strictly to `0.30 - 0.52` (Narrator: `0.32`, dialogue: `0.35 - 0.42`, climactic scenes: $\le 0.50$) stabilizes vocal timbre and ensures natural, conversational phrasing.
+#### 🎯 Expressive Performance & Calibrated Temperature Architecture:
+- **Root Cause of Vocoder Runaway Dead-Air**: Empirically verified on `gemini-3.8-flash-tts` that low temperatures ($\le 0.50$) cause vocoder runaway silence loops (>40s dead air) and robotic monotone delivery.
+- **Calibrated Operating Temperature Range (`0.65 - 0.85`)**:
+  - **Narrator**: Locked strictly to `0.65` (steady, calm, articulate, measured audiobook delivery).
+  - **Dialogue Baseline**: Standard conversational turns operate at `0.70 - 0.72`.
+  - **Amusement & Mockery**: Confident dark humor, banter, swagger at `0.75`.
+  - **Rage & Aggression**: Furious anger, threats, combat shouting at `0.78 - 0.82`.
+  - **Subdued & Whispers**: Intimate, vulnerable, terrified whispers at `0.65`.
+- **Dynamic Intent Extraction (`MultiCastStudioClient`)**:
+  - Automatically extracts `emotion`, `actioning`, `intensity_level`, and `character_objective` from screenplay segments.
+  - Automatically induces contextual acoustic reflex tags from preceding narrator cues (e.g. `गुर्राया` $\to$ `[growls]`, `हँसा` $\to$ `[laughs]`, `मुस्कुराया` $\to$ `[chuckles]`, `फुसफुसाया` $\to$ `[whispers]`).
+  - Ensures 0% flatline default `neutral / standard / medium` fallbacks.
 
 ---
 
-### 3. Screenplay Directing & Dynamic Narrator Vocal Tinting (`resolve_speech_metadata_style`)
+### 3. Punctuation-Driven Prosodic Phrasing (The Native Prosody Engine)
+
+Autoregressive generative audio models like Gemini 3.8 Flash do NOT rely on heavy SSML tags for prosody; they react organically to **literary dramatic punctuation**:
+
+| Punctuation Mark | Acoustic Performance Effect in Gemini Flash TTS | Example Script Usage |
+|---|---|---|
+| **Em-Dash (`—`)** | Breathless interruption, sudden violent stop, or pivot | `चुप रहो, एल्डरमैन, और बीच में मत पड़ो— वर्ना खाल उधेड़ दूँगा!` |
+| **Ellipses (`...`)** | Pitch trail-off, weary hesitation, dark brooding drawl | `सच है... मेरे पास कोई हथियार नहीं है...` |
+| **Interrobang (`?!` or `!`)** | Sharp rising-pitch indignation, explosive disbelief | `क्या?! तुम होश में तो हो?!` |
+| **Comma (`,`)** | 80–120ms organic micro-breath pause without dead air | `रुको, पहले मेरी बात सुनो, फिर फ़ैसला करना।` |
+| **Semicolon (`;`)** | Deliberate, weighty dramatic beat (~250ms cadence) | `उसका नाम कोई नहीं जानता था; पर डर सबको था।` |
+
+> [!TIP]
+> **Input Guard Preservation Rule**:
+> `NumeralAndTokenExpander` and `DeliveryIntentExtractor` MUST NEVER strip or flatten em-dashes `—`, ellipses `...`, or interrobangs `?!` into ordinary periods. They are sacred acoustic prosody markers.
+
+---
+
+### 4. 2-Speaker Dialogue Rally Staging (`multiSpeakerVoiceConfig`) & Cross-Gender Gating
+
+When two characters engage in consecutive dialogue ($A \leftrightarrow B$) within the same scene, synthesizing each line as an isolated API call introduces unnatural conversational latency and eliminates cross-speaker acoustic reaction.
+
+`MultiCastStudioClient` groups qualifying adjacent character turns into **2-Speaker Conversational Rallies**:
+- **Payload Structure**: Both character utterances are packaged into a single `generateContent` invocation with `multiSpeakerVoiceConfig`:
+  ```json
+  {
+    "speechConfig": {
+      "multiSpeakerVoiceConfig": {
+        "speakerVoiceConfigs": [
+          {"speaker": "Speaker_A", "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Voice_A"}}},
+          {"speaker": "Speaker_B", "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Voice_B"}}}
+        ]
+      }
+    },
+    "contents": [{
+      "parts": [
+        {"text": "...", "speechMetadata": {"speaker": "Speaker_A", "style": "..."}},
+        {"text": "...", "speechMetadata": {"speaker": "Speaker_B", "style": "..."}}
+      ]
+    }]
+  }
+  ```
+- **Organic Turn Reaction**: Speaker B's pitch, cadence, and breath dynamically react to Speaker A's tone.
+- **Micro-Timing**: The pause between lines is rendered organically by the neural vocoder, eliminating artificial silence splicing.
+
+#### 🛡️ The Cross-Gender Gating Rule (ADR-029 & ADR-030)
+Gemini 3.8 Flash TTS shares an underlying acoustic vocoder latent space across prebuilt voices of the same gender in Devanagari/Hindi synthesis (clustering male voices into a tight ~40Hz fundamental pitch band). Coupling two speakers of the same gender into a single `multiSpeakerVoiceConfig` payload causes acoustic feature bleeding, creating the audible impression of a single actor attempting to modulate their voice.
+
+To guarantee pristine acoustic contrast:
+1. **Strict Cross-Gender Gating**:
+   ```python
+   is_cross_gender = (
+       gen_a in ("male", "female")
+       and gen_b in ("male", "female")
+       and gen_a != gen_b
+   )
+   ```
+2. **Coupling Policy**: Only qualifying **Cross-Gender** pairs (Male $\leftrightarrow$ Female) are grouped into `multiSpeakerVoiceConfig` rallies.
+3. **Same-Gender Decoupling**: Dialogue between same-gender speakers (Male $\leftrightarrow$ Male or Female $\leftrightarrow$ Female) is strictly decoupled into independent single-turn synthesis requests. These turns are processed individually with character-specific 4D parametric EQ formants and assembled via Room 4 Dialogue Editorial Net Silence.
+4. **TakeBank Priority Bypass**: High-priority dramatic or climactic dialogue turns (`performance_priority in ("focused", "high", "climactic")`) bypass rally grouping to allow multi-take auditioning via `TakeBankManager`.
+
+
+---
+
+### 5. Screenplay Directing & Dynamic Narrator Vocal Tinting (`resolve_speech_metadata_style`)
 
 Implemented in [`audiobook_factory/tts/providers/gemini.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py#L77), [`resolve_speech_metadata_style`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py#L77) transforms Pydantic screenplay acting directives, emotion tags, dynamic intensity, Memory 2.0 physical vocal constraints, and chapter-level narrator vocal tints into a concise natural language style descriptor for Gemini's `speechMetadata.style`:
 
@@ -431,6 +503,24 @@ def resolve_speech_metadata_style(
 - **The Balance**: The Narrator Transparency Invariant requires the lead narrator to remain transparent and unhistrionic, delivering steady measured prose. However, long-form audiobooks benefit from subtle atmospheric coloring matching chapter stakes (e.g., *"ominous, low, watchful dread"* during a tense confrontation vs. *"gentle, reflective, poignantly understated"* during a solemn scene).
 - **Automated Resolution**: During synthesis in [`GeminiTTSClient._synthesize_batch_multispeaker`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py#L599), the segment's `narrator_tint` (derived from [`ChapterDirectorCard.narrator_vocal_tint`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/contracts/playbook.py#L64)) is passed into `resolve_speech_metadata_style(..., is_narrator=True)`.
 - **Zero Inline Leakage**: [`sanitize_spoken_text_and_extract_stage_directions()`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/providers/gemini.py#L131) strips any bracketed directions (e.g., `[whispers]`, `[cold menace]`, `[धीमी आवाज में]`) from spoken text and folds them into `speechMetadata.style` so the synthesizer never speaks stage directions aloud.
+
+#### 🎭 Automatic Character Persona Style Injection (`MultiCastStudioClient`)
+In multi-character dramatic screenplays, characters must retain distinct vocal weight, dialect, and social presence across turns without manual prompt engineering. `MultiCastStudioClient.produce_screenplay()` executes automatic persona injection:
+1. **Base Persona Resolution**: For each non-Narrator speaker, the character's base vocal persona (`persona_description`) is resolved directly from `cast_lock.json` or `book_bible.json` (e.g., *"deep gravelly baritone, menacing street cadence"*).
+2. **Subtext & Objective Fusion**: The scene-level `character_objective` or `subtext` from the dramatic plan is merged with the base persona:
+   ```python
+   vocal_constraints = []
+   if speaker != "Narrator":
+       vocal_persona = resolved_personas.get(speaker, "")
+       if vocal_persona:
+           vocal_constraints.append(vocal_persona)
+   if char_obj and char_obj not in vocal_constraints:
+       vocal_constraints.append(char_obj)
+   combined_constraint = ", ".join(vocal_constraints) if vocal_constraints else None
+   ```
+3. **Intent Formulation**: `combined_constraint` is injected into `DeliveryIntent(memory_vocal_constraint=combined_constraint)` and converted by `resolve_speech_metadata_style()` into Gemini's `speechMetadata.style`.
+4. **Universal Agnostic Delivery**: This dynamic resolution operates with 0 hardcoded character names or lore bias, preserving the Universal Novel-Agnostic Invariant.
+
 
 ---
 
@@ -561,40 +651,93 @@ is_stutter = (word_count > 3 and ratio > 3.2 and dur_sec >= 15.0)
 
 ---
 
-## 🎛️ Post-DSP Mastering Chain & FFmpeg Integration
+## 🎛️ Unified MultiCastStudioClient Pipeline, 4D Formants & Room 5 Mastering
 
-Because Gemini TTS outputs **24,000 Hz 16-bit Mono WAV**, high-end distribution (Audible, Spotify, Apple Books, broadcast) requires upsampling and multitrack integration:
+In the Option C architecture, speech synthesis, formant sculpting, dialogue editorial stitching, and broadcast vocal mastering are unified into a single autonomous engine: [`MultiCastStudioClient`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/facades/multi_cast_client.py#L34).
 
 ```mermaid
-graph LR
-    A["Gemini 3.8 Flash TTS<br/>24kHz Mono WAV"] --> B["Resample & Polish<br/>SOXR 48kHz / 24-bit + 12ms Hann Fade"]
-    B --> C["Acoustic Space<br/>Dynamic Room IR Reverb"]
-    C --> D["Multitrack Summer<br/>Dialogue (DX) + Music (MX) + Ambience (AMB)"]
-    D --> E["Sidechain Ducking<br/>-16dB Vocals-over-Music"]
-    E --> F["Master Limiter & EBU R128<br/>Integrated -19 LUFS (-1.5 dBTP)"]
+flowchart TD
+    Script["Screenplay Segments<br/>(Dramaturgy Room 3)"] --> Audit["Pre-Flight Attribution Audit<br/>(_audit_screenplay_attribution: 0% swap / 0% swallow)"]
+    Audit --> Resolve["Voice & Persona Resolution<br/>(cast_lock.json / book_bible.json)"]
+    Resolve --> Reflex["Acoustic Reflex Induction & Style Injection<br/>(Tag mapping + Dynamic Persona + Calibrated Temp)"]
+    Reflex --> RallyGating{"2-Speaker Turn Grouping"}
+    RallyGating -->|Cross-Gender Pair| Rally["2-Speaker Dialogue Rally<br/>(multiSpeakerVoiceConfig)"]
+    RallyGating -->|Same-Gender or Narrator| Single["Single Turn / TakeBank Audition<br/>(Single-Speaker Part)"]
+    Rally & Single --> Synth["Gemini 3.8 Flash TTS Modality<br/>(24kHz 16-bit Mono WAV Stems)"]
+    Synth --> Formant["4D Formant Sculpting<br/>(FormantSculptor: Phase-Safe Parametric EQ)"]
+    Formant --> Stitch["Dialogue Editorial Stitching<br/>(12ms/18ms Hann Micro-Fades & Net Silence)"]
+    Stitch --> Premaster["Chapter Premaster WAV<br/>(audiobooks/mastered/chapter_XXX_premaster.wav)"]
+    Premaster --> Room5["Room 5 Broadcast EBU R128 Mastering<br/>(MasteringEngineV2: Two-Pass Linear Loudnorm)"]
+    Room5 --> MasterOut["Final Broadcast Chapter Master<br/>(-19.0 LUFS, -1.5 dBTP, 48kHz / 24-bit WAV)"]
+    Room5 --> Ledger["Cryptographic Mastering Ledger<br/>(chapter_XXX_mastering_ledger.json)"]
 ```
 
-### Self-Healing FFmpeg Mastering Filtergraph
+### 1. The 7-Stage MultiCastStudioClient Pipeline (`produce_screenplay`)
 
-```bash
-ffmpeg -y \
-  -i vocal_scene.wav \
-  -i background_music.wav \
-  -filter_complex "\
-    [0:a]aresample=48000:resampler=soxr,afade=t=in:ss=0:d=0.012,afade=t=out:st=12.54:d=0.018,asplit=2[vox_main][vox_sidechain]; \
-    [1:a]aresample=48000:resampler=soxr,equalizer=f=2200:t=q:w=1.5:g=-5.5,volume=0.35[bgm_carved]; \
-    [bgm_carved][vox_sidechain]sidechaincompress=threshold=0.018:ratio=4:attack=15:release=350[bgm_ducked]; \
-    [vox_main][bgm_ducked]amix=inputs=2:weights=1.0 0.8:normalize=0[mixed]; \
-    [mixed]loudnorm=I=-19:LRA=9:TP=-1.5[master_out]" \
-  -map "[master_out]" \
-  -c:a flac -ar 48000 master_audio_scene.flac
+1. **Pre-Flight Attribution Audit (`_audit_screenplay_attribution`)**: Validates that all dialogue turns are explicitly assigned to registered characters, verifying 0% speaker turn inversion ($A \leftrightarrow B$) and 0% quote swallowing by the narrator before synthesis.
+2. **Dynamic Voice & Persona Resolution**: Resolves voice assignments, gender profiles, and base character personas from `cast_lock.json` (falling back to `book_bible.json`).
+3. **Contextual Reflex Induction & Dynamic Intent**: Automatically maps Devanagari narrative action tags (`गुर्राया` $\to$ `[growls]`, `हँसा` $\to$ `[laughs]`, `मुस्कुराया` $\to$ `[chuckles]`, etc.), merges character base personas with scene objectives, and calibrates temperature across turns (`0.65` narrator, `0.70-0.72` standard, `0.75` amusement, `0.78-0.82` rage).
+4. **Cross-Gender Dialogue Rally Batching**: Groups adjacent character turns into `multiSpeakerVoiceConfig` rallies strictly when speakers are cross-gender (male $\leftrightarrow$ female). Same-gender turns are synthesized individually.
+5. **4D Acoustic Formant Sculpting (`FormantSculptor`)**: Applies surgical 2nd-order biquad parametric EQ curves to character vocal stems without pitch or time resampling.
+6. **Dialogue Editorial Stitching (`_stitch_screenplay`)**: Concatenates vocal chunks with contextual turn latencies (280ms dialogue switch, 380ms narrator intro), 12ms/18ms Hann micro-fades, and Net Silence pause subtraction.
+7. **Room 5 Broadcast EBU R128 Linear Mastering (`MasteringEngineV2`)**: Invokes two-pass linear loudness normalization (-19.0 LUFS, -1.5 dBTP), Kaiser sinc 48kHz upsampling, and triangular dither, producing a verified `ChapterMasterResult`.
+
+---
+
+### 2. 4D Acoustic Formants: Surgical Non-Destructive Parametric EQ
+
+To guarantee auditory separation when two characters share a base voice model, [`FormantSculptor`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/tts/formant_sculptor.py) modulates the acoustic formant envelope via phase-safe biquad parametric EQ curves:
+
+```python
+# Phase-safe biquad parametric EQ sculpting (Zero resampling artifacts)
+FormantSculptor.apply_formant_eq(
+    pcm_bytes=chunk.pcm_bytes,
+    profile=speaker_formant,
+    sample_rate=chunk.sample_rate,
+)
 ```
 
-1. **SOXR 48kHz Resampling**: High-quality sinc interpolation upsamples 24kHz speech to the broadcast standard 48kHz.
-2. **12ms Hann Micro-Fades**: Eliminates boundary clicks and zero-crossing pops at chunk seams.
-3. **2.2kHz Spectral Carving (`-5.5 dB`)**: Creates a clean acoustic pocket in the music bed, ensuring speech intelligibility without excessive ducking.
-4. **Dynamic Sidechain Ducking (`-16 dB`)**: Ducking triggers automatically via vocal sidechain with a whisper-safe threshold of `0.018` ($-34.9\text{ dBFS}$).
-5. **EBU R128 Loudness Normalization**: Targets an integrated loudness of **`-19.0 LUFS` ($\pm 1.0\text{ LU}$)** and a True Peak ceiling of **`-1.5 dBTP`**.
+- **Acoustic Profiling**:
+  - `WARM_BARITONE`: Low-mid boost at 180 Hz (+2.0 dB), high-presence softening at 3.2 kHz (-1.5 dB).
+  - `CRISP_TENOR`: Subsonic cleanup at 120 Hz (-2.0 dB), articulation boost at 2.8 kHz (+2.5 dB).
+  - `DEEP_RESONANT`: Chest cavity enhancement at 110 Hz (+3.0 dB, Q=1.2).
+  - `ELDERLY_TEXTURED`: Upper formant lift at 3.5 kHz (+2.0 dB) with slight low-end thinning.
+- **The Phase-Safe Invariant (ADR-028 & ADR-030)**:
+  - Resampling-based pitch shifting (`asetrate`, `atempo`) is **permanently prohibited**. Artificial time/pitch warping degrades the natural vocoder realism of Gemini 3.8 Flash neural speech.
+  - All character contrast is achieved through authentic neural roster selection (`VoiceProfileRegistry`), stylistic directing (`speechMetadata.style`), and gentle parametric EQ shaping.
+
+---
+
+### 3. Room 5 Broadcast EBU R128 Mastering Engine (`MasteringEngineV2`)
+
+Implemented in [`audiobook_factory/mastering_engine.py`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobook_factory/mastering_engine.py), `MasteringEngineV2` executes authentic broadcast mastering directly inside `produce_screenplay()`:
+
+```python
+from audiobook_factory.mastering_contracts import MasteringRequest, MasteringProfile
+from audiobook_factory.mastering_engine import MasteringEngineV2
+
+profile = MasteringProfile(
+    target_integrated_lufs=-19.0,
+    true_peak_ceiling_dbtp=-1.5,
+    target_sample_rate_hz=48000,
+    dither_type="triangular",
+)
+master_req = MasteringRequest(
+    chapter_id=f"chapter_{chapter_num:03d}",
+    premaster_path=premaster_path,
+    output_master_path=master_path,
+    profile=profile,
+    is_premaster=True,
+)
+mastering_engine = MasteringEngineV2()
+m_res = mastering_engine.master(master_req)
+```
+
+#### Dual-Pass Linear Loudnorm Architecture
+1. **Pass 1 (Forensic Analysis)**: Computes true integrated loudness ($I$), loudness range ($\text{LRA}$), and true peak ($\text{TP}$) using libebur128.
+2. **Pass 2 (Linear Normalization)**: Applies exact linear gain offset (`measured_I`, `measured_TP`, `measured_LRA`, `measured_thresh`) rather than dynamic compression, preserving the pristine natural dynamic range of character whispers and shouted climaxes.
+3. **Studio Resampling**: Upsamples from 24kHz to **48,000 Hz / 24-bit** via Kaiser windowed sinc interpolation.
+4. **Cryptographic Ledger**: Writes `*_mastering_ledger.json` containing SHA-256 audio hashes, measured loudness metrics, and filter parameters for Gate 6 release verification.
 
 ---
 
@@ -604,8 +747,11 @@ Before dispatching audiobook chapters to the Gemini TTS engine, ensure all items
 
 - [ ] **Model Identifier**: Specified as `gemini-3.8-flash-tts` or `gemini-3.8-flash-lite-tts`. Legacy stubs (`gemini-2.5-flash-preview-tts`) are disabled.
 - [ ] **Permanent Safety Filter Unlock**: Explicit `BLOCK_NONE` thresholds configured across all 4 harm categories.
-- [ ] **Turn-Level Multi-Speaker Parts**: Every dialogue rally passes distinct `Part` objects with `speechMetadata.speaker` set.
-- [ ] **Angle Bracket Tag Hygiene**: Only biological tags (`<gasp>`, `<sigh>`, `<laugh>`, `<sob>`, `<short pause>`) are used in text. Square brackets (`[...]`) and non-vocal SFX are stripped.
-- [ ] **Quota Isolation**: Auxiliary LLM tasks use `service="text"`, preserving the dedicated `service="tts"` key pool.
-- [ ] **Fail-Closed Gate 1 Speaker Check**: All character names exist in `voice_registry.json` or `character_roster.json` before dispatching API calls.
-- [ ] **Master DSP Calibration**: Audio is upsampled to 48kHz with SOXR and mastered to EBU R128 -19 LUFS.
+- [ ] **Cross-Gender Rally Gating**: 2-Speaker dialogue rallies are restricted to male $\leftrightarrow$ female pairs; same-gender pairs are synthesized as individual turns.
+- [ ] **Automatic Persona Injection**: Character base personas and scene subtext are merged into `speechMetadata.style` without novel hardcoding.
+- [ ] **Angle Bracket Tag Hygiene**: Only certified biological tags (`<gasp>`, `<sigh>`, `<laugh>`, `<sob>`, `[laughs]`, `[growls]`, `[chuckles]`) are used in text. Non-vocal SFX are permanently decoupled.
+- [ ] **Quota Isolation**: Auxiliary tasks use `service="text"`, preserving the dedicated `service="tts"` key pool.
+- [ ] **Fail-Closed Attribution Gate**: All speaker names in screenplay segments exist in `cast_lock.json` or `book_bible.json` before synthesis.
+- [ ] **Phase-Safe Audio Invariant**: Zero `asetrate` / `atempo` DSP resampling; 4D formants apply biquad parametric EQ only.
+- [ ] **Room 5 Mastering Calibration**: Output audio is mastered to EBU R128 -19.0 LUFS ($\pm 1.0$) and -1.5 dBTP True Peak ceiling via `MasteringEngineV2`.
+

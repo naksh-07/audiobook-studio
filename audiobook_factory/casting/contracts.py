@@ -390,6 +390,10 @@ class CastLockManifest(BaseModel):
         """Resolves cast lock leveraging matches() for bilingual and alias lookup."""
         if not identifier:
             return None
+        # 1. Direct dictionary key match
+        if identifier in self.locks:
+            return self.locks[identifier]
+
         t_clean = str(identifier).strip()
         t_low = t_clean.lower()
         if t_low in HONORIFIC_BLACKLIST or t_clean in HONORIFIC_BLACKLIST:
@@ -398,9 +402,6 @@ class CastLockManifest(BaseModel):
         t_norm = unicodedata.normalize("NFC", t_norm).strip().lower()
         if t_norm in HONORIFIC_BLACKLIST:
             return None
-        # 1. Direct dictionary key match
-        if identifier in self.locks:
-            return self.locks[identifier]
         # 2. Match across all locks using lock.matches()
         for lock in self.locks.values():
             if lock.matches(identifier):

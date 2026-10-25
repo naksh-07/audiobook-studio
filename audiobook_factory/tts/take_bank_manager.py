@@ -87,7 +87,7 @@ class TakeBankManager:
         self,
         base_request: CanonicalTTSRequest,
         priority: str = "standard",
-        model: str = "gemini-3.8-flash",
+        model: str = "gemini-3.8-flash-tts",
     ) -> List[CandidateTake]:
         """
         Generates candidate takes based on performance priority and evaluates their quality.
@@ -152,7 +152,7 @@ class TakeBankManager:
         self,
         base_request: CanonicalTTSRequest,
         priority: str = "standard",
-        model: str = "gemini-3.8-flash",
+        model: str = "gemini-3.8-flash-tts",
     ) -> Tuple[SynthesizedAudioChunk, Optional[AudioValidationResult], List[CandidateTake]]:
         """
         Convenience method that generates candidate takes and returns the selected best take.

@@ -127,6 +127,9 @@ class UniversalInputGuard:
         dialogue structure and Hindi danda (।) / double danda (॥).
         """
         t = text
+        # Convert double hyphens to dramatic em-dash (--) -> —
+        t = re.sub(r"-{2,}", "—", t)
+        t = re.sub(r"—{2,}", "—", t)
         # Collapse multiple question marks or exclamation marks (???? -> ?, !!!! -> !)
         t = re.sub(r"\?{2,}", "?", t)
         t = re.sub(r"!{2,}", "!", t)

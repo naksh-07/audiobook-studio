@@ -60,12 +60,16 @@ class FormantSculptor:
         FormantProfile.NEUTRAL: [],
     }
 
+    # ADR-028 Invariant: DSP pitch shifting permanently banned to protect human vocal realism.
+    # Voice distinction is strictly achieved via pure neural casting and parametric EQ formant sculpting.
+
     @classmethod
     def apply_formant_eq(
         cls,
         pcm_bytes: bytes,
         profile: FormantProfile | str,
         sample_rate: int = 24000,
+        apply_pitch: bool = False,
     ) -> bytes:
         """
         Applies calibrated parametric EQ filters corresponding to the FormantProfile on 16-bit PCM.

@@ -40,16 +40,21 @@ Background music (BGM), sound effects (SFX), 5-track stem mixdowns, and external
 Production compute is 100% focused on vocal clarity, multi-character acting nuance, conversational breathability, and Audible/EBU R128 compliance:
 - **Model & Keys Manager Control Plane** ([`KeyLeaseManager`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md#1-keyleasemanager-acid-inventory--atomic-leases), [`AntiBanGuard`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/docs/ARCHITECTURE.md#2-antibanguard-the-7-iron-shields)): ACID SQLite key inventory (123+ active healthy keys verified), atomic single-request mutual exclusion (`Concurrency = 1`), Win32 `kernel32.OpenProcess` dead-PID crash recovery, zero-secret salted public aliases (`key_XXXX`), and The 7 Iron Shields anti-ban protection (11.0 RPM token bucket, session affinity, 18-32s anti-correlation key-switch delay, stealth SDK headers, emergency global tripwire).
 - **Google Gemini Flash TTS Key Pool**: 120+ active rotating API keys with token-bucket concurrency, daily quota tracking (10 RPD per key on `gemini-3.8-flash-tts`), and permanent `BLOCK_NONE` safety settings.
-- **4D Acoustic Formant Modulation**: Modulates pitch delta ($\pm 4-12\%$), tempo rate, and 4D parametric EQ curves (`equalizer=f=...`) via FFmpeg DSP to prevent vocal convergence across shared base TTS voices.
+- **4D Acoustic Formant Modulation & Phase-Safe Sculpting (ADR-028/029/030)**: Phase-safe 2nd-order biquad parametric EQ curves (`FormantSculptor`) without destructive resampling pitch/time warping (`asetrate` / `atempo` strictly banned), preserving pristine neural vocoder realism while ensuring acoustic separation across characters.
 - **Stanislavski Directing Restraint**: Clamped temperature (`0.30 - 0.52`) and physical vocal anchors eliminate histrionics and pitch screeching.
-- **Pro-Grade AI Vocal Mastering Workstation (Room 5)**: High-performance C++ JUCE / Pedalboard DSP with 4-band vocal parametric EQ (75Hz subsonic cut, 320Hz boxiness reduction, 3.2kHz presence lift), optical vocal compression, and True-Peak limiting ($\le -1.5\text{ dBTP}$), with seamless deterministic FFmpeg dual-pass linear loudnorm fallback.
+- **Core Pipeline Unification (`MultiCastStudioClient`)**: Primary default synthesis engine wired into `PipelineOrchestrator` (`orchestrator.py`) and CLI. Renders multi-voice screenplays with 4D parametric EQ formants, 2-speaker dialogue rallies with Cross-Gender gating, automatic character persona style injection, and Room 5 broadcast EBU R128 `MasteringEngineV2` integration.
+- **Pro-Grade AI Vocal Mastering Workstation (Room 5 - Studio 10/10)**: High-performance C++ JUCE / Pedalboard DSP featuring vectorized split-band lookahead dynamic de-essing (5.5kHz), 4-band resonance mud notch (300Hz) & silky air restoration (>10.5kHz), two-stage vocal dynamics (Fast Peak Tamer + Opto RMS leveler), downward noise expander, Audible ACX continuous room tone bed framing (0.75s head / 3.0s tail at -65 dBFS), and True-Peak limiting ($\\le -1.5\\text{ dBTP}$), with seamless deterministic FFmpeg dual-pass linear loudnorm fallback.
 - **Forensic Speech QA Auditor & AI Polish**: `AudioQAAuditor` (energy VAD, speaking pace 75–240 WPM, dropouts/loops detection, MOS scoring), DeepFilterNet3 neural polish with selective $>45\text{dB}$ SNR auto-bypass, Matchering 2.0 reference spectrum matching ($\pm 3.0\text{dB}$ clamp), and `<0.2s` single-segment hot-patching.
+- **100% Novel-Agnostic Dynamic Casting & Benchmark Entity Purge (ADR-030)**: Eradicated all hardcoded fantasy benchmark entities from `phonetic_transliteration.py` (`DEV_PHONETIC_VOCAB`), `character_caster.py`, `lexical_scanner.py`, and `preproduction_supervisor.py`. Entity rosters, dialect tags, and phonetic bindings are 100% dynamically derived at runtime from source text and `book_bible.json`.
+- **Dual-Track Side-by-Side Coexistence**: Studio Audiobook Engine (-19.0 LUFS, `.m4b`) and 2-Host Podcast Engine (-16.0 LUFS, `.m4a`/`.mp3`) coexisting side-by-side with 100% green test passes across both tracks.
+- **Zero-Duplication PDF Engine**: `audiobook_factory/pdf/` converted into zero-duplication compatibility shims re-exporting `audiobook_factory.extraction.parsers.pdf` (-1,657 lines).
 - **8-Pillar Studio Production Certification Harness**: Autonomous, fail-closed verification across extraction, translation, dramaturgy, attribution, performance, loudness, spatial staging, and packaging.
 - **Two-Tier Decoupling Architecture**: Pure stateless room engines (Tier 1: `ExtractionEngine`, `translate_chapter`, `ScreenplayDramaturgyRoom`, `MasteringEngineV2`) decoupled from workflow orchestration and JIT pre-production auto-resolution (Tier 2).
 - **Domain-Scoped Metadata Architecture**: Anti-monolithic JSON invariant with dedicated SSOT artifacts (`cast_lock.json`, `book_bible.json`, `translation/glossary.json`, `mastered/*_mastering_ledger.json`) and dynamic, backward-compatible auto-projections (`character_roster.json`, `voice_registry.json`).
 - **Zero-Token Pre-Flight Metadata Doctor**: Millisecond-fast ($<50\text{ms}$) forensic sanity audit validating metadata across all 6 production rooms before consuming a single LLM API token.
 - **Mastering V2 Ledgers & Fast-Path Quality Gates**: Immutable chapter mastering ledgers, Gate 6A voice authority precedence (`cast_lock` $\rightarrow$ `book_bible` $\rightarrow$ `voice_registry`), and Gate 6B fast-path audit.
 - **Strict TTS-Only API Architecture & Antigravity Native Execution (v6.1)**: All non-TTS API calls (research, translation, screenplay, casting, network discovery pings) are permanently blocked via root deadbolts in `ModelGateway`, adapters, and lease managers. All creative tasks are performed directly within Antigravity via subagent invocations, reserving 100% of keypool capacity for `gemini-3.8-flash-tts` speech synthesis.
+
 
 ---
 
@@ -398,17 +403,33 @@ out_wav, total_sec, chunks = long_client.synthesize_prose(
 )
 print(f"[+] Prose stream complete: {total_sec:.2f}s across {len(chunks)} semantic chunks")
 
-# 4. Room 5 Pro-Grade AI Vocal DSP Mastering (C++ JUCE Pedalboard + BS.1770-4)
+# 4. Flagship Multi-Cast Screenplay Production & Room 5 Mastering (MultiCastStudioClient)
+multicast = MultiCastStudioClient()
+master_res = multicast.produce_screenplay(
+    segments=[
+        {"speaker": "Narrator", "text": "सराय में भारी सन्नाटा था।", "scene_num": 1},
+        {"speaker": "Hero", "text": "चुप रहो। कोई आ रहा है।", "scene_num": 1, "acting": {"emotion": "grave"}},
+        {"speaker": "Villain", "text": "बहुत देर हो चुकी है!", "scene_num": 1, "acting": {"emotion": "menacing"}},
+    ],
+    chapter_num=1,
+    output_dir=Path("output/mastered"),
+    default_narrator_voice="Aoede",
+    enable_dialogue_rallies=True,
+)
+print(f"[+] Mastered Chapter 1: {master_res.duration_sec:.2f}s, {master_res.integrated_lufs} LUFS, {master_res.true_peak_db} dBTP (QC: {master_res.qc_passed})")
+
+# 5. Room 5 Pro-Grade AI Vocal DSP Mastering (C++ JUCE Pedalboard + BS.1770-4)
 dsp = VocalDSPProcessor()
 res = dsp.master_chapter("output/prose_stream.wav", "output/prose_master.wav")
 print(f"[+] Mastered via {res.backend_used}: {res.integrated_lufs} LUFS, {res.true_peak_dbtp} dBTP")
 
-# 5. Forensic Speech QA Auditing (VAD, 75-240 WPM, MOS scoring)
+# 6. Forensic Speech QA Auditing (VAD, 75-240 WPM, MOS scoring)
 auditor = AudioQAAuditor()
 eval_result = auditor.audit_segment("output/hello_hindi.wav", expected_text="नमस्ते दुनिया!", speaker="Narrator")
 print(f"[+] Take QA status: {eval_result.status} (WPM: {eval_result.estimated_wpm}, MOS: {eval_result.predicted_mos})")
 
-# 6. Phase 7 Vectorized Audio Peaks & Studio Bridge
+# 7. Phase 7 Vectorized Audio Peaks & Studio Bridge
+
 from audiobook_factory.api.studio_bridge import (
     get_engine_status,
     list_projects,

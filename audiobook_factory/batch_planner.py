@@ -246,8 +246,21 @@ class BatchDispatchPlanner:
                     else:
                         break
 
-                # If we collected multiple dialogue lines with exactly 2 speakers -> multi_speaker_duo
+                # If we collected multiple dialogue lines with exactly 2 speakers -> check cross-gender
+                is_cross_gender = False
                 if len(dialogue_segs) > 1 and len(active_speakers) == 2:
+                    try:
+                        from audiobook_factory.casting.registry import VoiceProfileRegistry
+                        v_reg = VoiceProfileRegistry.get_instance()
+                        spk_list_temp = list(active_speakers)
+                        g1 = getattr(v_reg.get_profile(v_map.get(spk_list_temp[0], "")), "gender", None)
+                        g2 = getattr(v_reg.get_profile(v_map.get(spk_list_temp[1], "")), "gender", None)
+                        if g1 and g2 and g1.lower() in ("male", "female") and g2.lower() in ("male", "female") and g1.lower() != g2.lower():
+                            is_cross_gender = True
+                    except Exception:
+                        is_cross_gender = False
+
+                if len(dialogue_segs) > 1 and len(active_speakers) == 2 and is_cross_gender:
                     spk_list = sorted(list(active_speakers))
                     s1 = _clean_token(spk_list[0])
                     s2 = _clean_token(spk_list[1])

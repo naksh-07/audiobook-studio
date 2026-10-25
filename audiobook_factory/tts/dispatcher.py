@@ -811,6 +811,15 @@ class TTSDispatcher:
         intensity = segment.get("intensity_level", "medium") if isinstance(segment, dict) else getattr(segment, "intensity_level", "medium")
         mem_vc = segment.get("memory_vocal_constraint") if isinstance(segment, dict) else getattr(segment, "memory_vocal_constraint", None)
 
+        if not mem_vc and speaker != "Narrator" and voice:
+            try:
+                from audiobook_factory.casting.registry import VoiceProfileRegistry
+                prof = VoiceProfileRegistry.get_instance().get_profile(voice)
+                if prof:
+                    mem_vc = prof.persona or prof.timbre or None
+            except Exception:
+                pass
+
         spoken_res = self.spoken_text_engine.resolve_screenplay_segment(segment)
         tts_text = spoken_res.spoken_text or text
         if isinstance(segment, dict):
@@ -1027,10 +1036,7 @@ class TTSDispatcher:
             if abs(volume_gain_db) > 0.1:
                 post_filters.append(f"volume={volume_gain_db:+.1f}dB")
 
-            # Phase-safe micro-band pitch shifting (asetrate + aresample, zero rubberband/WSOLA)
-            if abs(pitch - 1.0) >= 0.005:
-                new_rate = int(round(24000 * pitch))
-                post_filters.append(f"asetrate={new_rate},aresample=24000")
+            # Phase-safe neural vocoder invariant (ADR-028: asetrate permanently disabled)
 
             # 4-Band Parametric EQ Formant Filters
             formant_filters = _parse_eq_formant_profile(sp_cfg.get("eq_formant_profile"))
@@ -1067,9 +1073,7 @@ class TTSDispatcher:
             if softclip_tanh:
                 post_filters.append("asoftclip=type=tanh:param=1.2")
 
-            if abs(pitch - 1.0) >= 0.005:
-                new_rate = int(round(24000 * pitch))
-                post_filters.append(f"asetrate={new_rate},aresample=24000")
+            # ADR-028: asetrate permanently disabled to preserve pure neural vocoder output
             # WSOLA atempo disabled to preserve phase coherence
 
             formant_filters = _parse_eq_formant_profile(sp_cfg.get("eq_formant_profile"))

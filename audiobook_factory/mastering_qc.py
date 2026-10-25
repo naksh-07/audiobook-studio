@@ -57,7 +57,10 @@ class MasteringQCAgent:
 
         # 2. Duration Continuity
         if premaster_facts and premaster_facts.duration_sec > 0.0:
-            dur_delta = abs(master_facts.duration_sec - premaster_facts.duration_sec)
+            expected_delta = 0.0
+            if getattr(prof, "enable_acx_framing", False):
+                expected_delta = float(getattr(prof, "acx_head_silence_sec", 0.75) + getattr(prof, "acx_tail_silence_sec", 3.0))
+            dur_delta = abs(master_facts.duration_sec - (premaster_facts.duration_sec + expected_delta))
             details["duration_delta_sec"] = round(dur_delta, 3)
             # Allow up to 0.35s for trailing lookahead limiter / reverb release
             if dur_delta > 0.35:

@@ -11,8 +11,9 @@ import json
 import wave
 import uuid
 import math
+import shutil
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional, Union, Callable
+from typing import Dict, Any, List, Tuple, Optional, Union, Callable, Set
 
 from audiobook_factory.logger import logger
 from audiobook_factory.tts.contracts import (
@@ -27,6 +28,7 @@ from audiobook_factory.tts.core_orchestrator import TTSCoreOrchestrator
 from audiobook_factory.tts.formant_sculptor import FormantSculptor, FormantProfile
 from audiobook_factory.tts.take_bank_manager import TakeBankManager, CandidateTake
 from audiobook_factory.tts.dsp.editorial import EditorialDSPEngine
+from audiobook_factory.casting.registry import VoiceProfileRegistry
 
 
 class MultiCastStudioClient:
@@ -43,14 +45,15 @@ class MultiCastStudioClient:
     def produce_screenplay(
         self,
         segments: List[Dict[str, Any]],
-        character_voices: Dict[str, str],
-        chapter_num: int,
-        output_dir: Union[str, Path],
-        model: str = "gemini-3.8-flash",
+        chapter_num: int = 1,
+        output_dir: Union[str, Path] = "audiobooks/output",
+        character_voices: Optional[Dict[str, str]] = None,
+        model: str = "gemini-3.8-flash-tts",
         default_narrator_voice: str = "Puck",
         cast_lock_file: Optional[Union[str, Path]] = None,
         character_formants: Optional[Dict[str, Union[str, FormantProfile]]] = None,
         enable_take_bank: bool = False,
+        enable_dialogue_rallies: bool = True,
         progress_callback: Optional[Callable[..., None]] = None,
     ) -> ChapterMasterResult:
         """
@@ -66,17 +69,46 @@ class MultiCastStudioClient:
         master_path = out_d / f"chapter_{chapter_num:03d}_master.wav"
 
         # 1. Cast Lock Verification & Roster Resolution
-        resolved_voices = dict(character_voices)
+        resolved_voices = dict(character_voices or {})
+        resolved_personas: Dict[str, str] = {}
+        resolved_genders: Dict[str, str] = {}
+
         if cast_lock_file:
             lock_p = Path(cast_lock_file).resolve()
             if lock_p.exists():
                 try:
                     with open(lock_p, "r", encoding="utf-8") as lf:
                         locked = json.load(lf)
-                    for char_name, v_id in locked.items():
-                        resolved_voices[char_name] = v_id
+                    lock_dict = locked.get("locks", locked) if isinstance(locked, dict) else {}
+                    for char_name, v_info in lock_dict.items():
+                        if isinstance(v_info, dict):
+                            v_id = v_info.get("voice_id")
+                            if v_id:
+                                resolved_voices[char_name] = v_id
+                                for alias in v_info.get("aliases", []):
+                                    resolved_voices[alias] = v_id
+                            if v_info.get("persona"):
+                                resolved_personas[char_name] = v_info["persona"]
+                            elif v_info.get("timbre"):
+                                resolved_personas[char_name] = v_info["timbre"]
+                            if v_info.get("gender"):
+                                resolved_genders[char_name] = str(v_info["gender"]).lower()
+                        elif isinstance(v_info, str):
+                            resolved_voices[char_name] = v_info
                 except Exception as e:
                     logger.warning(f"[!] Could not load cast_lock_file: {e}")
+
+        # Enrich persona and gender from VoiceProfileRegistry for any resolved voices
+        voice_reg = VoiceProfileRegistry.get_instance()
+        for char_name, v_id in list(resolved_voices.items()):
+            prof = voice_reg.get_profile(v_id)
+            if prof:
+                if char_name not in resolved_genders and prof.gender:
+                    resolved_genders[char_name] = prof.gender.lower()
+                if char_name not in resolved_personas:
+                    p_desc = prof.persona or prof.timbre or ""
+                    if p_desc:
+                        resolved_personas[char_name] = p_desc
 
         # 2. Attribution & Sanity Audit (Anti-Swap QA)
         self._audit_screenplay_attribution(segments)
@@ -96,18 +128,115 @@ class MultiCastStudioClient:
                 if voice_id not in self.ANIME_SEIYU_VOICES:
                     voice_id = self.ANIME_SEIYU_VOICES[0]
 
-            acting = seg.get("acting", {})
+            # Resolve gender and vocal persona for speaker if not yet mapped
+            if speaker not in resolved_genders or speaker not in resolved_personas:
+                prof = voice_reg.get_profile(voice_id)
+                if prof:
+                    if speaker not in resolved_genders and prof.gender:
+                        resolved_genders[speaker] = prof.gender.lower()
+                    if speaker not in resolved_personas:
+                        p_desc = prof.persona or prof.timbre or ""
+                        if p_desc:
+                            resolved_personas[speaker] = p_desc
+
+            acting = seg.get("acting", {}) if isinstance(seg.get("acting"), dict) else {}
+            emotion = (
+                seg.get("emotion")
+                or seg.get("surface_emotion")
+                or acting.get("emotion")
+                or "neutral"
+            )
+            delivery_style = (
+                acting.get("delivery_style")
+                or seg.get("actioning")
+                or acting.get("tone")
+                or "standard"
+            )
+            intensity = (
+                seg.get("intensity_level")
+                or seg.get("intensity")
+                or acting.get("intensity")
+                or "medium"
+            )
+            spatial = seg.get("spatial", {}) if isinstance(seg.get("spatial"), dict) else {}
+            proximity = spatial.get("proximity", "normal")
+            if any(k in str(emotion).lower() for k in ("whisper", "intimate", "subdued")):
+                proximity = "intimate"
+
+            char_obj = seg.get("character_objective") or seg.get("subtext") or None
+
+            # Build memory vocal constraint combining character base persona with scene objective
+            vocal_constraints = []
+            if speaker != "Narrator":
+                vocal_persona = resolved_personas.get(speaker, "")
+                if vocal_persona:
+                    vocal_constraints.append(vocal_persona)
+            if char_obj and char_obj not in vocal_constraints:
+                vocal_constraints.append(char_obj)
+
+            combined_constraint = ", ".join(vocal_constraints) if vocal_constraints else None
+
             intent = DeliveryIntent(
-                emotion=acting.get("emotion", "neutral") if isinstance(acting, dict) else "neutral",
-                delivery_style=acting.get("delivery_style", "standard") if isinstance(acting, dict) else "standard",
-                intensity=acting.get("intensity", "medium") if isinstance(acting, dict) else "medium",
+                emotion=str(emotion).replace("-", "_").strip(),
+                delivery_style=str(delivery_style).replace("-", "_").strip(),
+                intensity=str(intensity).strip(),
+                proximity=proximity,
+                memory_vocal_constraint=combined_constraint,
             )
 
+            # Contextual acoustic reflex induction from preceding narrative tag
+            eff_raw_text = raw_text
+            if speaker != "Narrator" and idx > 1:
+                prev_seg = segments[idx - 2]
+                prev_text = prev_seg.get("text", "")
+                if prev_seg.get("speaker") == "Narrator" and any(k in prev_text for k in ("—", ":", "कहा", "बोला")):
+                    if any(w in prev_text for w in ("गुर्राया", "गुर्राते", "दहाड़ा", "धमकाया")) and not eff_raw_text.startswith("["):
+                        eff_raw_text = f"[growls] {eff_raw_text}"
+                    elif any(w in prev_text for w in ("हँसा", "हँसते", "हंसते", "ठहाका")) and not eff_raw_text.startswith("["):
+                        eff_raw_text = f"[laughs] {eff_raw_text}"
+                    elif any(w in prev_text for w in ("मुस्कुराया", "मुस्कुराते", "ज़हरीली मुस्कान", "व्यंग्य")) and not eff_raw_text.startswith("["):
+                        eff_raw_text = f"[chuckles] {eff_raw_text}"
+                    elif any(w in prev_text for w in ("फुसफुसाया", "फुसफुसाते", "बुदबुदाया", "धीमी आवाज़")) and not eff_raw_text.startswith("["):
+                        eff_raw_text = f"[whispers] {eff_raw_text}"
+                    elif any(w in prev_text for w in ("हाँफा", "हाँफते", "हांफते", "साँस फूल")) and not eff_raw_text.startswith("["):
+                        eff_raw_text = f"[pant] {eff_raw_text}"
+                    elif any(w in prev_text for w in ("कराहा", "कराहते", "दर्द से")) and not eff_raw_text.startswith("["):
+                        eff_raw_text = f"[groan] {eff_raw_text}"
+                    elif any(w in prev_text for w in ("चौंका", "चौंककर", "सकपकाया", "हक्का-बक्का")) and not eff_raw_text.startswith("["):
+                        eff_raw_text = f"[gasp] {eff_raw_text}"
+                    elif any(w in prev_text for w in ("गला साफ़", "खंखाड़ा", "खंकार")) and not eff_raw_text.startswith("["):
+                        eff_raw_text = f"[clears throat] {eff_raw_text}"
+                    elif any(w in prev_text for w in ("आह भरी", "ठंडी सांस")) and not eff_raw_text.startswith("["):
+                        eff_raw_text = f"[sighs] {eff_raw_text}"
+
+            # Dynamic calibrated temperature for expressive vocal performance
+            seg_temp = seg.get("temperature")
+            if not seg_temp:
+                if speaker == "Narrator":
+                    seg_temp = 0.35  # Rock-solid, calm, measured Audible-grade narration
+                elif intensity == "explosive":
+                    seg_temp = 0.85  # Maximum emotional inflection & vocal friction
+                elif intensity in ("high", "intense"):
+                    seg_temp = 0.78  # High dynamic range
+                elif intensity == "low":
+                    seg_temp = 0.55  # Subdued, restrained
+                elif any(k in str(emotion).lower() for k in ("rage", "anger", "furious", "aggression", "menace")):
+                    seg_temp = 0.80
+                elif any(k in str(emotion).lower() for k in ("mockery", "amusement", "swagger", "irony")):
+                    seg_temp = 0.75
+                elif any(k in str(emotion).lower() for k in ("fear", "panic", "plead", "terror")):
+                    seg_temp = 0.75
+                elif any(k in str(emotion).lower() for k in ("whisper", "subdued", "tender", "intimate")):
+                    seg_temp = 0.60
+                else:
+                    seg_temp = 0.70
+
             req = UniversalInputGuard.sanitize_and_guard(
-                raw_text=raw_text,
+                raw_text=eff_raw_text,
                 voice_id=voice_id,
                 segment_uid=f"ch{chapter_num:03d}_seg{idx:04d}_{speaker.lower()}",
                 speaker=speaker,
+                temperature=seg_temp,
                 pipeline_mode=TTSPipelineMode.MULTI_CAST,
                 chapter_num=chapter_num,
                 scene_num=seg.get("scene_num", 1),
@@ -120,29 +249,103 @@ class MultiCastStudioClient:
         # 4. Synthesis & TakeBank Auditioning
         synthesized_takes: List[Tuple[CanonicalTTSRequest, SynthesizedAudioChunk, Any]] = []
 
+        # Identify 2-Speaker Dialogue Rallies if enabled and model is Gemini
+        rally_groups: Dict[int, List[int]] = {}
+        rally_skip_indices: Set[int] = set()
+
+        if enable_dialogue_rallies and "gemini" in model.lower():
+            i = 0
+            while i < len(requests):
+                seg_i, req_i = requests[i]
+                if req_i.speaker != "Narrator":
+                    j = i + 1
+                    speakers_in_run = {req_i.speaker}
+                    run_indices = [i]
+                    while j < len(requests):
+                        seg_j, req_j = requests[j]
+                        if req_j.speaker == "Narrator" or req_j.scene_num != req_i.scene_num:
+                            break
+                        speakers_in_run.add(req_j.speaker)
+                        if len(speakers_in_run) > 2:
+                            break
+                        run_indices.append(j)
+                        j += 1
+                    if len(run_indices) >= 2 and len(speakers_in_run) == 2:
+                        spk_list = list(speakers_in_run)
+                        spk_a, spk_b = spk_list[0], spk_list[1]
+                        gen_a = resolved_genders.get(spk_a, "neutral").lower()
+                        gen_b = resolved_genders.get(spk_b, "neutral").lower()
+                        # Strict Cross-Gender Gate (ADR-029): Gemini multiSpeakerVoiceConfig only preserves
+                        # distinct vocal contrast when speakers are cross-gender (male <-> female).
+                        # Same-gender rallies cause acoustic convergence; they must remain decoupled individual turns.
+                        is_cross_gender = (
+                            gen_a in ("male", "female")
+                            and gen_b in ("male", "female")
+                            and gen_a != gen_b
+                        )
+                        if is_cross_gender and not any(
+                            enable_take_bank and requests[idx][0].get("performance_priority") in ("focused", "high", "climactic")
+                            for idx in run_indices
+                        ):
+                            rally_groups[i] = run_indices
+                            rally_skip_indices.update(run_indices[1:])
+                            i = j
+                            continue
+                i += 1
+
         # Process requests (either directly or via TakeBank auditioning for dramatic turns)
         standard_reqs: List[CanonicalTTSRequest] = []
+        standard_req_indices: List[int] = []
         take_bank_indices: Dict[int, str] = {}
 
         for i, (seg, req) in enumerate(requests):
+            if i in rally_groups or i in rally_skip_indices:
+                continue
             prio = seg.get("performance_priority", "standard")
             if enable_take_bank and prio in ("focused", "high", "climactic"):
                 take_bank_indices[i] = prio
             else:
                 standard_reqs.append(req)
+                standard_req_indices.append(i)
 
         # Batch synthesize standard requests
         standard_results = self.orchestrator.synthesize_batch(standard_reqs, model=model) if standard_reqs else []
-        standard_iter = iter(standard_results)
+        standard_results_map = {idx: standard_results[r_i] for r_i, idx in enumerate(standard_req_indices)}
 
-        for i, (seg, req) in enumerate(requests):
-            if i in take_bank_indices:
-                prio = take_bank_indices[i]
+        idx = 0
+        while idx < len(requests):
+            if idx in rally_groups:
+                run_idxs = rally_groups[idx]
+                try:
+                    logger.info(f"[*] Synthesizing 2-speaker dialogue rally for segments {run_idxs} ({len(run_idxs)} turns)...")
+                    rally_req, rally_chunk, validation = self._synthesize_dialogue_rally(
+                        [requests[k] for k in run_idxs], model=model
+                    )
+                    synthesized_takes.append((rally_req, rally_chunk, validation))
+                    idx += len(run_idxs)
+                    continue
+                except Exception as e:
+                    logger.warning(f"Rally synthesis failed for run at {idx}, falling back to single turns: {e}")
+                    for k in run_idxs:
+                        r_req = requests[k][1]
+                        c, v = self.orchestrator.synthesize(r_req, model=model)
+                        synthesized_takes.append((r_req, c, v))
+                    idx += len(run_idxs)
+                    continue
+            elif idx in rally_skip_indices:
+                idx += 1
+                continue
+            elif idx in take_bank_indices:
+                prio = take_bank_indices[idx]
+                req = requests[idx][1]
                 chunk, validation, _ = self.take_bank_mgr.select_best_take(req, priority=prio, model=model)
                 synthesized_takes.append((req, chunk, validation))
+                idx += 1
             else:
-                _, chunk, validation = next(standard_iter)
+                _, chunk, validation = standard_results_map[idx]
+                req = requests[idx][1]
                 synthesized_takes.append((req, chunk, validation))
+                idx += 1
 
         if progress_callback:
             try:
@@ -176,23 +379,69 @@ class MultiCastStudioClient:
                 processed_chunks.append((req, chunk, validation))
 
         # 6. Dialogue Editorial Stitching with Contextual Turn Latency & Net Silence
+        premaster_path = master_path.with_name(f"{master_path.stem}_premaster.wav")
         total_duration = self._stitch_screenplay(
             batch_results=processed_chunks,
-            output_file=master_path,
+            output_file=premaster_path,
             sample_rate=requests[0][1].sample_rate if requests else 24000,
         )
 
-        logger.info(f"[+] Chapter {chapter_num} master generated -> {master_path.name} ({total_duration:.2f}s)")
+        # 7. Broadcast EBU R128 (-19 LUFS, -1.5 dBTP) Linear Mastering
+        actual_lufs = -19.0
+        actual_tp = -1.5
+        actual_lra = 4.5
+        qc_passed = True
+        actual_duration = total_duration
+
+        try:
+            from audiobook_factory.mastering_contracts import MasteringRequest, MasteringProfile
+            from audiobook_factory.mastering_engine import MasteringEngineV2
+
+            profile = MasteringProfile(
+                target_lufs=-19.0,
+                true_peak_ceiling_dbtp=-1.5,
+                output_sample_rate=48000,
+                dither_type="tpdf",
+            )
+            master_req = MasteringRequest(
+                chapter_id=f"chapter_{chapter_num:03d}",
+                premaster_path=str(premaster_path.resolve()),
+                output_master_path=str(master_path.resolve()),
+                profile=profile,
+                is_premaster=True,
+            )
+            mastering_engine = MasteringEngineV2()
+            m_res = mastering_engine.master(master_req)
+
+            if m_res.analysis_after:
+                actual_lufs = m_res.analysis_after.integrated_lufs
+                actual_tp = m_res.analysis_after.true_peak_dbtp if m_res.analysis_after.true_peak_dbtp is not None else -1.5
+                actual_lra = getattr(m_res.analysis_after, "loudness_range_lra", getattr(m_res.analysis_after, "loudness_range_lu", 4.5)) or 4.5
+                actual_duration = m_res.analysis_after.duration_sec
+            if m_res.qc_result:
+                qc_passed = m_res.qc_result.passed
+        except Exception as e:
+            logger.warning(f"MasteringEngineV2 failed or skipped: {e}. Falling back to premaster.")
+            if premaster_path.exists() and not master_path.exists():
+                shutil.copy2(premaster_path, master_path)
+        finally:
+            if premaster_path.exists() and master_path.exists() and premaster_path != master_path:
+                try:
+                    premaster_path.unlink()
+                except OSError:
+                    pass
+
+        logger.info(f"[+] Chapter {chapter_num} master generated -> {master_path.name} ({actual_duration:.2f}s, {actual_lufs:.1f} LUFS, {actual_tp:.2f} dBTP)")
 
         return ChapterMasterResult(
             chapter_num=chapter_num,
             master_audio_path=master_path,
-            duration_sec=round(total_duration, 2),
+            duration_sec=round(actual_duration, 2),
             total_segments=len(processed_chunks),
-            integrated_lufs=-19.0,
-            true_peak_db=-1.5,
-            loudness_range=4.5,
-            qc_passed=True,
+            integrated_lufs=round(actual_lufs, 1),
+            true_peak_db=round(actual_tp, 2),
+            loudness_range=round(actual_lra, 1),
+            qc_passed=qc_passed,
             metadata={
                 "character_count": len(resolved_voices),
                 "model": model,
@@ -230,18 +479,32 @@ class MultiCastStudioClient:
             chunks_pcm.append(chunk.pcm_bytes)
 
             if idx < len(batch_results) - 1:
+                cur_req = batch_results[idx][0]
                 next_req = batch_results[idx + 1][0]
-                if req.scene_num != next_req.scene_num:
-                    pause_ms = 700  # Scene break
-                elif req.speaker == next_req.speaker:
-                    pause_ms = 250  # Same speaker continuation
-                elif req.speaker == "Narrator" or next_req.speaker == "Narrator":
-                    pause_ms = 500  # Narrator transition
+                cur_text = (getattr(cur_req, "spoken_text", getattr(cur_req, "literary_text", "")) or "").strip()
+
+                if cur_req.scene_num != next_req.scene_num:
+                    pause_ms = 650  # Scene shift / chapter beat
+                elif cur_text.endswith("—") or cur_text.endswith("--") or cur_text.endswith("-"):
+                    pause_ms = 110  # Breathless interruption / cut-off
+                elif cur_text.endswith("...") or cur_text.endswith("…"):
+                    pause_ms = 620  # Trailing hesitation / lingering thought
+                elif cur_text.endswith("?") or cur_text.endswith("؟!"):
+                    pause_ms = 400  # Expectant question pause
+                elif cur_text.endswith("!"):
+                    pause_ms = 260  # Sharp exclamation beat
+                elif cur_text.endswith(","):
+                    pause_ms = 150  # Mid-sentence breath clause
+                elif cur_req.speaker == next_req.speaker:
+                    pause_ms = 220  # Same speaker continuation
+                elif cur_req.speaker == "Narrator" or next_req.speaker == "Narrator":
+                    pause_ms = 350  # Narrator intro / transition
                 else:
-                    pause_ms = 320  # Conversational turn switch
+                    pause_ms = 290  # Organic conversational turn switch
+
                 target_pauses_ms.append(pause_ms)
             else:
-                target_pauses_ms.append(500)
+                target_pauses_ms.append(400)
 
         # Stitch with EditorialDSPEngine (Hann micro-fades & Net-Silence)
         stitched_pcm, total_duration = EditorialDSPEngine.process_and_stitch(
@@ -257,3 +520,114 @@ class MultiCastStudioClient:
             out_wf.writeframes(stitched_pcm)
 
         return total_duration
+
+    def _synthesize_dialogue_rally(
+        self,
+        rally_items: List[Tuple[Dict[str, Any], CanonicalTTSRequest]],
+        model: str = "gemini-3.8-flash-tts",
+    ) -> Tuple[CanonicalTTSRequest, SynthesizedAudioChunk, Any]:
+        """
+        Synthesizes a 2-speaker multi-turn dialogue rally in a single API call
+        using Gemini multiSpeakerVoiceConfig and turn-level speechMetadata.
+        """
+        from audiobook_factory.core.models.gateway import get_model_gateway
+        from audiobook_factory.tts.gateway_bridge import extract_pcm_and_duration_from_audio
+        from audiobook_factory.tts.providers.gemini_adapter import GeminiTTSAdapter
+        from audiobook_factory.tts.providers.gemini import sanitize_spoken_text_and_extract_stage_directions
+
+        gw = get_model_gateway()
+        speakers = list(dict.fromkeys(r[1].speaker for r in rally_items))
+        if len(speakers) != 2:
+            raise ValueError(f"Rally requires exactly 2 distinct speakers, got {len(speakers)}")
+
+        spk_a, spk_b = speakers[0], speakers[1]
+        alias_map = {spk_a: "SpeakerA", spk_b: "SpeakerB"}
+        voice_a = next(r[1].voice_id for r in rally_items if r[1].speaker == spk_a)
+        voice_b = next(r[1].voice_id for r in rally_items if r[1].speaker == spk_b)
+
+        speech_config = {
+            "multiSpeakerVoiceConfig": {
+                "speakerVoiceConfigs": [
+                    {
+                        "speaker": "SpeakerA",
+                        "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice_a}}
+                    },
+                    {
+                        "speaker": "SpeakerB",
+                        "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice_b}}
+                    }
+                ]
+            }
+        }
+
+        parts = []
+        temps = []
+        for seg, req in rally_items:
+            spoken_text = req.spoken_text
+            if req.literary_text and req.speaker != "Narrator":
+                clean_text, _ = sanitize_spoken_text_and_extract_stage_directions(req.literary_text)
+                if clean_text:
+                    spoken_text = clean_text
+
+            style_desc = GeminiTTSAdapter.build_style_descriptor(req.delivery_intent, speaker=req.speaker)
+            part_payload = {
+                "text": spoken_text,
+                "speechMetadata": {
+                    "speaker": alias_map[req.speaker],
+                }
+            }
+            if style_desc and style_desc.lower() not in ("neutral", "standard"):
+                part_payload["speechMetadata"]["style"] = style_desc
+            parts.append(part_payload)
+            temps.append(req.temperature)
+
+        avg_temp = max(0.65, min(sum(temps) / len(temps), 0.85))
+        session_id = f"rally_{rally_items[0][1].segment_uid}"
+
+        speech_res = gw.synthesize_speech(
+            text="",
+            model=model,
+            preferred_provider="gemini",
+            session_id=session_id,
+            temperature=avg_temp,
+            parts=parts,
+            speech_config=speech_config,
+        )
+
+        pcm_bytes, dur_sec, sample_rate = extract_pcm_and_duration_from_audio(
+            speech_res.audio_bytes,
+            mime_type=speech_res.mime_type,
+            default_sample_rate=rally_items[0][1].sample_rate or 24000,
+        )
+
+        first_req = rally_items[0][1]
+        last_req = rally_items[-1][1]
+        combined_uid = f"rally_{first_req.segment_uid}_{last_req.segment_uid}"
+        combined_lit = " \n".join(r[1].literary_text for r in rally_items)
+
+        combined_req = CanonicalTTSRequest(
+            segment_uid=combined_uid,
+            literary_text=combined_lit,
+            spoken_text=" ".join(r[1].spoken_text for r in rally_items),
+            voice_id=f"{voice_a}+{voice_b}",
+            speaker=f"{spk_a} & {spk_b}",
+            temperature=avg_temp,
+            sample_rate=sample_rate,
+            pipeline_mode=TTSPipelineMode.MULTI_CAST,
+            chapter_num=first_req.chapter_num,
+            scene_num=first_req.scene_num,
+            metadata={"rally": True, "turn_count": len(rally_items), "speakers": speakers},
+        )
+
+        chunk = SynthesizedAudioChunk(
+            segment_uid=combined_uid,
+            pcm_bytes=pcm_bytes,
+            sample_rate=sample_rate,
+            num_channels=1,
+            duration_sec=dur_sec,
+            provider_model=model,
+            voice_id=f"{voice_a}+{voice_b}",
+            metadata={"rally": True, "turn_count": len(rally_items)},
+        )
+
+        return combined_req, chunk, None

@@ -27,22 +27,21 @@ _DEV_CONNECTORS: Set[str] = {
 
 _GENERIC_TITLES: Set[str] = {
     "lord", "sir", "master", "lady", "king", "queen", "baron", "duke",
-    "captain", "witcher", "the", "alderman", "doctor", "dr", "father",
+    "captain", "alderman", "doctor", "dr", "father",
     "brother", "sister", "dame", "count", "duchess", "prince", "princess",
     "elder", "general", "chief", "officer", "inspector", "innkeeper",
     "commander", "emperor", "empress", "mr", "mrs", "miss",
     "chancellor", "leader", "mistress",
     # Hindi honorifics & titles
     "महाराज", "राजा", "रानी", "श्रीमान", "स्वामी", "प्रभु", "ठाकुर",
-    "मालिक", "कप्तान", "विचर", "मुखिया", "चौधरी", "सर", "लॉर्ड", "मास्टर",
+    "मालिक", "कप्तान", "मुखिया", "चौधरी", "सर", "लॉर्ड", "मास्टर",
     "लोर्ड", "किन्ग", "सिर", "मास्टेर",
     "चान्सेल्लोर", "लीडेर", "मिस्ट्रेस्स",
     # Generic occupations, titles, numbers, and descriptors
     "man", "मान", "fat", "फ़ाट", "फाट", "yellow", "येल्लोव", "येलो",
-    "jerkin", "जेर्किन", "cobbler", "कोब्ब्लेर", "कॉबलर", "sorcerer", "सोर्सेरेर", "सोर्सरर",
-    "sorceress", "सोर्सेरेस्स", "सोर्सरेस", "halberdier", "हाल्बेर्डिेर", "हलबर्डियर",
-    "warrior", "वार्रिोर", "वॉरियर", "वारियर", "reaver", "रीवेर", "रीवर",
-    "denesle", "डेनेस्ले", "golden", "गोल्डेन", "गोल्डन", "dragon", "ड्रागोन", "ड्रैगन",
+    "cobbler", "कोब्ब्लेर", "कॉबलर",
+    "warrior", "वार्रिोर", "वॉरियर", "वारियर",
+    "golden", "गोल्डेन", "गोल्डन",
     "little", "लिट्ट्ले", "लिटिल", "duke", "डुके", "ड्यूक", "baron", "बारोन", "बैरन",
     "queen", "क्वीन", "miss", "मिस्स", "मिस", "mrs", "म्र्स", "मिसेज",
 }
@@ -59,80 +58,11 @@ _CONNECTOR_EDGE_TOKENS: Set[str] = {
 }
 
 
-# Canonical Phonetic Devanagari Vocabulary for universal and fantasy literature
+# Canonical Phonetic Devanagari Vocabulary for universal literary terms
 DEV_PHONETIC_VOCAB: Dict[str, str] = {
-    # Benchmark & Canonical Novel Characters
-    "geralt": "गेराल्ट",
-    "geralt of rivia": "गेराल्ट",
-    "yennefer": "येनेफ़र",
-    "yennefer of vengerberg": "येनेफ़र",
-    "yen": "येन",
-    "ciri": "सिरी",
-    "cirilla": "सिरिला",
-    "dandelion": "डैंडेलियन",
-    "jaskier": "जास्किएर",
-    "borch": "बोर्च",
-    "three": "थ्री",
-    "jackdaws": "जैकडॉज़",
-    "three jackdaws": "थ्री जैकडॉज़",
-    "borch three jackdaws": "बोर्च थ्री जैकडॉज़",
-    "eyck": "आइक",
-    "eyck of denesle": "आइक ऑफ़ डेनेस्ले",
-    "sir eyck": "आइक",
-    "sir eyck of denesle": "आइक ऑफ़ डेनेस्ले",
-    "denesle": "डेनेस्ले",
-    "véa": "वेया",
-    "téa": "तेया",
-    "vea": "वेया",
-    "tea": "तेया",
-    "dainty": "डेंटी",
-    "biberveldt": "बाइबरवेल्ड्ट",
-    "dainty biberveldt": "डेंटी बाइबरवेल्ड्ट",
-    "alderman": "एल्डरमैन",
-    "town alderman": "एल्डरमैन",
-    "cicada": "सिकाडा",
-    "yarpen": "यारपेन",
-    "zigrin": "ज़िग्रिन",
-    "yarpen zigrin": "यारपेन ज़िग्रिन",
-    "boholt": "बोहोल्ट",
-    "chappelle": "चैपेल",
-    "renfri": "रेनफ़्री",
-    "stregobor": "स्ट्रेगोबोर",
-    "calanthe": "कैलेंथे",
-    "duny": "डनी",
-    "pavetta": "पावेत्ता",
-    "foltest": "फ़ोल्टेस्ट",
-    "crach": "क्रैक",
-    "regis": "रेजिस",
-    "cahir": "काहिर",
-    "milva": "मिल्वा",
-    "vilgefortz": "विल्गेफ़ोर्ट्ज़",
-    "triss": "ट्रिस",
-    "triss merigold": "ट्रिस मेरिगोल्ड",
-    "vesemir": "वेसेमिर",
-    "lambert": "लैम्बर्ट",
-    "eskel": "एस्केल",
-    "coen": "कोएन",
-    "denis": "डेनिस",
-    "herwig": "हर्विक",
-    "vimme": "विम्मे",
-    "vivaldi": "विवाल्डी",
-    "shani": "शानी",
-    "essi": "एस्सी",
-    "little eye": "लिटिल आई",
-    "roach": "रोच",
+    # Universal narrator and production anchors
     "narrator": "सूत्रधार",
     "narration": "सूत्रधार",
-    "witcher": "विचर",
-    "white wolf": "व्हाइट वुल्फ़",
-    "edward": "एडवर्ड",
-    "corwin": "कॉरविन",
-    "elena": "एलेना",
-    "freya": "फ्रेया",
-    "drake": "ड्रेक",
-    "malik": "मलिक",
-    "chintu": "चिंटू",
-    "samir": "समीर",
     "mayor": "मेयर",
     "town mayor": "टाउन मेयर",
 }
@@ -303,29 +233,12 @@ def derive_devanagari_name(
     if primary_dev and is_devanagari(primary_dev):
         dev_aliases.add(primary_dev)
 
-    # Rule for Eyck: include both "आइक" and "आईक"
-    all_alias_strs = [str(a).lower() for a in (aliases or []) if a]
-    if "eyck" in eng_lower or any("eyck" in a for a in all_alias_strs):
-        dev_aliases.add("आइक")
-        dev_aliases.add("आईक")
-
-    # Special handling for composite or compound names
-    if "borch three jackdaws" in eng_lower or ("borch" in eng_lower and "three jackdaws" in eng_lower):
-        dev_aliases.add("बोर्च")
-        dev_aliases.add("थ्री जैकडॉज़")
-        dev_aliases.add("बोर्च थ्री जैकडॉज़")
-        primary_dev = primary_dev or "बोर्च थ्री जैकडॉज़"
-    elif "three jackdaws" in eng_lower:
-        dev_aliases.add("थ्री जैकडॉज़")
-        dev_aliases.add("बोर्च")
-    elif "borch" in eng_lower:
-        dev_aliases.add("बोर्च")
-        dev_aliases.add("थ्री जैकडॉज़")
-
-    if "town alderman" in eng_lower or "alderman" in eng_lower:
-        dev_aliases.add("एल्डरमैन")
-        if not primary_dev or not is_devanagari(primary_dev):
-            primary_dev = "एल्डरमैन"
+    # Transliterate compound components if multi-word name
+    if " " in eng_clean:
+        for part in eng_clean.split():
+            part_dev = transliterate_to_devanagari(part, project_dir=project_dir)
+            if is_devanagari(part_dev):
+                dev_aliases.add(part_dev)
 
     # Also transliterate existing aliases
     if aliases:
@@ -341,17 +254,7 @@ def derive_devanagari_name(
                     dev_aliases.add(d_trans)
 
     # Purge any standalone connector, generic title, short token (<3 chars), or forbidden common words
-    banned_standalone_dev = _DEV_CONNECTORS | _GENERIC_TITLES | {
-        "आई", "एे", "लिटिल", "सिर", "मास्टेर", "ओफ़", "ऑफ़", "थ्री", "three", "of", "little", "eye", "lord", "sir", "master",
-        "chancellor", "leader", "mistress", "चान्सेल्लोर", "लीडेर", "मिस्ट्रेस्स",
-        "man", "मान", "fat", "फ़ाट", "फाट", "yellow", "येल्लोव", "येलो",
-        "jerkin", "जेर्किन", "cobbler", "कोब्ब्लेर", "कॉबलर", "sorcerer", "सोर्सेरेर", "सोर्सरर",
-        "sorceress", "सोर्सेरेस्स", "सोर्सरेस", "halberdier", "हाल्बेर्डिेर", "हलबर्डियर",
-        "warrior", "वार्रिोर", "वॉरियर", "वारियर", "reaver", "रीवेर", "रीवर",
-        "denesle", "डेनेस्ले", "golden", "गोल्डेन", "गोल्डन", "dragon", "ड्रागोन", "ड्रैगन",
-        "little", "लिट्ट्ले", "duke", "डुके", "ड्यूक", "baron", "बारोन", "बैरन",
-        "queen", "क्वीन", "miss", "मिस्स", "मिस", "mrs", "म्र्स", "मिसेज",
-    }
+    banned_standalone_dev = _DEV_CONNECTORS | _GENERIC_TITLES
 
     def _is_invalid_alias(alias_str: str) -> bool:
         if not alias_str:
@@ -371,17 +274,12 @@ def derive_devanagari_name(
         return False
 
     # For compound Devanagari names, split by space, add individual name tokens to dev_aliases
-    # If an alias is a descriptive phrase (3 or more words, e.g. "fat man in yellow jerkin", "leader of the reavers"):
-    # DO NOT split it into constituent single-word tokens! Only full names (1-2 tokens) should have name tokens extracted.
     current_dev_strings = set(dev_aliases)
     if primary_dev and is_devanagari(primary_dev):
         current_dev_strings.add(primary_dev)
 
     for dev_str in list(current_dev_strings):
         if is_devanagari(dev_str):
-            # Compound epithets like "लिटिल आई", keep full compound, do not split into constituent common words
-            if dev_str.strip() in ("लिटिल आई", "व्हाइट वुल्फ़"):
-                continue
             tokens = [t.strip() for t in dev_str.split() if t.strip()]
             # Only full names (exactly 2 tokens) should have name tokens extracted
             if len(tokens) == 2:
@@ -390,23 +288,9 @@ def derive_devanagari_name(
                         continue
                     dev_aliases.add(tok)
 
-    # For compound epithets like "Little Eye" / "लिटिल आई":
-    # Do NOT add constituent single common words like "Eye", "Little", "आई", "एे" to aliases! Keep the full compound "लिटिल आई" / "Little Eye".
-    is_little_eye = "little eye" in eng_lower or any("little eye" in str(a).lower() for a in (aliases or []))
-    if is_little_eye:
-        dev_aliases.add("लिटिल आई")
-
     cleaned_dev_aliases = {
         da for da in dev_aliases
         if not _is_invalid_alias(da)
         and len(da) >= 3
     }
-    if is_little_eye:
-        cleaned_dev_aliases.discard("आई")
-        cleaned_dev_aliases.discard("एे")
-        cleaned_dev_aliases.discard("लिटिल")
-        cleaned_dev_aliases.discard("Eye")
-        cleaned_dev_aliases.discard("Little")
-        cleaned_dev_aliases.add("लिटिल आई")
-
     return primary_dev, sorted(list(cleaned_dev_aliases))

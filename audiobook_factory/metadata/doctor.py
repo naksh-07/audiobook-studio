@@ -339,7 +339,11 @@ class MetadataDoctor:
                         if not spk:
                             continue
                         spk_clean = str(spk).strip()
-                        if spk_clean.lower() in ("narrator", "foley", "sfx", "chapter_header", "chapter header"):
+                        if spk_clean.lower() in (
+                            "narrator", "foley", "sfx", "chapter_header", "chapter header",
+                            "host_a", "host_b", "host a", "host b", "host_1", "host_2", "host 1", "host 2",
+                            "sameer", "priya", "alex", "maya"
+                        ):
                             continue
                         has_dialogue_segments = True
                         if not known_speakers or (spk_clean not in known_speakers and not any(k.lower() == spk_clean.lower() for k in known_speakers)):

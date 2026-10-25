@@ -374,54 +374,78 @@ class PipelineOrchestrator:
         # Gate 2 & Gate 2.5: Script Schema and Dramatic Fidelity
         verify_pre_synthesis_gates(script_file, chap_stem, project_dir, chapter_num)
 
-        # 1. Synthesize speech segments via Gemini TTS (Token Bucket & Graceful Key Halting)
-        logger.info(f"[*] Synthesizing Chapter {chapter_num:02d} speech segments (Workers: {workers})...")
-        from audiobook_factory.key_manager import AllKeysExhaustedTodayError
-        import sys
-        synth_segments: List[Path] = []
-        try:
-            dispatcher = TTSDispatcher(
-                project_dir=project_dir,
-                default_voice=voice,
-                max_workers=workers,
-                allow_dynamic_cast=True,
+        # Synthesis & Editorial Mastering
+        use_legacy_dispatcher = os.environ.get("USE_LEGACY_TTS_DISPATCHER", "false").lower() in ("true", "1", "yes")
+
+        if not use_legacy_dispatcher:
+            # Modern Studio Pipeline: MultiCastStudioClient (4D Formants, 2-Speaker Rallies, Stage 12 Mastering)
+            logger.info(f"[*] Studio MultiCast Engine: Producing Chapter {chapter_num:02d} screenplay with rallies & EBU R128 mastering...")
+            from audiobook_factory.tts.facades.multi_cast_client import MultiCastStudioClient
+            cast_lock_path = project_dir / "casting" / "cast_lock.json"
+            if not cast_lock_path.exists():
+                cast_lock_path = project_dir / "book_bible.json"
+
+            client = MultiCastStudioClient()
+            master_res = client.produce_screenplay(
+                segments=script_data,
+                chapter_num=chapter_num,
+                output_dir=mastered_dir,
+                default_narrator_voice=voice,
+                cast_lock_file=cast_lock_path if cast_lock_path.exists() else None,
+                enable_dialogue_rallies=True,
             )
-            synth_segments = dispatcher.synthesize_chapter_script(script_file, chapter_num)
-        except AllKeysExhaustedTodayError as e:
-            if os.environ.get("ENABLE_EMERGENCY_FALLBACK", "").lower() in ("true", "1", "yes"):
-                logger.warning(f"  [EMERGENCY FALLBACK] Gemini key pool exhausted; emergency local WinRT fallback was applied.")
-                fallback_dispatcher = TTSDispatcher(
+            vocal_wav = master_res.master_audio_path
+            vocal_dur = master_res.duration_sec
+            segments = []
+        else:
+            # 1. Synthesize speech segments via Gemini TTS (Token Bucket & Graceful Key Halting)
+            logger.info(f"[*] Synthesizing Chapter {chapter_num:02d} speech segments (Workers: {workers})...")
+            from audiobook_factory.key_manager import AllKeysExhaustedTodayError
+            import sys
+            synth_segments: List[Path] = []
+            try:
+                dispatcher = TTSDispatcher(
                     project_dir=project_dir,
                     default_voice=voice,
-                    default_backend="winrt",
                     max_workers=workers,
                     allow_dynamic_cast=True,
                 )
-                synth_segments = fallback_dispatcher.synthesize_chapter_script(script_file, chapter_num)
-            else:
-                logger.error("\n[!] 🛑 SUPERVISOR AGENT HALT: ALL TTS API KEYS EXHAUSTED FOR TODAY.")
-                logger.error(f"[!] 🛑 {e}")
-                logger.info(f"[*] Progress Checkpoint safely stored on disk for Chapter {chapter_num:02d}.")
-                logger.info("[*] The system will gracefully halt now. Run the script again tomorrow after 12:30 PM IST (Midnight PT) to automatically resume.")
-                raise AllKeysExhaustedTodayError(
-                    f"Supervisor Halt: All TTS API keys exhausted today for Chapter {chapter_num:02d}. "
-                    "Progress safely checkpointed on disk."
-                ) from e
+                synth_segments = dispatcher.synthesize_chapter_script(script_file, chapter_num)
+            except AllKeysExhaustedTodayError as e:
+                if os.environ.get("ENABLE_EMERGENCY_FALLBACK", "").lower() in ("true", "1", "yes"):
+                    logger.warning(f"  [EMERGENCY FALLBACK] Gemini key pool exhausted; emergency local WinRT fallback was applied.")
+                    fallback_dispatcher = TTSDispatcher(
+                        project_dir=project_dir,
+                        default_voice=voice,
+                        default_backend="winrt",
+                        max_workers=workers,
+                        allow_dynamic_cast=True,
+                    )
+                    synth_segments = fallback_dispatcher.synthesize_chapter_script(script_file, chapter_num)
+                else:
+                    logger.error("\n[!] 🛑 SUPERVISOR AGENT HALT: ALL TTS API KEYS EXHAUSTED FOR TODAY.")
+                    logger.error(f"[!] 🛑 {e}")
+                    logger.info(f"[*] Progress Checkpoint safely stored on disk for Chapter {chapter_num:02d}.")
+                    logger.info("[*] The system will gracefully halt now. Run the script again tomorrow after 12:30 PM IST (Midnight PT) to automatically resume.")
+                    raise AllKeysExhaustedTodayError(
+                        f"Supervisor Halt: All TTS API keys exhausted today for Chapter {chapter_num:02d}. "
+                        "Progress safely checkpointed on disk."
+                    ) from e
 
-        # Gate 2.8: Pre-Mix Performance Fidelity Gate (Fail-Closed)
-        verify_performance_fidelity_gate(manifests_dir, chap_stem, chapter_num)
+            # Gate 2.8: Pre-Mix Performance Fidelity Gate (Fail-Closed)
+            verify_performance_fidelity_gate(manifests_dir, chap_stem, chapter_num)
 
-        # 2. Dialogue Editorial Layer & Dialogue Vocal Mastering
-        vocal_wav, vocal_dur, seg_durations, segments = process_and_master_dialogue_stem(
-            project_dir=project_dir,
-            chapter_num=chapter_num,
-            chap_stem=chap_stem,
-            script_data=script_data,
-            audio_dir=audio_dir,
-            mastered_dir=mastered_dir,
-            spatial_staging=spatial_staging,
-            segment_files=synth_segments,
-        )
+            # 2. Dialogue Editorial Layer & Dialogue Vocal Mastering
+            vocal_wav, vocal_dur, seg_durations, segments = process_and_master_dialogue_stem(
+                project_dir=project_dir,
+                chapter_num=chapter_num,
+                chap_stem=chap_stem,
+                script_data=script_data,
+                audio_dir=audio_dir,
+                mastered_dir=mastered_dir,
+                spatial_staging=spatial_staging,
+                segment_files=synth_segments,
+            )
 
         # 3. Vocals-Only Master Chapter Encoding (-19 LUFS AAC)
         mastered_out = mastered_dir / f"{chap_stem}_mastered.m4a"

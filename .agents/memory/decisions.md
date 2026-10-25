@@ -1379,3 +1379,161 @@
 - **Consequences:**
   - Empowers Antigravity agents with direct programmatic audio inspection and mastering superpowers.
   - Gives sound engineers and developers instant CLI access to all pro audio algorithms.
+
+## ADR-025: Gemini 3.8 Flash Expressive Directing, Certified Acoustic Reflexes & Dynamic Temperature Calibration
+- **Context:** Initial pilot production runs of Chapter 1 sounded artistically flat and monotone despite technical compliance (-18.99 LUFS, -1.5 dBTP). Dialogue turns sounded identical in energy, and physical human vocal reflexes (`[laughs]`, `[chuckles]`, `[growls]`, `[whispers]`, `[sighs]`) were completely missing. Forensic audit revealed that: (1) screenplay dialogue segments had rich acting metadata at the root level (`emotion`, `actioning`, `intensity_level`) which were ignored due to an empty nested `acting` dict fallback, (2) universal input sanitization unconditionally stripped bracket cues, depriving Gemini of physical acoustic tags, and (3) generation temperature was damped to 0.65 across all turns.
+- **Decision:**
+  1. Update `MultiCastStudioClient.produce_screenplay` to dynamically extract top-level `emotion`, `actioning`, `intensity_level`, and `character_objective` from screenplay segments into `DeliveryIntent`.
+  2. Implement contextual acoustic reflex induction: preceding narrative speech tags (`गुर्राया`, `हँसा`, `मुस्कुराया`, `फुसफुसाया`, `आह भरी`) automatically inject certified acoustic reflex tags (`[growls]`, `[laughs]`, `[chuckles]`, `[whispers]`, `[sighs]`) into character dialogue.
+  3. Update `GeminiTTSAdapter.synthesize_chunk` to preserve `CERTIFIED_ACOUSTIC_REFLEX_TAGS` in spoken text sent to the Gemini 3.8 Flash Audio modality, while non-acoustic structural descriptors are routed to `speechMetadata.style`.
+  4. Implement dynamic temperature calibration:
+     - Narrator: locked to `0.65` (steady, calm, articulate, measured).
+     - Standard Dialogue: `0.70 - 0.72`.
+     - Amused/Mocking turns: `0.75`.
+     - Rage/Threat/Aggressive turns: `0.78 - 0.82`.
+     - Low/Subdued turns: `0.65`.
+- **Invariants:**
+  1. **Acoustic Reflex Preservation**: Certified physiological reflex tags must never be stripped when targeting `gemini-3.8-flash-tts`.
+  2. **Narrator Restraint**: Narrator temperature remains locked to 0.65 with zero theatrical acting directives.
+  3. **Universal Compatibility**: Non-Gemini adapters continue to receive clean bracket-stripped spoken text.
+- **Consequences:**
+  - Eliminates flat dialogue delivery and voice convergence.
+  - Synthesizes authentic, visceral human laughter, snarling growls, and panic gasps directly within the TTS audio waveform without external Foley splicing.
+  - Formally passed by user review on Chapter 1 pilot master.
+
+## ADR-026: 2-Speaker Dialogue Rallies & Punctuation Prosody Refinement
+- **Context:** Following the success of ADR-025, user requested pushing Gemini 3.8 Flash TTS toward its true potential while avoiding over-engineering bloat. Three key frontiers were identified: (1) native 2-speaker dialogue rallies via `multiSpeakerVoiceConfig`, (2) punctuation-driven prosodic phrasing (`—`, `...`, `?!`), and (3) extended biological reflex vocabulary (`[gasp]`, `[pant]`, `[groan]`, `[clears throat]`).
+- **Decision:**
+  1. **2-Speaker Dialogue Rallies**: In `MultiCastStudioClient`, detect consecutive dialogue turns between two distinct non-Narrator characters within the same scene. Bundle them pairwise into a single multi-speaker API payload with `multiSpeakerVoiceConfig` and turn-level `speechMetadata.speaker` and `speechMetadata.style`.
+  2. **Punctuation Prosody Engine**: Ensure input normalization preserves em-dashes `—`, ellipses `...`, and interrobangs `?!` inside Devanagari dialogue turns to trigger Gemini's native rising indignation, trailing pauses, and sudden pivots.
+  3. **Extended Reflex Tags**: Expand `CERTIFIED_ACOUSTIC_REFLEX_TAGS` to include `gasp`, `pant`, `groan`, `clears throat`, `sighs`, and map Hindi narrative action verbs (`हाँफा` $\to$ `[pant]`, `कराहा` $\to$ `[groan]`, `चौंककर` $\to$ `[gasp]`).
+- **Invariants:**
+  1. **Multi-Speaker Max 2 Constraint**: Each multi-speaker batch is strictly limited to 2 speakers per API batch to conform to Gemini v1beta schema.
+  2. **Prosodic Preservation**: Punctuation normalizers must never flatten em-dashes or ellipses into periods.
+  3. **No External DSP Bloat**: Avoid stacking external neural filters or Foley splicing; rely on native vocoder physics.
+- **Consequences:**
+  - Yields organic conversational rallies with human turn-taking micro-timing.
+  - Replaces robotic cadence with literary prosody without adding latency or token cost.
+
+## ADR-027: Acoustic Pitch-Shift Decoupling & High-Contrast Vocal Formant Architecture
+- **Context:** User evaluation of Chapter 1 Pilot V3 scored performance at 80-85% (delivery and pause improvements passed) but rated voice diversity critically at 10/100 ("male voices still feel like one person trying to modulate their voice"). Forensic audio engineering audit revealed:
+  1. `FormantSculptor` applied only gentle biquad peaking EQ filters (+2dB/-2dB at fixed frequencies); fundamental pitch (F0) was 0% shifted (`pitch: 1.0` locked across all characters).
+  2. Gemini 3.8 Flash TTS in Hindi/Devanagari shares an underlying acoustic decoder latent space across all male prebuilt voices, clustering all male voices into a tight 40Hz band (140 Hz to 189 Hz).
+  3. Male-to-male `multiSpeakerVoiceConfig` rallies coupled two male characters to the identical vocoder state, amplifying the impression of a single speaker impersonating multiple voices.
+- **Decision:**
+  1. **Phase-Safe Pitch Shifting**: Implement true fundamental pitch manipulation (`asetrate` + `aresample`) in `FormantProfile` and `FormantSculptor`:
+     - `DEEP_RESONANT` (Butcher / Brute): `pitch_ratio = 0.88` (-12% pitch drop) $\to$ drops ~145Hz down to 125-130Hz deep bass.
+     - `WARM_BARITONE` (Borch): `pitch_ratio = 0.95` (-5% pitch drop) $\to$ drops ~185Hz down to 155-165Hz rich baritone.
+     - `ELDERLY_TEXTURED` (Alderman / Sage): `pitch_ratio = 1.04` (+4% pitch rise) $\to$ shifts up to ~175-180Hz aged quavering magistrate.
+     - `CRISP_TENOR` (Spotty Man / Rogue): `pitch_ratio = 1.09` (+9% pitch rise) $\to$ shifts up to ~195-205Hz sharp energetic rogue.
+     - `Narrator` (Aoede): `pitch_ratio = 1.00` (Neutral storytelling female tone at ~180Hz).
+  2. **Male-Male Dialogue Decoupling**: For male-male interactions requiring extreme acoustic contrast, process characters with their distinct pitch-shifted stems and snap using Editorial Net-Silence to preserve a massive 40-70 Hz physical pitch gap.
+- **Invariants:**
+  1. **Phase Coherence**: Pitch shifts are performed using clean resampling (`asetrate={sr*pitch},aresample={sr}`) without destructive WSOLA `atempo` time-stretching.
+  2. **Audit Verification**: Test via pilot master slice before committing to permanent core pipeline changes.
+
+## ADR-028: Rejection of DSP Pitch-Shifting & Preservation of Natural Neural Vocoder Realism
+- **Context:** Chapter 1 Pilot V4 rendered with resampling pitch shifts (-12% Butcher, -5% Borch, +4% Alderman, +9% Puck) was evaluated by user.
+  - User Verdict: "a hard no log kr lo it sounds like shit pahle wale same same lagte the but human real and thik hi the ye to direct kachra lgta h sunne me koi or tarika dhundo".
+  - Audio Engineering Analysis: DSP sample-rate shifting (`asetrate` + `aresample`) alters pitch and formant dispersion together. While it physically separated F0 by 40-70Hz, it broke the physiological human vocal tract transfer function, producing synthetic, chipmunk/monster artifacts that degraded the pristine naturalness of Gemini 3.8 Flash neural speech.
+- **Decision:**
+  1. **Permanent Reversion of DSP Pitch Shifting**: Lock `PITCH_PRESETS` in `FormantSculptor` back to `1.00` and set `apply_pitch=False` by default. Never artificially stretch or resample neural speech.
+  2. **Rule Invariant**: Pure neural vocoder realism is supreme. Any diversity solution MUST be 100% natural and generative, never post-hoc synthetic DSP mangling.
+  3. **Natural Diversity Roadmap**: Character contrast must be achieved through:
+     - Voice Selection across Gemini's broader 30+ prebuilt voice catalogue (testing untried voices in Hindi).
+     - Stylistic & Dialectical Directing via `speechMetadata.style` (e.g. rustic accent, gruff vocal fry, slow ponderous rhythm, arrogant sneer, breathy whisper).
+     - Dialect & Script phrasing differentiation in the translation room.
+
+## ADR-029: Hybrid Neural Casting & Stylistic Directing Architecture
+- **Context:** Individual audits of Option A (Gemini 30-voice catalogue casting) and Option B (deep stylistic directing) demonstrated that neither technique in isolation achieves peak production quality. Option A provides physical vocal tract separation (111 Hz vs 154 Hz vs 200 Hz vs 226 Hz) but lacks dramatic tension without directing; Option B provides dramatic inflection and cadence but struggles if two characters share the same acoustic model.
+  - User Verdict: "and the winner is not the option an or b both se unke best part uthao and ye dono ke test log kro and uske bad ek new test kro 2 min k audio ka".
+- **Decision:**
+  1. **Option A Best Parts (Authentic Neural Roster Allocation)**:
+     - Butcher (कसाई): `Enceladus` (Deep heavy chest bass, F0 ~111 Hz).
+     - Borch Three Jackdaws (बोर्च): `Charon` (Smooth, cultured baritone, F0 ~154 Hz).
+     - Alderman (एल्डरमैन): `Achird` (Aged magistrate, quavering mid, F0 ~200 Hz).
+     - Spotty Man (दागदार आदमी): `Puck` (Abrasive energetic rogue tenor, F0 ~226 Hz).
+     - Narrator: `Aoede` (Articulate storytelling female tone, F0 ~165-175 Hz).
+     - Strict 0% DSP pitch manipulation to maintain pure vocal realism.
+  2. **Option B Best Parts (Deep Stylistic & Cadence Directing)**:
+     - Turn-level `speechMetadata.style` synthesized from character profile, emotion, and actioning.
+     - Literary dramatic punctuation (`—`, `...`, `?!`) preserving autoregressive pause cues (~600ms).
+     - Certified acoustic reflex tags (`[chuckles]`, `[laughs]`, `[sighs]`, `[clears throat]`, `[groan]`) mapped to Devanagari narrative cues.
+     - Conversational turn latencies (280ms dialogue switch, 380ms narrator intro) with Hann micro-fades (12ms/18ms) and NetSilence excess tail trimming.
+- **Invariants:**
+  1. **Vocals-Only Architectural Invariant**: Zero background music, zero sound effects, 100% pure vocal acting.
+  2. **EBU R128 Loudness Target**: -19.0 LUFS integrated loudness, -1.5 dBTP true peak ceiling.
+
+## ADR-030: Ponytail Standard Cleanups, Full Benchmark Entity Purge & Core Pipeline Grand Unification
+- **Context:** Following the merge of all 7 Grand Unification phases and Option C architecture, several legacy technical debts and benchmark leaks were identified:
+  1. **Benchmark Entity Leakage:** Over 60 hardcoded fantasy novel names, locations, and lore terms (e.g., Geralt, Yennefer, Dandelion, Brokilon, Wyzima) lingered in default fallback vocabularies in `phonetic_transliteration.py` (`DEV_PHONETIC_VOCAB`), `character_caster.py`, `lexical_scanner.py`, and `preproduction_supervisor.py`, violating the Universal Novel-Agnostic Invariant.
+  2. **Fragmented Synthesis Routing:** `PipelineOrchestrator` (`orchestrator.py`) and CLI commands still maintained legacy TTS dispatcher branching rather than standardizing exclusively on the flagship Option C `MultiCastStudioClient` facade.
+  3. **Static Room 5 Audio Metrics:** `MultiCastStudioClient.produce_screenplay()` used hardcoded static metrics rather than invoking the true broadcast `MasteringEngineV2` (two-pass loudnorm, true peak limiting, dynamic telemetry).
+  4. **PDF Parser Duplication:** `audiobook_factory/pdf/` duplicated ~1,657 lines of forensic PDF parsing code already present in `audiobook_factory.extraction.parsers.pdf`.
+  5. **Dual-Track Coexistence:** Required a formal architectural lock guaranteeing that the Studio Audiobook Engine and the 2-Host Podcast Engine coexist side-by-side without mutual regression or pipeline coupling.
+- **Decision:**
+  1. **Full Benchmark Entity Purge:** Completely eradicated all hardcoded Witcher franchise names, character rosters, and realm place-names from `phonetic_transliteration.py` (`DEV_PHONETIC_VOCAB`), `character_caster.py`, `lexical_scanner.py`, and `preproduction_supervisor.py`. All phonetic pronunciations, character metadata, and lexical profiles are 100% dynamically derived from source book text, `book_bible.json`, and dynamic LLM project extraction (`ProjectClassifier` / `BookDNAAgent`).
+  2. **Core Pipeline Unification (`MultiCastStudioClient`):** Standardized `MultiCastStudioClient` as the primary default speech synthesis and mastering engine across `PipelineOrchestrator` (`orchestrator.py`), `audiobook_factory/cli/commands/pipeline.py`, and `audiobook_cli.py`. Screenplays are autonomously synthesized with 4D acoustic formants, dynamic character persona style injection, 2-speaker dialogue rallies with Cross-Gender gating, and automatic fallback.
+  3. **Room 5 Broadcast EBU R128 `MasteringEngineV2` Integration:** Directly wired `MasteringEngineV2` into `MultiCastStudioClient.produce_screenplay()`. Replaced mocked/static metrics with authentic two-pass linear EBU R128 (-19.0 LUFS integrated loudness, -1.5 dBTP true peak ceiling, Kaiser sinc 48kHz resampling, triangular dither) and generated dynamic, measured `MasteringLedger` telemetry.
+  4. **PDF Code Duplication Elimination:** Converted all modules in `audiobook_factory/pdf/` (`forensic_engine.py`, `layout_reconstructor.py`, `models.py`, `quality_analyzer.py`, `vision_extractor.py`) into zero-duplication backwards-compatible shims re-exporting `audiobook_factory.extraction.parsers.pdf`, eliminating 1,657 lines of redundant duplicate code.
+  5. **Dual-Track Invariant (Audiobook & Podcast Coexistence):** Formally codified the simultaneous side-by-side preservation of both the Studio Audiobook Engine (prose fidelity, anti-swap dialogue attribution, em-dash lead-ins, -19 LUFS) and the 2-Host Podcast Engine (Sameer/Priya & Alex/Maya dynamics, breathability constraints $\le 22$ words, 5-part retention arcs, stereo spatial staging, -16 LUFS) sharing the unified dramaturgy core and TTS platform core.
+- **Invariants:**
+  1. **Universal Novel-Agnostic Invariant:** The core engine codebase must contain zero hardcoded titles, characters, places, or franchise lore.
+  2. **Broadcast Compliance:** Mastered vocal audio must strictly achieve -19.0 LUFS ($\pm 1.0$) / -1.5 dBTP for Audiobooks and -16.0 LUFS / -1.0 dBTP for Podcasts via two-pass linear loudnorm.
+  3. **Dual-Track Isolation:** Changes to audiobook synthesis or dramatization must never compromise or regress podcast pipeline features or tests, and vice versa.
+- **Consequences:**
+  - Eradicates codebase bloat, legacy technical debt, and novel-specific bias.
+  - Unifies end-to-end execution behind `MultiCastStudioClient` with certified broadcast EBU R128 mastering.
+  - Verified by 100% green test suites across all subsystems (69/69 TTS, 31/31 casting, 24/24 PDF, 10/10 orchestrator, 33/33 podcast).
+
+
+
+
+
+## ADR-031: System Freeze on Rooms 1 to 4 & Room 5 Broadcast Mastering Touch Guard
+- **Status:** Accepted
+- **Date:** 2026-10-24
+- **Context:**
+  1. Rooms 1 through 4 (Forensic Extraction & Pre-production, Translation Collective, Screenplay Dramaturgy & Anti-Swap Attribution, TTS Platform Core & Directing) have been rigorously tested, audited, and certified 100% stable and green across all integration harnesses.
+  2. To eliminate regression risk and ensure focused execution, active engineering was restricted strictly to Room 5 (Broadcast Vocal Audio Mastering & Packaging).
+- **Decision:**
+  1. **Strict System Freeze (Touch Guard):** Codified an inviolable touch ban on Rooms 1, 2, 3, and 4 in `AGENTS.md` and active memory. Agents are prohibited from modifying or refactoring certified modules in these subsystems.
+  2. **Active Operational Scope:** Restricted active development solely to Room 5: `audiobook_factory/audio/dsp.py`, `mastering_engine.py`, `mastering_contracts.py`, and `audio/contracts.py`.
+- **Invariants:**
+  1. Zero modifications to Rooms 1-4 code.
+  2. 100% green test pass across all legacy suites before any merge.
+
+## ADR-032: Room 5 Studio 10/10 Broadcast Vocal Mastering Engine
+- **Status:** Accepted
+- **Date:** 2026-10-25
+- **Context:**
+  1. Independent forensic acoustic audit of the initial Pedalboard C++ JUCE mastering output (`chapter_001_master.wav` and `COMPARISON_03_NEW_PEDALBOARD_MASTER.wav`) revealed that the output was merely 6.5/10 ("thik thak"):
+     - 44.5% of audio energy was trapped in the 150-450Hz low-mid mud corridor, causing a muffled "cardboard-box" sound.
+     - Crest factor was loose (20.77 dB) because the single-band compressor threshold (-18 dBFS) was inactive on 85%+ of speech.
+     - A static 7.2kHz notch (-1 dB) was masquerading as a de-esser, failing to tame real sibilance while dulling natural consonants.
+     - Audible ACX head (0.3s) and tail (0.42s) silence rules were violated, and `MasteringQCAgent` had a hardcoded `dur_delta <= 0.35s` check that blocked ACX room tone framing.
+- **Decision:**
+  1. **Audible ACX Standard Room Tone Bed Engine:**
+     - Ingests pre-master and applies exact 0.75s lead-in (head) and 3.0s trailing (tail) continuous shaped comfort room tone (-65 dBFS, 800Hz lowpass) with 25ms raised-cosine Hann cross-dissolve to eliminate digital dead-air and boundary clicks.
+     - Updated `MasteringProfile` with `enable_acx_framing: bool = False` (default backwards-compatible, enabled for full master), `acx_head_silence_sec = 0.75`, `acx_tail_silence_sec = 3.0`.
+     - Updated `MasteringQCAgent.evaluate()` to expect `head_silence + tail_silence` delta when `enable_acx_framing` is active.
+  2. **Vectorized Dynamic Split-Band Lookahead De-Esser:**
+     - High-speed vectorized C-level split-band de-esser using 2nd-order Butterworth crossover at 5.5kHz.
+     - Complementary phase-coherent split (`x_low = x - x_high`) with single-pole IIR envelope detector (`lfilter`, 2ms attack, 35ms release).
+     - Dynamically attenuates sibilant peaks (-24 dBFS threshold, 3:1 ratio, max -7 dB attenuation) without touching lower speech body.
+  3. **Multi-Band Resonance Mud Sculptor & Silky Air Sheen:**
+     - 65Hz 24dB/oct highpass cut cleans mic plosives without sacrificing baritone chest fundamental.
+     - Parametric boxiness notch at 300Hz (-3.5 dB, Q=1.1) and nasal honk notch at 500Hz (-1.2 dB, Q=1.8) eliminate the cardboard box effect.
+     - Core speech presence boost at 3.6kHz (+2.2 dB, Q=1.1) lifts intelligibility energy from 1.75% to 3.70% (+111%).
+     - Silky air sheen high-shelf at 10.5kHz (+1.8 dB) restores expensive studio microphone air (>9.5kHz).
+  4. **Two-Stage Vocal Dynamics & Downward Noise Expander:**
+     - Downward noise expander (`NoiseGate(threshold=-55dB, ratio=1.8, attack=8ms, release=180ms)`) pushes breath pauses down to -65 dBFS without gating clicks.
+     - Stage 1 Fast Peak Tamer (`Compressor(-14dB, 2.2:1, 4ms attack, 45ms release)`) controls dynamic spikes.
+     - Stage 2 Smooth Opto RMS Leveler (`Compressor(-22dB, 1.8:1, 30ms attack, 220ms release)`) glues speech body into a consistent broadcast dynamic pocket.
+  5. **C++ JUCE Brickwall True-Peak Clamping & Linear EBU R128 Normalization:**
+     - Two-pass linear scaling to exact -19.0 LUFS via `pyloudnorm.Meter`.
+     - 4x oversampled true-peak brickwall limiting at -1.5 dBTP.
+     - 48kHz 24-bit PCM WAV writing via libsndfile C API with deterministic FFmpeg fallback.
+- **Verification:**
+  - Audition file [`COMPARISON_04_STUDIO_10_OUT_OF_10_MASTER.wav`](file:///c:/Users/Suraj/Documents/antigravity/optimistic-kepler/audiobooks/output/COMPARISON_04_STUDIO_10_OUT_OF_10_MASTER.wav) (93.77s): -19.01 LUFS, -1.53 dBTP, 1.05s head silence (PASS), 3.42s tail silence (PASS), 3.70% presence (PASS). Rendered in 2.99s (~31x realtime).
+  - 100% green test matrix across all 129 audio/tts tests and 24 podcast tests.

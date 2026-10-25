@@ -396,8 +396,8 @@ class PreProductionSupervisor:
             )
             # 2. Relocate known geographical regions or place indicator nouns (regardless of stopword status)
             if not is_origin_person and (
-                any(geo in c_name_lower for geo in ("brokilon", "wyzima", "cintra", "blaviken", "novigrad", "skellige", "ellander"))
-                or any(ind in c_name_lower for ind in place_indicators)
+                any(ind in c_name_lower for ind in place_indicators)
+                # dynamic place indicators check
             ):
                 relocated_locations[c_name] = c.get("hindi_name") or c_name
                 logger.info(f"  [Room 1 Sanitization] Relocated place candidate '{c_name}' to book_bible.locations.")
@@ -550,92 +550,10 @@ class PreProductionSupervisor:
         bible.objects.update(lexicon_data.get("objects", {}))
         bible.terminology.update(lexicon_data.get("terminology", {}))
 
-        # Explicitly preserve Brokilon in locations if present in novel or world lore
-        loc_keys_lower = {k.lower() for k in list(bible.locations.keys()) + list(relocated_locations.keys())}
-        if "brokilon" in full_corpus_text.lower() or "brokilon" in loc_keys_lower or any("brokilon" in k for k in loc_keys_lower):
-            bible.locations["Brokilon"] = "ब्रोकिलोन"
-
-        # Ensure Alderman is in bible.characters as an active speaking character (gender="male", hindi_name="एल्डरमैन")
-        alderman_present = (
-            re.search(r"\balderman\b", full_corpus_text, re.IGNORECASE) is not None
-            or any("alderman" in k.lower() for k in bible.terminology.keys())
-            or any("alderman" in k.lower() for k in bible.titles.keys())
-            or any("alderman" in (c.english_name or "").lower() for c in bible.characters.values())
-        )
-        if alderman_present:
-            ald_key = next((k for k in bible.characters if k.lower() == "alderman"), "Alderman")
-            if ald_key not in bible.characters:
-                c_mentions = lexical_index.get_mention_count("Alderman", ["Town Alderman"]) if lexical_index else 5
-                c_first_ch = lexical_index.get_first_chapter("Alderman") if lexical_index else 1
-                bible.characters["Alderman"] = BookEntity(
-                    canonical_name="Alderman",
-                    english_name="Alderman",
-                    hindi_name="एल्डरमैन",
-                    gender="male",
-                    aliases=["Town Alderman", "नगर प्रमुख", "एल्डरमैन"],
-                    sociolect_archetype="disciplined town official",
-                    speech_quirks="",
-                    default_honorific_level="tum",
-                    provenance=EpistemicProvenance(
-                        origin="CORPUS_EXTRACTED",
-                        first_chapter=c_first_ch,
-                        corpus_mention_count=max(5, c_mentions),
-                        evidence_quote="Have you forgotten, Alderman...",
-                    ),
-                )
-            else:
-                bible.characters[ald_key].gender = "male"
-                bible.characters[ald_key].hindi_name = "एल्डरमैन"
-                if not bible.characters[ald_key].sociolect_archetype:
-                    bible.characters[ald_key].sociolect_archetype = "disciplined town official"
-
-        # Ensure Téa (Zerrikanian warrior companion to Borch and Véa) is in bible.characters
-        tea_present = (
-            re.search(r"\b(?:téa|tea)\b", full_corpus_text, re.IGNORECASE) is not None
-            or any(k.lower() in ("téa", "tea", "तेया") for k in bible.characters.keys())
-            or any("téa" in (c.english_name or "").lower() or "tea" in (c.english_name or "").lower() for c in bible.characters.values())
-        )
-        if tea_present:
-            tea_key = next((k for k in bible.characters if k.lower() in ("téa", "tea", "तेया")), "Téa")
-            c_mentions = lexical_index.get_mention_count("Téa", ["Tea", "तेया"]) if lexical_index else 5
-            c_first_ch = lexical_index.get_first_chapter("Téa") if lexical_index else 1
-            if tea_key not in bible.characters:
-                bible.characters["Téa"] = BookEntity(
-                    canonical_name="Téa",
-                    english_name="Téa",
-                    hindi_name="तेया",
-                    gender="female",
-                    aliases=["Tea", "Téa", "तेया", "Zerrikanian Warrior"],
-                    sociolect_archetype="warrior companion",
-                    speech_quirks="Sparse foreign utterances, fierce silence.",
-                    default_honorific_level="tum",
-                    assigned_voice="Achernar",
-                    is_child=False,
-                    provenance=EpistemicProvenance(
-                        origin="CORPUS_EXTRACTED",
-                        first_chapter=c_first_ch,
-                        corpus_mention_count=max(5, c_mentions),
-                        evidence_quote="Téa, walking two steps behind him, feigning boredom...",
-                    ),
-                )
-            else:
-                bible.characters[tea_key].gender = "female"
-                bible.characters[tea_key].hindi_name = "तेया"
-                bible.characters[tea_key].is_child = False
-                if not getattr(bible.characters[tea_key], "assigned_voice", None):
-                    bible.characters[tea_key].assigned_voice = "Achernar"
-                for a in ["Tea", "Téa", "तेया"]:
-                    if a not in bible.characters[tea_key].aliases:
-                        bible.characters[tea_key].aliases.append(a)
-
-        # Final purge of any stopword or relocated location from bible.characters
-        loc_names_lower = {loc.lower() for loc in bible.locations.keys()} | {
-            "brokilon", "wyzima", "cintra", "blaviken", "novigrad", "skellige", "ellander"
-        }
+        # Clean any stopword or relocated location from bible.characters
+        loc_names_lower = {loc.lower() for loc in bible.locations.keys()}
         for eng_name in list(bible.characters.keys()):
             eng_low = eng_name.lower()
-            if eng_low in ("téa", "tea", "तेया", "alderman", "एल्डरमैन"):
-                continue
             if is_stopword(eng_name) or eng_name in bible.locations or eng_low in loc_names_lower:
                 del bible.characters[eng_name]
 
